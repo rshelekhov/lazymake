@@ -22,9 +22,14 @@ func init() {
 	rootCmd.Flags().StringP("file", "f", "Makefile", "Path to Makefile")
 	rootCmd.Flags().StringP("theme", "t", "default", "Color theme")
 
-	// TODO: fix unhandled error warning
-	viper.BindPFlag("makefile", rootCmd.Flags().Lookup("file"))
-	viper.BindPFlag("theme", rootCmd.Flags().Lookup("theme"))
+	if err := viper.BindPFlag("makefile", rootCmd.Flags().Lookup("file")); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error binding makefile flag: %v\n", err)
+		os.Exit(1)
+	}
+	if err := viper.BindPFlag("theme", rootCmd.Flags().Lookup("theme")); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error binding theme flag: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func run(cmd *cobra.Command, args []string) error {
