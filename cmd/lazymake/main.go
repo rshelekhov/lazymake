@@ -1,0 +1,51 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rshelekhov/lazymake/config"
+	"github.com/rshelekhov/lazymake/internal/tui"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "lazymake",
+	Short: "A beautiful TUI for running Makefile targets",
+	Long:  `Lazymake is a terminal user interface for browsing and executing Makefile targets.`,
+	RunE:  run,
+}
+
+func init() {
+	rootCmd.Flags().StringP("file", "f", "Makefile", "Path to Makefile")
+	rootCmd.Flags().StringP("theme", "t", "default", "Color theme")
+
+	// TODO: fix unhandled error warning
+	viper.BindPFlag("makefile", rootCmd.Flags().Lookup("file"))
+	viper.BindPFlag("theme", rootCmd.Flags().Lookup("theme"))
+}
+
+func run(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	m := tui.NewModel(cfg.MakefilePath)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
