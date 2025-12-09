@@ -14,10 +14,19 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
 - **Lack of visibility**: No easy way to see execution time, dependencies, or what commands will actually run
 - **Frustrating errors**: Common issues like "missing separator" are cryptic and hard to debug
 
-## Planned Features
+## Features
 
-### High Priority
-- **Self-documenting help system**: Extract and display inline comments from Makefile targets
+### ✅ Implemented
+- **Self-documenting help system**: Automatically extracts and displays comments from Makefile targets
+  - Supports industry-standard `##` comments for documentation
+  - Backward compatible with single `#` comments
+  - Inline comments (e.g., `build: ## Build the app`) take priority
+  - Press `?` to toggle help view showing all documented targets
+  - Visual distinction: cyan for `##` documented targets, gray for regular comments
+
+### Planned
+
+#### High Priority
 - **Dependency graph visualization**: See which targets will execute and in what order
 - **Search & filtering**: Real-time fuzzy search for targets, filter by recently used or favorites
 - **Performance profiling**: Track execution time and build history to identify slow targets
@@ -81,4 +90,42 @@ lazymake -f path/to/Makefile
 lazymake -t <theme-name>
 ```
 
+### Keyboard Shortcuts
+
+- `↑/↓` or `j/k` - Navigate targets
+- `Enter` - Execute selected target
+- `?` - Toggle help view
+- `/` - Filter/search targets
+- `esc` - Return to list view (from help or output)
+- `q` or `ctrl+c` - Quit
+
 Configuration can be set via `.lazymake.yaml` in your project directory.
+
+## Writing Self-Documenting Makefiles
+
+lazymake supports the industry-standard `##` convention for documenting Makefile targets. Use `##` comments to mark targets for documentation:
+
+```makefile
+.PHONY: build test deploy
+
+build: ## Build the application
+	go build -o app main.go
+
+test: ## Run all tests
+	go test ./...
+
+## Deploy to production
+deploy:
+	./scripts/deploy.sh
+```
+
+**Comment styles:**
+- `##` - Industry standard for documentation (shown in cyan)
+- `#` - Regular comments (shown in gray, backward compatible)
+- Inline comments (after `:`) override preceding comments
+
+**Best practices:**
+- Use `##` for targets you want to document for other developers
+- Use `#` for internal implementation notes
+- Keep descriptions concise (one line)
+- Place inline comments for quick reference: `target: ## Description`

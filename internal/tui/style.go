@@ -32,6 +32,11 @@ var (
 				Foreground(MutedColor).
 				PaddingLeft(3)
 
+	// DocDescriptionStyle is used for ## documented comments (industry standard)
+	DocDescriptionStyle = lipgloss.NewStyle().
+				Foreground(SecondaryColor). // Cyan to distinguish from regular comments
+				PaddingLeft(3)
+
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(ErrorColor).
 			Bold(true).

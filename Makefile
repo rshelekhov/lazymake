@@ -1,36 +1,28 @@
 .PHONY: build install test clean run release snapshot
 
-# Build the application
-build:
+build: ## Build the application
 	go build -o lazymake cmd/lazymake/main.go
 
-# Install to GOPATH/bin (requires GOPATH/bin in PATH)
-install:
+install: ## Install to GOPATH/bin (requires GOPATH/bin in PATH)
 	go install ./cmd/lazymake
 
-# Install to /usr/local/bin (requires sudo)
-install-system:
+install-system: ## Install to /usr/local/bin (requires sudo)
 	go build -o lazymake cmd/lazymake/main.go
 	sudo mv lazymake /usr/local/bin/
 
-# Run the application without installing
-run:
+run: ## Run the application without installing
 	go run cmd/lazymake/main.go
 
-# Run all tests
-test:
+test: ## Run all tests
 	go test ./...
 
-# Clean build artifacts
-clean:
+clean: ## Clean build artifacts
 	rm -f lazymake
 
-# Test release build locally (doesn't publish)
-snapshot:
+snapshot: ## Test release build locally (doesn't publish)
 	goreleaser release --snapshot --clean
 
-# Create a new release (requires git tag)
-release:
+release: ## Create a new release (requires git tag)
 	@echo "To create a release:"
 	@echo "1. Create and push a tag: git tag -a v0.1.0 -m 'Release v0.1.0'"
 	@echo "2. Push the tag: git push origin v0.1.0"

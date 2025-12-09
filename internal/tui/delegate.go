@@ -6,12 +6,14 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rshelekhov/lazymake/internal/makefile"
 )
 
-// Target represents a Makefile target
+// Target represents a Makefile target in the TUI
 type Target struct {
 	Name        string
 	Description string
+	CommentType makefile.CommentType
 }
 
 // Implement list.Item interface
@@ -42,9 +44,15 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	}
 
 	if target.Description != "" {
-		str += "\n" + DescriptionStyle.Render(target.Description)
+		// Use different styles based on comment type
+		// ## comments use cyan (industry standard for documentation)
+		// # comments use gray (backward compatibility)
+		descStyle := DescriptionStyle
+		if target.CommentType == makefile.CommentDouble {
+			descStyle = DocDescriptionStyle
+		}
+		str += "\n" + descStyle.Render(target.Description)
 	}
 
-	// TODO: fix unhandled error warning
-	fmt.Fprint(w, str)
+	_, _ = fmt.Fprint(w, str)
 }

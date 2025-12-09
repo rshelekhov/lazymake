@@ -12,6 +12,7 @@ const (
 	StateList AppState = iota
 	StateExecuting
 	StateOutput
+	StateHelp
 )
 
 type Model struct {
@@ -24,6 +25,7 @@ type Model struct {
 	ExecutingTarget string
 	Output          string
 	ExecutionError  error
+	Targets         []Target // Store targets for help view
 
 	// Dimensions
 	Width  int
@@ -38,12 +40,17 @@ func NewModel(makefilePath string) Model {
 		return Model{Err: err}
 	}
 
+	// Convert targets to TUI format
+	tuiTargets := make([]Target, len(targets))
 	items := make([]list.Item, len(targets))
 	for i, t := range targets {
-		items[i] = Target{
+		tuiTarget := Target{
 			Name:        t.Name,
 			Description: t.Description,
+			CommentType: t.CommentType,
 		}
+		tuiTargets[i] = tuiTarget
+		items[i] = tuiTarget
 	}
 
 	delegate := ItemDelegate{}
@@ -54,7 +61,8 @@ func NewModel(makefilePath string) Model {
 	l.Styles.Title = TitleStyle
 
 	return Model{
-		List:  l,
-		State: StateList,
+		List:    l,
+		State:   StateList,
+		Targets: tuiTargets,
 	}
 }
