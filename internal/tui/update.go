@@ -12,92 +12,121 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// If there's an error in the model, handle window size and quit commands
 	if m.Err != nil {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			}
-		case tea.WindowSizeMsg:
-			m.Width = msg.Width
-			m.Height = msg.Height
-		}
-		return m, nil
+		return m.updateError(msg)
 	}
 
-	var cmd tea.Cmd
+	switch m.State {
+	case StateList:
+		return m.updateList(msg)
+	case StateOutput:
+		return m.updateOutput(msg)
+	case StateHelp:
+		return m.updateHelp(msg)
+	case StateExecuting:
+		return m.updateExecuting(msg)
+	default:
+		return m, nil
+	}
+}
 
+func (m Model) updateError(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.State == StateOutput {
-			// In output view, handle viewport scrolling and navigation
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "esc":
-				m.State = StateList
-				return m, nil
-			}
-
-			m.Viewport, cmd = m.Viewport.Update(msg)
-			return m, cmd
-		}
-
-		if m.State == StateHelp {
-			// In help view, handle navigation
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "esc", "?":
-				m.State = StateList
-				return m, nil
-			}
-			return m, nil
-		}
-
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		}
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+	return m, nil
+}
+
+func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+
 		case "?":
-			if m.State == StateList {
-				m.State = StateHelp
-				return m, nil
-			}
+			m.State = StateHelp
+			return m, nil
+
 		case "enter":
-			if m.State == StateList {
-				selected := m.List.SelectedItem()
-				if target, ok := selected.(Target); ok {
-					m.State = StateExecuting
-					m.ExecutingTarget = target.Name
-					return m, executeTarget(target.Name)
-				}
+			selected := m.List.SelectedItem()
+			if target, ok := selected.(Target); ok {
+				m.State = StateExecuting
+				m.ExecutingTarget = target.Name
+				return m, executeTarget(target.Name)
 			}
 		}
-
-	case executeFinishedMsg:
-		m.State = StateOutput
-		m.Output = msg.result.Output
-		m.ExecutionError = msg.result.Err
-
-		m.initViewport(msg.result.Output)
-		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
 		m.List.SetSize(msg.Width-4, msg.Height-4)
-
-		if m.State == StateOutput {
-			m.resizeViewport()
-		}
 	}
 
-	// Let list handle its updates
+	var cmd tea.Cmd
 	m.List, cmd = m.List.Update(msg)
-
 	return m, cmd
+}
+
+func (m Model) updateOutput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.State = StateList
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.Viewport, cmd = m.Viewport.Update(msg)
+		return m, cmd
+
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+		m.resizeViewport()
+	}
+
+	return m, nil
+}
+
+func (m Model) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "esc", "?":
+			m.State = StateList
+		}
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+	return m, nil
+}
+
+func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case executeFinishedMsg:
+		m.State = StateOutput
+		m.Output = msg.result.Output
+		m.ExecutionError = msg.result.Err
+		m.initViewport(msg.result.Output)
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+	return m, nil
 }
 
 func (m *Model) initViewport(content string) {
