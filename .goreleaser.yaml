@@ -1,0 +1,82 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/lazymake
+    binary: lazymake
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+# Homebrew tap
+brews:
+  - name: lazymake
+    repository:
+      owner: rshelekhov
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/rshelekhov/lazymake
+    description: "A beautiful TUI for running Makefile targets"
+    license: MIT
+    install: |
+      bin.install "lazymake"
+    test: |
+      system "#{bin}/lazymake --version"
+
+# Linux packages (.deb and .rpm)
+nfpms:
+  - id: packages
+    package_name: lazymake
+    homepage: https://github.com/rshelekhov/lazymake
+    description: "A beautiful TUI for running Makefile targets"
+    maintainer: rshelekhov <your-email@example.com>
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+    dependencies:
+      - make
