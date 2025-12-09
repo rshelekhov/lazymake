@@ -32,7 +32,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.State == StateOutput {
-			// In output view, any key returns to list
+			// In output view, handle viewport scrolling and navigation
 			switch msg.String() {
 			case "q", "ctrl+c":
 				return m, tea.Quit
@@ -45,9 +45,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+		if m.State == StateHelp {
+			// In help view, handle navigation
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			case "esc", "?":
+				m.State = StateList
+				return m, nil
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "?":
+			if m.State == StateList {
+				m.State = StateHelp
+				return m, nil
+			}
 		case "enter":
 			if m.State == StateList {
 				selected := m.List.SelectedItem()
