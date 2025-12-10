@@ -373,3 +373,287 @@ target3: dep4 dep5
 		})
 	}
 }
+
+// TestParseRecipes tests recipe extraction functionality
+func TestParseRecipes(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// Use explicit tabs for recipe lines
+	content := "## Build the app\n" +
+		"build:\n" +
+		"\tgo build -o app\n" +
+		"\tchmod +x app\n" +
+		"\n" +
+		"## Run tests\n" +
+		"test:\n" +
+		"\tgo test ./...\n" +
+		"\n" +
+		"## Clean build artifacts\n" +
+		"clean:\n" +
+		"\trm -rf build/\n" +
+		"\trm -f app\n" +
+		"\n" +
+		"## Single line recipe\n" +
+		"single:\n" +
+		"\techo \"one command\"\n" +
+		"\n" +
+		"## Meta-target with no recipe\n" +
+		"all: build test\n" +
+		"\n" +
+		"## Recipe with special characters\n" +
+		"special:\n" +
+		"\t@echo \"Testing: special\"\n" +
+		"\techo 'single quotes'\n" +
+		"\techo \"double quotes\"\n"
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	targetMap := make(map[string]Target)
+	for _, target := range targets {
+		targetMap[target.Name] = target
+	}
+
+	tests := []struct {
+		name           string
+		expectedRecipe []string
+	}{
+		{
+			name: "build",
+			expectedRecipe: []string{
+				"go build -o app",
+				"chmod +x app",
+			},
+		},
+		{
+			name: "test",
+			expectedRecipe: []string{
+				"go test ./...",
+			},
+		},
+		{
+			name: "clean",
+			expectedRecipe: []string{
+				"rm -rf build/",
+				"rm -f app",
+			},
+		},
+		{
+			name: "single",
+			expectedRecipe: []string{
+				`echo "one command"`,
+			},
+		},
+		{
+			name:           "all",
+			expectedRecipe: nil, // Meta-target with no recipe
+		},
+		{
+			name: "special",
+			expectedRecipe: []string{
+				`@echo "Testing: special"`,
+				`echo 'single quotes'`,
+				`echo "double quotes"`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target, found := targetMap[tt.name]
+			if !found {
+				t.Errorf("Target %s not found", tt.name)
+				return
+			}
+
+			if len(target.Recipe) != len(tt.expectedRecipe) {
+				t.Errorf("Target %s: expected %d recipe lines, got %d\nExpected: %v\nGot: %v",
+					tt.name, len(tt.expectedRecipe), len(target.Recipe), tt.expectedRecipe, target.Recipe)
+				return
+			}
+
+			for i, expected := range tt.expectedRecipe {
+				if target.Recipe[i] != expected {
+					t.Errorf("Target %s recipe[%d]: expected %q, got %q",
+						tt.name, i, expected, target.Recipe[i])
+				}
+			}
+		})
+	}
+}
+
+// TestParseMultiTargetRecipe tests that multiple targets on one line share the same recipe
+func TestParseMultiTargetRecipe(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// Use explicit tabs (cannot rely on editor tab settings with backticks)
+	content := "## Build and install\n" +
+		"build install: ## Both targets share the recipe\n" +
+		"\tgo build -o app\n" +
+		"\tcp app /usr/local/bin\n" +
+		"\n" +
+		"## Separate targets\n" +
+		"separate1:\n" +
+		"\techo \"first\"\n" +
+		"\n" +
+		"separate2:\n" +
+		"\techo \"second\"\n"
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	targetMap := make(map[string]Target)
+	for _, target := range targets {
+		targetMap[target.Name] = target
+	}
+
+	// Both build and install should have the same recipe
+	buildTarget := targetMap["build"]
+	installTarget := targetMap["install"]
+
+	expectedRecipe := []string{
+		"go build -o app",
+		"cp app /usr/local/bin",
+	}
+
+	if len(buildTarget.Recipe) != len(expectedRecipe) {
+		t.Errorf("build: expected %d recipe lines, got %d", len(expectedRecipe), len(buildTarget.Recipe))
+	}
+
+	if len(installTarget.Recipe) != len(expectedRecipe) {
+		t.Errorf("install: expected %d recipe lines, got %d", len(expectedRecipe), len(installTarget.Recipe))
+	}
+
+	for i, expected := range expectedRecipe {
+		if buildTarget.Recipe[i] != expected {
+			t.Errorf("build recipe[%d]: expected %q, got %q", i, expected, buildTarget.Recipe[i])
+		}
+		if installTarget.Recipe[i] != expected {
+			t.Errorf("install recipe[%d]: expected %q, got %q", i, expected, installTarget.Recipe[i])
+		}
+	}
+
+	// separate1 and separate2 should have different recipes
+	separate1 := targetMap["separate1"]
+	separate2 := targetMap["separate2"]
+
+	if len(separate1.Recipe) != 1 || separate1.Recipe[0] != `echo "first"` {
+		t.Errorf("separate1 has wrong recipe: %v", separate1.Recipe)
+	}
+
+	if len(separate2.Recipe) != 1 || separate2.Recipe[0] != `echo "second"` {
+		t.Errorf("separate2 has wrong recipe: %v", separate2.Recipe)
+	}
+}
+
+// TestParseRecipeWithVariables tests recipes containing variables
+func TestParseRecipeWithVariables(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := "VAR = value\n\n" +
+		"target:\n" +
+		"\techo $(VAR)\n" +
+		"\techo ${VAR}\n" +
+		"\techo $$VAR\n"
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if len(targets) != 1 {
+		t.Fatalf("Expected 1 target, got %d", len(targets))
+	}
+
+	target := targets[0]
+	expectedRecipe := []string{
+		"echo $(VAR)",
+		"echo ${VAR}",
+		"echo $$VAR",
+	}
+
+	if len(target.Recipe) != len(expectedRecipe) {
+		t.Errorf("Expected %d recipe lines, got %d", len(expectedRecipe), len(target.Recipe))
+	}
+
+	for i, expected := range expectedRecipe {
+		if target.Recipe[i] != expected {
+			t.Errorf("Recipe[%d]: expected %q, got %q", i, expected, target.Recipe[i])
+		}
+	}
+}
+
+// TestParseRecipeSeparation tests that recipes are correctly separated by empty lines and comments
+func TestParseRecipeSeparation(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := "target1:\n" +
+		"\techo \"first\"\n" +
+		"\n" +
+		"target2:\n" +
+		"\techo \"second\"\n" +
+		"\n" +
+		"# Comment between targets\n" +
+		"target3:\n" +
+		"\techo \"third\"\n" +
+		"\n" +
+		"## Documentation comment\n" +
+		"target4:\n" +
+		"\techo \"fourth\"\n"
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if len(targets) != 4 {
+		t.Fatalf("Expected 4 targets, got %d", len(targets))
+	}
+
+	expected := map[string][]string{
+		"target1": {`echo "first"`},
+		"target2": {`echo "second"`},
+		"target3": {`echo "third"`},
+		"target4": {`echo "fourth"`},
+	}
+
+	for _, target := range targets {
+		expectedRecipe := expected[target.Name]
+		if len(target.Recipe) != len(expectedRecipe) {
+			t.Errorf("Target %s: expected %d recipe lines, got %d: %v",
+				target.Name, len(expectedRecipe), len(target.Recipe), target.Recipe)
+			continue
+		}
+
+		for i, exp := range expectedRecipe {
+			if target.Recipe[i] != exp {
+				t.Errorf("Target %s recipe[%d]: expected %q, got %q",
+					target.Name, i, exp, target.Recipe[i])
+			}
+		}
+	}
+}

@@ -22,6 +22,7 @@ type Target struct {
 	Description  string
 	CommentType  CommentType
 	Dependencies []string // List of target names this target depends on
+	Recipe       []string // Recipe lines (commands to execute)
 }
 
 // commentInfo holds information about a comment
@@ -40,26 +41,62 @@ func Parse(filename string) ([]Target, error) {
 
 	var targets []Target
 	var lastComment commentInfo
+	var currentTargets []*Target // Track current targets for recipe accumulation (multi-target support)
+	var recipeLines []string     // Accumulate recipe lines
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		// Skip empty lines
+		// Empty line: commit current targets and reset
 		if trimmed == "" {
+			if len(currentTargets) > 0 {
+				for _, target := range currentTargets {
+					target.Recipe = recipeLines
+				}
+				recipeLines = nil
+				currentTargets = nil
+			}
 			lastComment = commentInfo{}
+			continue
+		}
+
+		// Recipe line (starts with tab)
+		if after, ok := strings.CutPrefix(line, "\t"); ok {
+			if len(currentTargets) > 0 {
+				// Remove leading tab, keep the command
+				recipeLines = append(recipeLines, after)
+			}
 			continue
 		}
 
 		// Check for comment (## takes priority over #)
 		if comment, found := strings.CutPrefix(trimmed, "##"); found {
+			// Commit current targets before processing new comment
+			if len(currentTargets) > 0 {
+				for _, target := range currentTargets {
+					target.Recipe = recipeLines
+				}
+				recipeLines = nil
+				currentTargets = nil
+			}
+
 			lastComment = commentInfo{
 				text:        strings.TrimSpace(comment),
 				commentType: CommentDouble,
 			}
 			continue
 		} else if comment, found := strings.CutPrefix(trimmed, "#"); found {
+			// Commit current targets before processing new comment
+			if len(currentTargets) > 0 {
+				for _, target := range currentTargets {
+					target.Recipe = recipeLines
+				}
+				recipeLines = nil
+				currentTargets = nil
+			}
+
 			lastComment = commentInfo{
 				text:        strings.TrimSpace(comment),
 				commentType: CommentSingle,
@@ -70,12 +107,21 @@ func Parse(filename string) ([]Target, error) {
 		// Check for target definition
 		// Recipe lines start with a tab, so check the original line, not trimmed
 		if strings.Contains(line, ":") && !strings.HasPrefix(line, "\t") {
+			// Commit previous targets before starting new ones
+			if len(currentTargets) > 0 {
+				for _, target := range currentTargets {
+					target.Recipe = recipeLines
+				}
+				recipeLines = nil
+			}
+
 			parts := strings.SplitN(line, ":", 2)
 			targetName := strings.TrimSpace(parts[0])
 
 			// Skip special targets
 			if strings.HasPrefix(targetName, ".") || strings.Contains(targetName, "=") {
 				lastComment = commentInfo{}
+				currentTargets = nil
 				continue
 			}
 
@@ -104,6 +150,9 @@ func Parse(filename string) ([]Target, error) {
 			}
 
 			// Handle multiple targets on one line
+			// All targets on the same line share the same recipe
+			currentTargets = nil
+			startIdx := len(targets) // Remember where we started adding targets
 			names := strings.FieldsSeq(targetName)
 			for name := range names {
 				targets = append(targets, Target{
@@ -111,10 +160,24 @@ func Parse(filename string) ([]Target, error) {
 					Description:  finalDesc,
 					CommentType:  finalType,
 					Dependencies: depList,
+					Recipe:       nil, // Will be populated as we read recipe lines
 				})
 			}
 
+			// Now take pointers AFTER all targets are added (avoids pointer invalidation during slice growth)
+			for i := startIdx; i < len(targets); i++ {
+				currentTargets = append(currentTargets, &targets[i])
+			}
+
 			lastComment = commentInfo{}
+			recipeLines = nil
+		}
+	}
+
+	// Commit final targets if any
+	if len(currentTargets) > 0 {
+		for _, target := range currentTargets {
+			target.Recipe = recipeLines
 		}
 	}
 
