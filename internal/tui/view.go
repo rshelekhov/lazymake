@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 )
 
@@ -15,6 +19,8 @@ func (m Model) View() string {
 		return "\n  ⏳ Executing: make " + m.ExecutingTarget + "\n\n  Please wait...\n"
 	case StateHelp:
 		return m.renderHelpView()
+	case StateGraph: // NEW
+		return m.renderGraphView()
 	case StateOutput:
 		return m.renderOutputView()
 	default:
@@ -109,7 +115,7 @@ func (m Model) renderHelpView() string {
 	// Footer with keyboard shortcuts
 	footer := lipgloss.NewStyle().
 		Foreground(MutedColor).
-		Render("\nPress ? to toggle help • esc to return • q to quit")
+		Render("\nPress ? to toggle help • g to view dependency graph • esc to return • q to quit")
 	helpContent += footer
 
 	// Wrap in a container with padding (no width constraint to avoid layout issues)
@@ -117,6 +123,68 @@ func (m Model) renderHelpView() string {
 		Padding(1, 2)
 
 	return containerStyle.Render(helpContent)
+}
+
+// renderGraphView displays the dependency graph for the selected target
+func (m Model) renderGraphView() string {
+	var builder strings.Builder
+
+	title := TitleStyle.Render("Dependency Graph")
+	writeString(&builder, title+"\n\n")
+
+	if m.GraphTarget != "" {
+		targetInfo := lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true).
+			Render("Target: " + m.GraphTarget)
+		writeString(&builder, targetInfo+"\n")
+	}
+
+	depthStr := "all levels"
+	if m.GraphDepth >= 0 {
+		depthStr = fmt.Sprintf("%d level(s)", m.GraphDepth+1)
+	}
+	depthInfo := lipgloss.NewStyle().
+		Foreground(MutedColor).
+		Render(fmt.Sprintf("Depth: %s", depthStr))
+
+	writeString(&builder, depthInfo+"\n\n")
+
+	var graphToRender *graph.Graph
+	if m.GraphTarget != "" && m.Graph.Nodes[m.GraphTarget] != nil {
+		// Show subgraph for specific target
+		graphToRender = m.Graph.GetSubgraph(m.GraphTarget, m.GraphDepth)
+	} else {
+		// Show full graph
+		graphToRender = m.Graph
+	}
+
+	renderer := graph.TreeRenderer{
+		ShowOrder:    m.ShowOrder,
+		ShowCritical: m.ShowCritical,
+		ShowParallel: m.ShowParallel,
+	}
+
+	treeStr := graphToRender.RenderTree(renderer)
+	writeString(&builder, treeStr+"\n")
+
+	legend := graph.RenderLegend(m.ShowOrder, m.ShowCritical, m.ShowParallel)
+	if legend != "" {
+		legendStyled := lipgloss.NewStyle().
+			Foreground(MutedColor).
+			Render(legend)
+		writeString(&builder, legendStyled+"\n")
+	}
+
+	writeString(&builder, "\n")
+	controls := "g/esc = return • +/- = depth • o = order • c = critical • p = parallel • q = quit"
+	controlsStyled := lipgloss.NewStyle().
+		Foreground(MutedColor).
+		Render(controls)
+	writeString(&builder, controlsStyled)
+
+	containerStyle := lipgloss.NewStyle().Padding(1, 2)
+	return containerStyle.Render(builder.String())
 }
 
 // renderOutputView displays output of the executed target
@@ -150,4 +218,8 @@ func (m Model) renderOutputView() string {
 func getContentWidth(terminalWidth int) int {
 	width := min(max(int(float64(terminalWidth)*0.9), 40), 120)
 	return width
+}
+
+func writeString(b *strings.Builder, s string) {
+	_, _ = b.WriteString(s)
 }

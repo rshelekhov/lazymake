@@ -11,16 +11,17 @@ import (
 type CommentType int
 
 const (
-	CommentNone CommentType = iota // No comment
-	CommentSingle                   // # comment
-	CommentDouble                   // ## comment (industry standard for documentation)
+	CommentNone   CommentType = iota // No comment
+	CommentSingle                    // # comment
+	CommentDouble                    // ## comment (industry standard for documentation)
 )
 
 // Target represents a Makefile target
 type Target struct {
-	Name        string
-	Description string
-	CommentType CommentType
+	Name         string
+	Description  string
+	CommentType  CommentType
+	Dependencies []string // List of target names this target depends on
 }
 
 // commentInfo holds information about a comment
@@ -83,6 +84,17 @@ func Parse(filename string) ([]Target, error) {
 			dependencies := parts[1]
 			inlineComment := extractInlineComment(dependencies)
 
+			// Extract the dependency list
+			// Need to clean the dependencies string by removing comments first
+			// Example: "deps compile ## Build" -> want just "deps compile"
+			cleanDeps := dependencies
+			if idx := strings.Index(dependencies, "#"); idx >= 0 {
+				// Remove everything from the first # onwards (the comment part)
+				cleanDeps = dependencies[:idx]
+			}
+			// Parse the cleaned dependency string to get individual target names
+			depList := parseDependencies(cleanDeps)
+
 			// Determine final description and comment type
 			finalDesc := lastComment.text
 			finalType := lastComment.commentType
@@ -95,9 +107,10 @@ func Parse(filename string) ([]Target, error) {
 			names := strings.FieldsSeq(targetName)
 			for name := range names {
 				targets = append(targets, Target{
-					Name:        name,
-					Description: finalDesc,
-					CommentType: finalType,
+					Name:         name,
+					Description:  finalDesc,
+					CommentType:  finalType,
+					Dependencies: depList,
 				})
 			}
 
@@ -132,4 +145,75 @@ func extractInlineComment(dependencies string) commentInfo {
 	}
 
 	return commentInfo{}
+}
+
+// parseDependencies extracts dependency target names from the dependency section
+// of a Makefile target line (everything after the colon but before any comment)
+//
+// The function handles several edge cases:
+// - Variables like $VAR or $(VAR) are skipped (Make expands these at runtime)
+// - Pattern rules like %.o are skipped (these are templates, not concrete targets)
+// - Order-only prerequisites (after |) are separated out
+//
+// Example inputs and outputs:
+//
+//	"deps compile"           -> ["deps", "compile"]
+//	"deps | order-only"      -> ["deps"]           (ignores order-only)
+//	"$VAR target"            -> ["target"]         (skips variable)
+//	"%.o: %.c"               -> []                 (skips pattern rule)
+func parseDependencies(depStr string) []string {
+	if depStr == "" {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(depStr)
+	if trimmed == "" {
+		return nil
+	}
+
+	// Handle order-only prerequisites: "normal-deps | order-only-deps"
+	// We only care about normal dependencies (before the pipe) for visualization
+	// Order-only deps are used to control when things rebuild, but don't affect
+	// what needs to run before this target
+	if idx := strings.Index(trimmed, "|"); idx >= 0 {
+		trimmed = trimmed[:idx] // Keep only the part before |
+	}
+
+	// Split by whitespace to get individual dependency names
+	fields := strings.Fields(trimmed)
+
+	var deps []string
+	for _, field := range fields {
+		// Skip Makefile variables (start with $)
+		// Example: $(OBJS) or $VAR
+		// We can't resolve these without running Make, so we skip them
+		if strings.HasPrefix(field, "$") {
+			continue
+		}
+
+		// Skip pattern rules (contain %)
+		// Example: %.o in "%.o: %.c"
+		// Pattern rules are templates, not actual targets we can visualize
+		if strings.Contains(field, "%") {
+			continue
+		}
+
+		// Skip file paths (likely files, not targets)
+		// This is a heuristic - Makefiles CAN have targets with /, but it's uncommon
+		// We filter out:
+		//   - Paths with multiple slashes: src/pkg/main.go
+		//   - Paths with file extensions: main.go, src/main.go
+		if strings.Count(field, "/") > 1 {
+			continue
+		}
+
+		// Check for file extensions (contains / and has extension like .go, .o, .c)
+		if strings.Contains(field, "/") && strings.Contains(field, ".") {
+			continue
+		}
+
+		deps = append(deps, field)
+	}
+
+	return deps
 }

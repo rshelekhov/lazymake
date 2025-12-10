@@ -23,6 +23,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateOutput(msg)
 	case StateHelp:
 		return m.updateHelp(msg)
+	case StateGraph:
+		return m.updateGraph(msg)
 	case StateExecuting:
 		return m.updateExecuting(msg)
 	default:
@@ -55,6 +57,15 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			m.State = StateHelp
 			return m, nil
+
+		case "g":
+			// Show graph view for selected target
+			selected := m.List.SelectedItem()
+			if target, ok := selected.(Target); ok {
+				m.State = StateGraph
+				m.GraphTarget = target.Name
+				return m, nil
+			}
 
 		case "enter":
 			selected := m.List.SelectedItem()
@@ -112,6 +123,57 @@ func (m Model) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width = msg.Width
 		m.Height = msg.Height
 	}
+	return m, nil
+}
+
+// updateGraph handles the graph view state
+func (m Model) updateGraph(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+
+		case "esc", "g":
+			// Return to list view and clear graph target
+			m.State = StateList
+			m.GraphTarget = ""
+			return m, nil
+
+		case "+", "=":
+			// Increase depth (show more levels)
+			if m.GraphDepth == -1 {
+				// Already unlimited, do nothing
+			} else {
+				m.GraphDepth++
+			}
+
+		case "-", "_":
+			// Decrease depth (show fewer levels)
+			if m.GraphDepth == -1 {
+				m.GraphDepth = 5 // Start with 5 levels when coming from unlimited
+			} else if m.GraphDepth > 0 {
+				m.GraphDepth--
+			}
+
+		case "o", "O":
+			// Toggle order display
+			m.ShowOrder = !m.ShowOrder
+
+		case "c", "C":
+			// Toggle critical path display
+			m.ShowCritical = !m.ShowCritical
+
+		case "p", "P":
+			// Toggle parallel display
+			m.ShowParallel = !m.ShowParallel
+		}
+
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+
 	return m, nil
 }
 

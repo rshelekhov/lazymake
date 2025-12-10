@@ -52,9 +52,9 @@ all: build test ## Inline after deps
 
 	// Test cases
 	tests := []struct {
-		name            string
-		expectedDesc    string
-		expectedType    CommentType
+		name         string
+		expectedDesc string
+		expectedType CommentType
 	}{
 		{"build", "Single hash comment", CommentSingle},
 		{"test", "Double hash comment (industry standard)", CommentDouble},
@@ -205,5 +205,171 @@ build: ## Build the app
 		if !found {
 			t.Errorf("Expected target %s not found", name)
 		}
+	}
+}
+
+// TestParseDependencies tests the new dependency extraction feature
+func TestParseDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// Create a Makefile with various dependency patterns
+	content := `
+# Simple dependencies
+build: deps compile ## Build the project
+	@go build
+
+compile: ## Compile source
+	@go build -o bin/app
+
+deps: ## Install dependencies
+	@go mod download
+
+# Chained dependencies
+test: build ## Run tests
+	@go test ./...
+
+# Multiple dependencies
+all: deps build test ## Do everything
+	@echo "Done!"
+
+# No dependencies
+clean: ## Clean build files
+	@rm -rf bin/
+
+# Pattern rule (should be ignored)
+%.o: %.c ## Pattern rule
+	@gcc -c $< -o $@
+
+# Order-only prerequisites
+order: normal-dep | order-only-dep ## Order-only test
+	@echo "test"
+
+# Variables (should be ignored)
+var-test: $(DEPS) real-dep ## With variable
+	@echo "test"
+
+# File paths (should be filtered)
+file-dep: src/main.go regular-target ## File and target mix
+	@echo "test"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Create map for easier lookup
+	targetMap := make(map[string]Target)
+	for _, target := range targets {
+		targetMap[target.Name] = target
+	}
+
+	// Test cases for dependency extraction
+	tests := []struct {
+		name         string
+		expectedDeps []string
+	}{
+		{"build", []string{"deps", "compile"}},
+		{"compile", nil}, // No dependencies
+		{"deps", nil},
+		{"test", []string{"build"}},
+		{"all", []string{"deps", "build", "test"}},
+		{"clean", nil},
+		{"order", []string{"normal-dep"}},        // Order-only deps filtered out
+		{"var-test", []string{"real-dep"}},       // Variables filtered out
+		{"file-dep", []string{"regular-target"}}, // Complex file paths filtered
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target, found := targetMap[tt.name]
+			if !found {
+				t.Errorf("Target %s not found", tt.name)
+				return
+			}
+
+			// Check dependency count
+			if len(target.Dependencies) != len(tt.expectedDeps) {
+				t.Errorf("Target %s: expected %d dependencies, got %d: %v",
+					tt.name, len(tt.expectedDeps), len(target.Dependencies), target.Dependencies)
+				return
+			}
+
+			// Check each dependency
+			for i, expectedDep := range tt.expectedDeps {
+				if target.Dependencies[i] != expectedDep {
+					t.Errorf("Target %s: expected dependency[%d]=%s, got %s",
+						tt.name, i, expectedDep, target.Dependencies[i])
+				}
+			}
+		})
+	}
+}
+
+// TestParseDependenciesWithComments verifies dependencies are extracted correctly
+// even when there are inline comments
+func TestParseDependenciesWithComments(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// The tricky part is separating dependencies from comments
+	// "build: dep1 dep2 ## Comment" -> deps are ["dep1", "dep2"], not including the comment
+	content := `
+target1: dep1 dep2 ## Inline comment after deps
+	@echo "test"
+
+target2: dep3 # Single hash comment
+	@echo "test"
+
+target3: dep4 dep5
+	@echo "test"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	targetMap := make(map[string]Target)
+	for _, target := range targets {
+		targetMap[target.Name] = target
+	}
+
+	// Test that comments don't interfere with dependency extraction
+	tests := []struct {
+		name         string
+		expectedDeps []string
+	}{
+		{"target1", []string{"dep1", "dep2"}},
+		{"target2", []string{"dep3"}},
+		{"target3", []string{"dep4", "dep5"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := targetMap[tt.name]
+
+			if len(target.Dependencies) != len(tt.expectedDeps) {
+				t.Errorf("Expected %d deps, got %d: %v",
+					len(tt.expectedDeps), len(target.Dependencies), target.Dependencies)
+				return
+			}
+
+			for i, expected := range tt.expectedDeps {
+				if target.Dependencies[i] != expected {
+					t.Errorf("Dependency[%d]: expected %s, got %s",
+						i, expected, target.Dependencies[i])
+				}
+			}
+		})
 	}
 }

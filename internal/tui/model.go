@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 )
 
@@ -13,6 +15,7 @@ const (
 	StateExecuting
 	StateOutput
 	StateHelp
+	StateGraph
 )
 
 type Model struct {
@@ -27,6 +30,14 @@ type Model struct {
 	ExecutionError  error
 	Targets         []Target // Store targets for help view
 
+	// Graph state
+	Graph        *graph.Graph
+	GraphTarget  string // Selected target for graph view
+	GraphDepth   int    // -1 = unlimited, 0 = direct deps only, etc.
+	ShowOrder    bool   // Show execution order numbers
+	ShowCritical bool   // Show critical path markers
+	ShowParallel bool   // Show parallel markers
+
 	// Dimensions
 	Width  int
 	Height int
@@ -39,6 +50,8 @@ func NewModel(makefilePath string) Model {
 	if err != nil {
 		return Model{Err: err}
 	}
+
+	depGraph := graph.BuildGraph(targets)
 
 	// Convert targets to TUI format
 	tuiTargets := make([]Target, len(targets))
@@ -60,9 +73,27 @@ func NewModel(makefilePath string) Model {
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
 
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(
+				key.WithKeys("g"),
+				key.WithHelp("g", "graph view"),
+			),
+			key.NewBinding(
+				key.WithKeys("?"),
+				key.WithHelp("?", "toggle help"),
+			),
+		}
+	}
+
 	return Model{
-		List:    l,
-		State:   StateList,
-		Targets: tuiTargets,
+		List:         l,
+		State:        StateList,
+		Targets:      tuiTargets,
+		Graph:        depGraph,
+		GraphDepth:   -1,
+		ShowOrder:    true,
+		ShowCritical: true,
+		ShowParallel: true,
 	}
 }
