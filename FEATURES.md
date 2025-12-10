@@ -13,10 +13,16 @@
 - Show target descriptions in a sidebar or help panel
 - Addresses biggest pain point: poor onboarding experience for new developers
 
-#### 2. Dependency Graph Visualization
-- Visual representation of target dependencies
-- Show which targets will be executed and in what order
-- Critical: over 60% of compilation delays stem from misconfigured dependencies
+#### ✅ 2. Dependency Graph Visualization
+- Visual representation of target dependencies with ASCII tree structure
+- Shows execution order numbering `[N]` indicating which targets run first
+- Highlights critical path `★` - the longest dependency chain determining minimum build time
+- Identifies parallel opportunities `∥` - targets that can run concurrently with `make -j`
+- Configurable depth control to show more or fewer dependency levels
+- Smart detection: only marks meaningful build chains, not standalone targets
+- Cycle detection with clear warnings for circular dependencies
+- Addresses: over 60% of compilation delays stem from misconfigured dependencies
+- **Implementation complete**: Uses DFS for cycle detection, Kahn's algorithm for topological sort, and memoized depth calculation for critical path analysis
 
 #### 3. Search & Filtering
 - Real-time fuzzy search for targets
