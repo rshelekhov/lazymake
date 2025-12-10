@@ -70,10 +70,28 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			selected := m.List.SelectedItem()
 			if target, ok := selected.(Target); ok {
+				// Record execution in history BEFORE starting
+				m.History.RecordExecution(m.MakefilePath, target.Name)
+				_ = m.History.Save() // Async, ignore errors (non-critical)
+
+				// Refresh recent targets for next render
+				recentEntries := m.History.GetRecent(m.MakefilePath)
+				m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
 				m.State = StateExecuting
 				m.ExecutingTarget = target.Name
 				return m, executeTarget(target.Name)
 			}
+
+		case "down", "j":
+			// Navigate down, skipping over separators and headers
+			m = navigateToNextTarget(m, true)
+			return m, nil
+
+		case "up", "k":
+			// Navigate up, skipping over separators and headers
+			m = navigateToNextTarget(m, false)
+			return m, nil
 		}
 
 	case tea.WindowSizeMsg:
@@ -84,7 +102,34 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.List, cmd = m.List.Update(msg)
+
 	return m, cmd
+}
+
+// navigateToNextTarget moves the cursor to the next/previous target, skipping separators and headers
+func navigateToNextTarget(m Model, down bool) Model {
+	items := m.List.Items()
+	currentIndex := m.List.Index()
+
+	if down {
+		// Search downward for next target
+		for i := currentIndex + 1; i < len(items); i++ {
+			if _, ok := items[i].(Target); ok {
+				m.List.Select(i)
+				return m
+			}
+		}
+	} else {
+		// Search upward for previous target
+		for i := currentIndex - 1; i >= 0; i-- {
+			if _, ok := items[i].(Target); ok {
+				m.List.Select(i)
+				return m
+			}
+		}
+	}
+
+	return m
 }
 
 func (m Model) updateOutput(msg tea.Msg) (tea.Model, tea.Cmd) {

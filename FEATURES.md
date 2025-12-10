@@ -24,10 +24,16 @@
 - Addresses: over 60% of compilation delays stem from misconfigured dependencies
 - **Implementation complete**: Uses DFS for cycle detection, Kahn's algorithm for topological sort, and memoized depth calculation for critical path analysis
 
-#### 3. Search & Filtering
-- Real-time fuzzy search for targets
-- Filter by recently used, favorites, or tags
-- Essential for developer productivity
+#### ✅ 3. Search & Filtering
+- Real-time fuzzy search for targets (type `/` to filter by name or description)
+- Filter by recently used targets with visual ⏱ indicator
+- Last 5 executed targets per Makefile appear at top of list for instant access
+- Per-project history stored in `~/.cache/lazymake/history.json`
+- Automatic cleanup of stale targets (removed from Makefile)
+- Smart navigation: arrow keys skip over section headers and separators
+- Essential for developer productivity, especially for repetitive workflows
+- **Implementation complete**: LRU cache with graceful degradation, persistent across sessions
+- **Note**: Favorites and tags were skipped in favor of simplicity - fuzzy search + recent history covers most use cases
 
 #### 4. Performance Profiling
 - Show execution time for each target

@@ -47,4 +47,16 @@ var (
 	SuccessStyle = lipgloss.NewStyle().
 			Foreground(SuccessColor).
 			Bold(true)
+
+	// SectionHeaderStyle is used for "RECENT" and "ALL TARGETS" headers
+	SectionHeaderStyle = lipgloss.NewStyle().
+				Foreground(MutedColor).
+				Bold(true).
+				PaddingTop(1).
+				PaddingLeft(1)
+
+	// SeparatorStyle is used for the line between sections
+	SeparatorStyle = lipgloss.NewStyle().
+			Foreground(MutedColor).
+			PaddingLeft(1)
 )

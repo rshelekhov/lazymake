@@ -34,10 +34,17 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
   - Smart detection: only marks meaningful build chains, not standalone targets
   - Cycle detection with clear warnings for circular dependencies
 
+- **Search & filtering with recent history**: Enhanced productivity for repetitive workflows
+  - Real-time fuzzy search: Type `/` to filter targets by name or description
+  - Recent targets tracking: Last 5 executed targets appear at the top with ⏱ indicator
+  - Per-Makefile history: Each project maintains its own execution history
+  - Automatic cleanup: Stale targets (removed from Makefile) are filtered automatically
+  - Persistent across sessions: History stored in `~/.cache/lazymake/history.json`
+  - Navigation: Arrow keys skip over section headers and separators
+
 ### Planned
 
 #### High Priority
-- **Search & filtering**: Real-time fuzzy search for targets, filter by recently used or favorites
 - **Performance profiling**: Track execution time and build history to identify slow targets
 - **Better error handling**: Parse and highlight common Makefile errors with helpful suggestions
 
@@ -153,6 +160,39 @@ deploy:
 - Use `#` for internal implementation notes
 - Keep descriptions concise (one line)
 - Place inline comments for quick reference: `target: ## Description`
+
+## Recent History & Smart Navigation
+
+lazymake tracks your most frequently used targets to speed up repetitive workflows. When you run the same 2-3 targets regularly (like `test`, `build`, `deploy`), they appear at the top of the list for instant access.
+
+### How It Works
+
+- **Automatic tracking**: Every time you execute a target, it's recorded in history
+- **Top 5 recent**: The last 5 executed targets appear in the "RECENT" section
+- **Visual indicator**: Recent targets are marked with a ⏱ clock emoji
+- **Per-project**: Each Makefile maintains separate history
+- **Smart cleanup**: Targets removed from the Makefile are automatically filtered out
+- **Persistent**: History survives across sessions
+
+### Example Display
+
+```
+RECENT
+⏱  test        Run all tests
+⏱  build       Build the application
+⏱  lint        Run linters
+──────────────────────────────────
+ALL TARGETS
+▶ build        Build the application
+  clean        Clean build artifacts
+  deploy       Deploy to production
+```
+
+### Benefits
+
+- **Faster workflows**: No need to scroll or type to find common targets
+- **Context awareness**: Different projects show different recent targets
+- **Zero configuration**: Works automatically from the first execution
 
 ## Understanding Dependency Graphs
 
