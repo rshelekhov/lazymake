@@ -110,7 +110,16 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-		m.List.SetSize(msg.Width-4, msg.Height-4)
+
+		// Calculate list size for left column
+		// Left column is 30% of width
+		leftWidth := max(int(float64(msg.Width)*0.30), 30)
+		// Account for border (2) on left column
+		listWidth := leftWidth - 2
+		// Account for status bar (3) and border (2) on columns
+		listHeight := msg.Height - 3 - 2
+
+		m.List.SetSize(listWidth, listHeight)
 	}
 
 	var cmd tea.Cmd

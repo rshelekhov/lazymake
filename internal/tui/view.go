@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/makefile"
+	"github.com/rshelekhov/lazymake/internal/util"
 )
 
 func (m Model) View() string {
@@ -134,14 +135,14 @@ func (m Model) renderGraphView() string {
 	var builder strings.Builder
 
 	title := TitleStyle.Render("Dependency Graph")
-	writeString(&builder, title+"\n\n")
+	util.WriteString(&builder, title+"\n\n")
 
 	if m.GraphTarget != "" {
 		targetInfo := lipgloss.NewStyle().
 			Foreground(PrimaryColor).
 			Bold(true).
 			Render("Target: " + m.GraphTarget)
-		writeString(&builder, targetInfo+"\n")
+		util.WriteString(&builder, targetInfo+"\n")
 	}
 
 	depthStr := "all levels"
@@ -152,7 +153,7 @@ func (m Model) renderGraphView() string {
 		Foreground(MutedColor).
 		Render(fmt.Sprintf("Depth: %s", depthStr))
 
-	writeString(&builder, depthInfo+"\n\n")
+	util.WriteString(&builder, depthInfo+"\n\n")
 
 	var graphToRender *graph.Graph
 	if m.GraphTarget != "" && m.Graph.Nodes[m.GraphTarget] != nil {
@@ -170,22 +171,22 @@ func (m Model) renderGraphView() string {
 	}
 
 	treeStr := graphToRender.RenderTree(renderer)
-	writeString(&builder, treeStr+"\n")
+	util.WriteString(&builder, treeStr+"\n")
 
 	legend := graph.RenderLegend(m.ShowOrder, m.ShowCritical, m.ShowParallel)
 	if legend != "" {
 		legendStyled := lipgloss.NewStyle().
 			Foreground(MutedColor).
 			Render(legend)
-		writeString(&builder, legendStyled+"\n")
+		util.WriteString(&builder, legendStyled+"\n")
 	}
 
-	writeString(&builder, "\n")
+	util.WriteString(&builder, "\n")
 	controls := "g/esc = return • +/- = depth • o = order • c = critical • p = parallel • q = quit"
 	controlsStyled := lipgloss.NewStyle().
 		Foreground(MutedColor).
 		Render(controls)
-	writeString(&builder, controlsStyled)
+	util.WriteString(&builder, controlsStyled)
 
 	containerStyle := lipgloss.NewStyle().Padding(1, 2)
 	return containerStyle.Render(builder.String())
@@ -222,8 +223,4 @@ func (m Model) renderOutputView() string {
 func getContentWidth(terminalWidth int) int {
 	width := min(max(int(float64(terminalWidth)*0.9), 40), 120)
 	return width
-}
-
-func writeString(b *strings.Builder, s string) {
-	_, _ = b.WriteString(s)
 }

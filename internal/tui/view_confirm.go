@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/safety"
+	"github.com/rshelekhov/lazymake/internal/util"
 )
 
 // renderConfirmView renders the dangerous command confirmation dialog
@@ -15,27 +16,27 @@ func (m Model) renderConfirmView() string {
 
 	target := m.PendingTarget
 
-	var content strings.Builder
+	var builder strings.Builder
 
 	// Title with danger emoji
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(ErrorColor).
 		Render("🚨 DANGEROUS COMMAND WARNING")
-	content.WriteString(title + "\n\n")
+	util.WriteString(&builder, title+"\n\n")
 
 	// Target name
 	targetLine := lipgloss.NewStyle().
 		Foreground(PrimaryColor).
 		Bold(true).
 		Render("Target: " + target.Name)
-	content.WriteString(targetLine + "\n\n")
+	util.WriteString(&builder, targetLine+"\n\n")
 
 	// Show all safety matches
 	if len(target.SafetyMatches) > 0 {
 		for i, match := range target.SafetyMatches {
 			if i > 0 {
-				content.WriteString("\n")
+				util.WriteString(&builder, "\n")
 			}
 
 			// Rule header with severity
@@ -58,21 +59,21 @@ func (m Model) renderConfirmView() string {
 				Foreground(severityColor).
 				Bold(true).
 				Render(severityStr + ": " + match.Rule.ID)
-			content.WriteString(ruleHeader + "\n")
+			util.WriteString(&builder, ruleHeader+"\n")
 
 			// Matched command
 			if match.MatchedLine != "" {
 				matchedStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#666666")).
 					Render("Command: " + match.MatchedLine)
-				content.WriteString(matchedStyle + "\n")
+				util.WriteString(&builder, matchedStyle+"\n")
 			}
 
 			// Description
 			if match.Rule.Description != "" {
 				descStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#CCCCCC"))
-				content.WriteString("\n" + descStyle.Render(match.Rule.Description) + "\n")
+				util.WriteString(&builder, "\n"+descStyle.Render(match.Rule.Description)+"\n")
 			}
 
 			// Suggestion
@@ -80,12 +81,12 @@ func (m Model) renderConfirmView() string {
 				suggestionStyle := lipgloss.NewStyle().
 					Foreground(SecondaryColor).
 					Italic(true)
-				content.WriteString("\n" + suggestionStyle.Render("💡 " + match.Rule.Suggestion) + "\n")
+				util.WriteString(&builder, "\n"+suggestionStyle.Render("💡 "+match.Rule.Suggestion)+"\n")
 			}
 		}
 	}
 
-	content.WriteString("\n")
+	util.WriteString(&builder, "\n")
 
 	// Actions
 	actionsStyle := lipgloss.NewStyle().
@@ -105,7 +106,7 @@ func (m Model) renderConfirmView() string {
 	actions := actionsStyle.Render(
 		enterAction + " Continue Anyway     " + escAction + " Cancel",
 	)
-	content.WriteString(actions)
+	util.WriteString(&builder, actions)
 
 	// Calculate dialog dimensions
 	contentWidth := min(80, m.Width-10)
@@ -120,7 +121,7 @@ func (m Model) renderConfirmView() string {
 		Height(contentHeight).
 		Align(lipgloss.Center)
 
-	dialog := dialogStyle.Render(content.String())
+	dialog := dialogStyle.Render(builder.String())
 
 	// Center the dialog on screen
 	verticalPadding := max((m.Height-strings.Count(dialog, "\n"))/2, 0)

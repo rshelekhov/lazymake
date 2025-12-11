@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
@@ -50,6 +51,9 @@ type Model struct {
 
 	// Confirmation state
 	PendingTarget *Target // Target awaiting dangerous command confirmation
+
+	// Key bindings for status bar display
+	KeyBindings []key.Binding
 
 	// Dimensions
 	Width  int
@@ -140,24 +144,44 @@ func NewModel(makefilePath string) Model {
 		items = append(items, t)
 	}
 
+	// Define key bindings for both list and status bar display
+	keyBindings := []key.Binding{
+		key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "run"),
+		),
+		key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "filter"),
+		),
+		key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "dependency graph"),
+		),
+		key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "help"),
+		),
+		key.NewBinding(
+			key.WithKeys("q"),
+			key.WithHelp("q", "quit"),
+		),
+	}
+
 	delegate := ItemDelegate{}
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Makefile Targets"
-	l.SetShowStatusBar(true)
+	l.SetShowStatusBar(false) // Disabled - we use custom status bar
+	l.SetShowHelp(false)      // Disabled - help text shown in custom status bar
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
 
+	// Customize filter prompt to be shorter and prevent truncation
+	l.FilterInput.Prompt = "/ "
+	l.FilterInput.PromptStyle = lipgloss.NewStyle().Foreground(SecondaryColor)
+
 	l.AdditionalShortHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			key.NewBinding(
-				key.WithKeys("g"),
-				key.WithHelp("g", "graph view"),
-			),
-			key.NewBinding(
-				key.WithKeys("?"),
-				key.WithHelp("?", "toggle help"),
-			),
-		}
+		return keyBindings
 	}
 
 	// Position cursor on first actual target (skip headers)
@@ -181,6 +205,7 @@ func NewModel(makefilePath string) Model {
 		History:       hist,
 		MakefilePath:  absPath,
 		RecentTargets: recentTargets,
+		KeyBindings:   keyBindings,
 	}
 }
 

@@ -80,6 +80,7 @@
 
 #### 7. Workspace/Project Management
 - Quick switching between different project Makefiles
+- Show in status bar what makefile is using now
 - Remember last-used targets per project
 - Support monorepo scenarios
 

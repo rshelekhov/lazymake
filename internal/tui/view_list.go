@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/safety"
+	"github.com/rshelekhov/lazymake/internal/util"
 )
 
 // renderListView renders the main two-column list view
@@ -22,38 +24,49 @@ func (m Model) renderListView() string {
 		}
 	}
 
-	// Calculate column widths (30% left, 70% right)
-	leftWidth := max(int(float64(m.Width)*0.30), 30)
-	rightWidth := m.Width - leftWidth - 4 // -4 for margins and spacing
+	// Calculate available space
+	// Status bar takes 3 lines (border 2 + content 1)
+	statusBarHeight := 3
+	availableHeight := m.Height - statusBarHeight
 
-	// Render left column (target list)
-	leftColumn := m.renderTargetList(leftWidth)
+	// Calculate left column width (30% of terminal width, minimum 30 chars)
+	leftWidthPercent := 0.30
+	minLeftWidth := 30
 
-	// Render right column (recipe preview)
-	rightColumn := m.renderRecipePreview(selectedTarget, rightWidth)
+	leftWidth := int(float64(m.Width) * leftWidthPercent)
+	if leftWidth < minLeftWidth && m.Width >= minLeftWidth*2 {
+		leftWidth = minLeftWidth
+	} else if leftWidth < minLeftWidth {
+		// Terminal too narrow for minimum, use percentage
+		leftWidth = int(float64(m.Width) * leftWidthPercent)
+	}
+
+	// Safety check: ensure left width is valid
+	if leftWidth < 10 {
+		leftWidth = 10
+	}
+
+	// Render left column first
+	leftColumn := m.renderTargetList(leftWidth, availableHeight)
+
+	// Measure actual rendered width of left column
+	actualLeftWidth := lipgloss.Width(leftColumn)
+
+	// Calculate right column width based on ACTUAL measured left width
+	// This prevents any rounding errors or overflow
+	rightWidth := max(m.Width-actualLeftWidth, 10)
+
+	// Render right column with measured width
+	rightColumn := m.renderRecipePreview(selectedTarget, rightWidth, availableHeight)
 
 	// Render status bar
 	statusBar := m.renderStatusBar()
 
-	// Calculate height for columns (leave space for status bar)
-	columnHeight := m.Height - 3 // -3 for status bar and spacing
-
-	// Apply height constraints
-	leftStyle := lipgloss.NewStyle().
-		Width(leftWidth).
-		Height(columnHeight).
-		MaxHeight(columnHeight)
-
-	rightStyle := lipgloss.NewStyle().
-		Width(rightWidth).
-		Height(columnHeight).
-		MaxHeight(columnHeight)
-
-	// Join columns horizontally
+	// Join columns horizontally (both same height)
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftStyle.Render(leftColumn),
-		rightStyle.Render(rightColumn),
+		leftColumn,
+		rightColumn,
 	)
 
 	// Combine with status bar
@@ -64,26 +77,50 @@ func (m Model) renderListView() string {
 	)
 }
 
-// renderTargetList renders the left column with target list
-func (m Model) renderTargetList(width int) string {
-	// The list already handles its own styling
-	return m.List.View()
+// renderTargetList renders the left column with target list and border
+func (m Model) renderTargetList(width, height int) string {
+	// Border adds 2 to height (1 top + 1 bottom) and 2 to width (1 left + 1 right)
+	contentWidth := width - 2
+	contentHeight := height - 2
+
+	// Set list size for this render - give full width for delegate to handle wrapping
+	m.List.SetSize(contentWidth, contentHeight)
+
+	// Get list content
+	listContent := m.List.View()
+
+	// Use lipgloss.Place to force content into exact dimensions
+	// This ensures the content fills the entire space, even if list is shorter
+	placedContent := lipgloss.Place(
+		contentWidth,
+		contentHeight,
+		lipgloss.Left,
+		lipgloss.Top,
+		listContent,
+	)
+
+	// Apply border WITHOUT Width/Height (let it wrap the placed content naturally)
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor)
+
+	return containerStyle.Render(placedContent)
 }
 
 // renderRecipePreview renders the right column with recipe and safety info
-func (m Model) renderRecipePreview(target *Target, width int) string {
+func (m Model) renderRecipePreview(target *Target, width, height int) string {
 	if target == nil {
-		return renderEmptyPreview(width)
+		return renderEmptyPreview(width, height)
 	}
 
-	var content strings.Builder
+	var builder strings.Builder
 
 	// Target name header
 	header := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(PrimaryColor).
 		Render(target.Name + ":")
-	content.WriteString(header + "\n\n")
+	util.WriteString(&builder, header+"\n\n")
 
 	// Recipe commands
 	if len(target.Recipe) > 0 {
@@ -92,39 +129,52 @@ func (m Model) renderRecipePreview(target *Target, width int) string {
 
 		for _, line := range target.Recipe {
 			// Indent each recipe line with tab
-			content.WriteString(recipeStyle.Render("  " + line) + "\n")
+			util.WriteString(&builder, recipeStyle.Render("  "+line)+"\n")
 		}
 	} else {
 		noRecipeStyle := lipgloss.NewStyle().
 			Foreground(MutedColor).
 			Italic(true)
-		content.WriteString(noRecipeStyle.Render("  (no recipe - meta target)") + "\n")
+		util.WriteString(&builder, noRecipeStyle.Render("  (no recipe - meta target)")+"\n")
 	}
 
 	// Safety warnings (if dangerous)
 	if target.IsDangerous && len(target.SafetyMatches) > 0 {
-		content.WriteString("\n")
-		content.WriteString(renderSafetyWarnings(target.SafetyMatches))
+		util.WriteString(&builder, "\n")
+		util.WriteString(&builder, renderSafetyWarnings(target.SafetyMatches))
 	}
 
-	// Wrap in container with padding and border
+	// Padding(1,2) = 2 vertical + 4 horizontal
+	// Border = 2 vertical + 2 horizontal
+	// Total overhead: 4 vertical, 6 horizontal
+	contentWidth := width - 6
+	contentHeight := height - 4
+
+	// Use lipgloss.Place to force content into exact dimensions
+	placedContent := lipgloss.Place(
+		contentWidth,
+		contentHeight,
+		lipgloss.Left,
+		lipgloss.Top,
+		builder.String(),
+	)
+
+	// Apply padding and border WITHOUT Width/Height (let it wrap naturally)
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(width - 2). // -2 for border
-		Height(0)         // Auto-height
+		Padding(1, 2)
 
-	return containerStyle.Render(content.String())
+	return containerStyle.Render(placedContent)
 }
 
 // renderSafetyWarnings renders safety match information
 func renderSafetyWarnings(matches []safety.MatchResult) string {
-	var content strings.Builder
+	var builder strings.Builder
 
 	for i, match := range matches {
 		if i > 0 {
-			content.WriteString("\n")
+			util.WriteString(&builder, "\n")
 		}
 
 		// Severity indicator and rule ID
@@ -147,21 +197,21 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			Foreground(severityColor).
 			Bold(true).
 			Render(severityStr + ": " + match.Rule.ID)
-		content.WriteString(severityHeader + "\n")
+		util.WriteString(&builder, severityHeader+"\n")
 
 		// Matched line
 		if match.MatchedLine != "" {
 			matchedStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#666666")).
 				Render("  Matched: " + match.MatchedLine)
-			content.WriteString(matchedStyle + "\n")
+			util.WriteString(&builder, matchedStyle+"\n")
 		}
 
 		// Description
 		if match.Rule.Description != "" {
 			descStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#AAAAAA"))
-			content.WriteString(descStyle.Render("  " + match.Rule.Description) + "\n")
+			util.WriteString(&builder, descStyle.Render("  "+match.Rule.Description)+"\n")
 		}
 
 		// Suggestion
@@ -169,22 +219,44 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			suggestionStyle := lipgloss.NewStyle().
 				Foreground(SecondaryColor).
 				Italic(true)
-			content.WriteString(suggestionStyle.Render("  💡 " + match.Rule.Suggestion) + "\n")
+			util.WriteString(&builder, suggestionStyle.Render("  💡 "+match.Rule.Suggestion)+"\n")
 		}
 	}
 
-	return content.String()
+	return builder.String()
 }
 
 // renderEmptyPreview shows placeholder when no target selected
-func renderEmptyPreview(width int) string {
+func renderEmptyPreview(width, height int) string {
+	emptyText := "Select a target to preview recipe"
+
 	emptyStyle := lipgloss.NewStyle().
 		Foreground(MutedColor).
-		Italic(true).
-		Align(lipgloss.Center).
-		Width(width)
+		Italic(true)
 
-	return emptyStyle.Render("Select a target to preview recipe")
+	content := emptyStyle.Render(emptyText)
+
+	// Same dimensions as recipe preview
+	contentWidth := width - 6
+	contentHeight := height - 4
+
+	// Use lipgloss.Place to force content into exact dimensions
+	// Center the text within the space
+	placedContent := lipgloss.Place(
+		contentWidth,
+		contentHeight,
+		lipgloss.Center,
+		lipgloss.Center,
+		content,
+	)
+
+	// Wrap in border with padding WITHOUT Width/Height
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Padding(1, 2)
+
+	return borderStyle.Render(placedContent)
 }
 
 // renderStatusBar renders the bottom status bar
@@ -210,38 +282,66 @@ func (m Model) renderStatusBar() string {
 		leftContent = fmt.Sprintf("%d targets", totalTargets)
 	}
 
-	// Right side: shortcuts
-	rightContent := "enter: run • g: graph • ?: help • q: quit"
+	// Right side: shortcuts - dynamically build from key bindings
+	var rightContent string
 
-	// If dangerous target selected, show warning
+	// If dangerous target selected, show warning with specific keys
 	if item := m.List.SelectedItem(); item != nil {
 		if target, ok := item.(Target); ok && target.IsDangerous {
 			if target.DangerLevel == safety.SeverityCritical {
 				rightContent = "⚠️  Dangerous command • enter: confirm & run • q: quit"
+			} else {
+				// Non-critical dangerous target, show normal shortcuts
+				rightContent = formatKeyBindings(m.KeyBindings)
 			}
+		} else {
+			// Normal target, show all shortcuts
+			rightContent = formatKeyBindings(m.KeyBindings)
 		}
+	} else {
+		// No target selected, show all shortcuts
+		rightContent = formatKeyBindings(m.KeyBindings)
 	}
 
-	// Build status bar with two sections
-	leftStyle := lipgloss.NewStyle().
-		Foreground(MutedColor)
-
-	rightStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Align(lipgloss.Right)
-
-	// Calculate widths
+	// Calculate content width (border=2 + padding=2)
+	contentWidth := m.Width - 4
 	leftWidth := len(leftContent) + 2
-	rightWidth := m.Width - leftWidth - 2
+	rightWidth := contentWidth - leftWidth
+
+	// Build status bar with two sections
+	leftStyle := lipgloss.NewStyle().Foreground(MutedColor)
+	rightStyle := lipgloss.NewStyle().Foreground(MutedColor).Align(lipgloss.Right)
 
 	left := leftStyle.Width(leftWidth).Render(leftContent)
 	right := rightStyle.Width(rightWidth).Render(rightContent)
 
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Background(lipgloss.Color("#2A2A2A")).
-		Padding(0, 1).
-		Width(m.Width)
+	content := left + right
 
-	return statusBarStyle.Render(left + right)
+	// Use lipgloss.Place to force content into exact width
+	placedContent := lipgloss.Place(
+		contentWidth,
+		1, // Single line height
+		lipgloss.Left,
+		lipgloss.Center,
+		content,
+	)
+
+	// Wrap in border WITHOUT Width (let it wrap naturally)
+	statusBarStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Foreground(MutedColor).
+		Padding(0, 1)
+
+	return statusBarStyle.Render(placedContent)
+}
+
+// formatKeyBindings formats key bindings as "key: description • key: description • ..."
+func formatKeyBindings(bindings []key.Binding) string {
+	var parts []string
+	for _, binding := range bindings {
+		help := binding.Help()
+		parts = append(parts, help.Key+": "+help.Desc)
+	}
+	return strings.Join(parts, " • ")
 }

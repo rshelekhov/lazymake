@@ -3,6 +3,8 @@ package graph
 import (
 	"fmt"
 	"strings"
+
+	"github.com/rshelekhov/lazymake/internal/util"
 )
 
 // TreeRenderer controls what annotations to show in the tree
@@ -32,11 +34,11 @@ func (g *Graph) RenderTree(renderer TreeRenderer) string {
 
 	// Handle cycles first - if there's a cycle, we can't render a proper tree
 	if g.HasCycle {
-		writeString(&builder, "⚠️  Circular dependency detected!\n")
-		writeString(&builder, "Cycle: ")
-		writeString(&builder, strings.Join(g.CycleNodes, " → "))
-		writeString(&builder, "\n\n")
-		writeString(&builder, "Fix the circular dependency in your Makefile before visualizing the graph.\n")
+		util.WriteString(&builder, "⚠️  Circular dependency detected!\n")
+		util.WriteString(&builder, "Cycle: ")
+		util.WriteString(&builder, strings.Join(g.CycleNodes, " → "))
+		util.WriteString(&builder, "\n\n")
+		util.WriteString(&builder, "Fix the circular dependency in your Makefile before visualizing the graph.\n")
 		return builder.String()
 	}
 
@@ -49,7 +51,7 @@ func (g *Graph) RenderTree(renderer TreeRenderer) string {
 	visited := make(map[string]bool)
 	for i, root := range g.Roots {
 		if i > 0 {
-			writeString(&builder, "\n") // Blank line between separate trees
+			util.WriteString(&builder, "\n") // Blank line between separate trees
 		}
 		renderNode(root, "", true, &builder, renderer, visited)
 	}
@@ -81,7 +83,7 @@ func renderNode(
 		if isLast {
 			connector = "└── "
 		}
-		writeString(builder, prefix+connector+nodeName+" (see above)\n")
+		util.WriteString(builder, prefix+connector+nodeName+" (see above)\n")
 		return
 	}
 
@@ -98,7 +100,7 @@ func renderNode(
 	nodeStr := buildNodeString(node, renderer)
 
 	// Write this node's line
-	writeString(builder, prefix+connector+nodeStr+"\n")
+	util.WriteString(builder, prefix+connector+nodeStr+"\n")
 
 	// Prepare prefix for children
 	extension := "│   "
@@ -176,8 +178,4 @@ func RenderLegend(showOrder, showCritical, showParallel bool) string {
 	}
 
 	return "Legend: " + strings.Join(parts, ", ")
-}
-
-func writeString(b *strings.Builder, s string) {
-	_, _ = b.WriteString(s)
 }

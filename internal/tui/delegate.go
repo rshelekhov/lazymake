@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
 )
@@ -18,10 +19,10 @@ type Target struct {
 	IsRecent    bool // Marks targets that appear in recent history
 
 	// Recipe and safety fields
-	Recipe        []string               // Command lines to execute
-	IsDangerous   bool                   // Whether target has dangerous commands
-	DangerLevel   safety.Severity        // Highest severity level
-	SafetyMatches []safety.MatchResult   // All matched safety rules
+	Recipe        []string             // Command lines to execute
+	IsDangerous   bool                 // Whether target has dangerous commands
+	DangerLevel   safety.Severity      // Highest severity level
+	SafetyMatches []safety.MatchResult // All matched safety rules
 }
 
 // Implement list.Item interface
@@ -44,13 +45,16 @@ func (h HeaderTarget) FilterValue() string { return "" }
 // ItemDelegate renders list items
 type ItemDelegate struct{}
 
-func (d ItemDelegate) Height() int { return 2 }
+func (d ItemDelegate) Height() int { return 3 } // Increased to handle text wrapping
 
 func (d ItemDelegate) Spacing() int { return 1 }
 
 func (d ItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
 func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	// Get available width for wrapping (subtract padding and margins)
+	availableWidth := m.Width() - 4 // Account for padding and list margins
+
 	// Handle separator
 	if _, ok := listItem.(SeparatorTarget); ok {
 		separator := SeparatorStyle.Render("─────────────────────────────────────")
@@ -93,20 +97,38 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	var str string
 	if index == m.Index() {
-		str = SelectedItemStyle.Render("▶ " + targetName)
+		// Wrap text to available width using a fresh style with Width set
+		wrappedStyle := lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true).
+			PaddingLeft(1).
+			Width(availableWidth)
+		str = wrappedStyle.Render("▶ " + targetName)
 	} else {
-		str = NormalItemStyle.Render("  " + targetName)
+		wrappedStyle := lipgloss.NewStyle().
+			Foreground(TextColor).
+			PaddingLeft(1).
+			Width(availableWidth)
+		str = wrappedStyle.Render("  " + targetName)
 	}
 
 	if target.Description != "" {
 		// Use different styles based on comment type
 		// ## comments use cyan (industry standard for documentation)
 		// # comments use gray (backward compatibility)
-		descStyle := DescriptionStyle
+		var descColor lipgloss.Color
 		if target.CommentType == makefile.CommentDouble {
-			descStyle = DocDescriptionStyle
+			descColor = SecondaryColor // Cyan for documented comments
+		} else {
+			descColor = MutedColor // Gray for regular comments
 		}
-		str += "\n" + descStyle.Render(target.Description)
+
+		// Wrap description to available width
+		wrappedDescStyle := lipgloss.NewStyle().
+			Foreground(descColor).
+			PaddingLeft(3).
+			Width(availableWidth)
+		str += "\n" + wrappedDescStyle.Render(target.Description)
 	}
 
 	_, _ = fmt.Fprint(w, str)
