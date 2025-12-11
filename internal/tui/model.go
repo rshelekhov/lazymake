@@ -9,6 +9,7 @@ import (
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
+	"github.com/rshelekhov/lazymake/internal/safety"
 )
 
 type AppState int
@@ -61,6 +62,21 @@ func NewModel(makefilePath string) Model {
 
 	depGraph := graph.BuildGraph(targets)
 
+	// Load safety configuration and run checks
+	safetyConfig, err := safety.LoadConfig()
+	if err != nil {
+		// Graceful degradation: continue without safety checks
+		safetyConfig = safety.DefaultConfig()
+	}
+
+	var safetyResults map[string]*safety.SafetyCheckResult
+	if safetyConfig.Enabled {
+		checker, err := safety.NewChecker(safetyConfig)
+		if err == nil {
+			safetyResults = checker.CheckAllTargets(targets)
+		}
+	}
+
 	// Convert targets to TUI format
 	tuiTargets := make([]Target, len(targets))
 	for i, t := range targets {
@@ -68,6 +84,16 @@ func NewModel(makefilePath string) Model {
 			Name:        t.Name,
 			Description: t.Description,
 			CommentType: t.CommentType,
+			Recipe:      t.Recipe,
+		}
+
+		// Populate safety fields if target was flagged
+		if safetyResults != nil {
+			if result, found := safetyResults[t.Name]; found {
+				tuiTargets[i].IsDangerous = result.IsDangerous
+				tuiTargets[i].DangerLevel = result.DangerLevel
+				tuiTargets[i].SafetyMatches = result.Matches
+			}
 		}
 	}
 
@@ -179,7 +205,7 @@ func buildRecentTargets(entries []history.Entry, allTargets []Target) []Target {
 	recentTargets := make([]Target, 0, len(entries))
 	for _, entry := range entries {
 		if t, ok := targetMap[entry.Name]; ok {
-			// Create a copy and mark as recent
+			// Create a copy and mark as recent (preserves all fields including safety)
 			recent := t
 			recent.IsRecent = true
 			recentTargets = append(recentTargets, recent)

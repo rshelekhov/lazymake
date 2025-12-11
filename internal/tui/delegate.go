@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rshelekhov/lazymake/internal/makefile"
+	"github.com/rshelekhov/lazymake/internal/safety"
 )
 
 // Target represents a Makefile target in the TUI
@@ -15,6 +16,12 @@ type Target struct {
 	Description string
 	CommentType makefile.CommentType
 	IsRecent    bool // Marks targets that appear in recent history
+
+	// Recipe and safety fields
+	Recipe        []string               // Command lines to execute
+	IsDangerous   bool                   // Whether target has dangerous commands
+	DangerLevel   safety.Severity        // Highest severity level
+	SafetyMatches []safety.MatchResult   // All matched safety rules
 }
 
 // Implement list.Item interface
@@ -64,9 +71,21 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	// Build the target name with optional clock emoji for recent targets
+	// Build the target name with indicators (priority: danger > recent)
 	var targetName string
-	if target.IsRecent {
+
+	// Danger indicators take priority
+	if target.IsDangerous {
+		switch target.DangerLevel {
+		case safety.SeverityCritical:
+			targetName = "🚨 " + target.Name
+		case safety.SeverityWarning:
+			targetName = "⚠️  " + target.Name
+		default:
+			// SeverityInfo - no indicator
+			targetName = target.Name
+		}
+	} else if target.IsRecent {
 		targetName = "⏱  " + target.Name
 	} else {
 		targetName = target.Name

@@ -19,10 +19,12 @@ func (m Model) View() string {
 		return "\n  ⏳ Executing: make " + m.ExecutingTarget + "\n\n  Please wait...\n"
 	case StateHelp:
 		return m.renderHelpView()
-	case StateGraph: // NEW
+	case StateGraph:
 		return m.renderGraphView()
 	case StateOutput:
 		return m.renderOutputView()
+	case StateList:
+		return m.renderListView()
 	default:
 		return lipgloss.NewStyle().Margin(1, 2).Render(m.List.View())
 	}
