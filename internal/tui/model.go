@@ -6,9 +6,11 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
+	"github.com/rshelekhov/lazymake/internal/safety"
 )
 
 type AppState int
@@ -19,6 +21,7 @@ const (
 	StateOutput
 	StateHelp
 	StateGraph
+	StateConfirmDangerous
 )
 
 type Model struct {
@@ -46,6 +49,12 @@ type Model struct {
 	MakefilePath  string   // Absolute path to current Makefile
 	RecentTargets []Target // Cached recent targets for current Makefile
 
+	// Confirmation state
+	PendingTarget *Target // Target awaiting dangerous command confirmation
+
+	// Key bindings for status bar display
+	KeyBindings []key.Binding
+
 	// Dimensions
 	Width  int
 	Height int
@@ -61,6 +70,21 @@ func NewModel(makefilePath string) Model {
 
 	depGraph := graph.BuildGraph(targets)
 
+	// Load safety configuration and run checks
+	safetyConfig, err := safety.LoadConfig()
+	if err != nil {
+		// Graceful degradation: continue without safety checks
+		safetyConfig = safety.DefaultConfig()
+	}
+
+	var safetyResults map[string]*safety.SafetyCheckResult
+	if safetyConfig.Enabled {
+		checker, err := safety.NewChecker(safetyConfig)
+		if err == nil {
+			safetyResults = checker.CheckAllTargets(targets)
+		}
+	}
+
 	// Convert targets to TUI format
 	tuiTargets := make([]Target, len(targets))
 	for i, t := range targets {
@@ -68,6 +92,16 @@ func NewModel(makefilePath string) Model {
 			Name:        t.Name,
 			Description: t.Description,
 			CommentType: t.CommentType,
+			Recipe:      t.Recipe,
+		}
+
+		// Populate safety fields if target was flagged
+		if safetyResults != nil {
+			if result, found := safetyResults[t.Name]; found {
+				tuiTargets[i].IsDangerous = result.IsDangerous
+				tuiTargets[i].DangerLevel = result.DangerLevel
+				tuiTargets[i].SafetyMatches = result.Matches
+			}
 		}
 	}
 
@@ -110,24 +144,44 @@ func NewModel(makefilePath string) Model {
 		items = append(items, t)
 	}
 
+	// Define key bindings for both list and status bar display
+	keyBindings := []key.Binding{
+		key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "run"),
+		),
+		key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "filter"),
+		),
+		key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "dependency graph"),
+		),
+		key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "help"),
+		),
+		key.NewBinding(
+			key.WithKeys("q"),
+			key.WithHelp("q", "quit"),
+		),
+	}
+
 	delegate := ItemDelegate{}
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Makefile Targets"
-	l.SetShowStatusBar(true)
+	l.SetShowStatusBar(false) // Disabled - we use custom status bar
+	l.SetShowHelp(false)      // Disabled - help text shown in custom status bar
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
 
+	// Customize filter prompt to be shorter and prevent truncation
+	l.FilterInput.Prompt = "/ "
+	l.FilterInput.PromptStyle = lipgloss.NewStyle().Foreground(SecondaryColor)
+
 	l.AdditionalShortHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			key.NewBinding(
-				key.WithKeys("g"),
-				key.WithHelp("g", "graph view"),
-			),
-			key.NewBinding(
-				key.WithKeys("?"),
-				key.WithHelp("?", "toggle help"),
-			),
-		}
+		return keyBindings
 	}
 
 	// Position cursor on first actual target (skip headers)
@@ -151,6 +205,7 @@ func NewModel(makefilePath string) Model {
 		History:       hist,
 		MakefilePath:  absPath,
 		RecentTargets: recentTargets,
+		KeyBindings:   keyBindings,
 	}
 }
 
@@ -179,7 +234,7 @@ func buildRecentTargets(entries []history.Entry, allTargets []Target) []Target {
 	recentTargets := make([]Target, 0, len(entries))
 	for _, entry := range entries {
 		if t, ok := targetMap[entry.Name]; ok {
-			// Create a copy and mark as recent
+			// Create a copy and mark as recent (preserves all fields including safety)
 			recent := t
 			recent.IsRecent = true
 			recentTargets = append(recentTargets, recent)

@@ -35,6 +35,32 @@
 - **Implementation complete**: LRU cache with graceful degradation, persistent across sessions
 - **Note**: Favorites and tags were skipped in favor of simplicity - fuzzy search + recent history covers most use cases
 
+### UI/UX Design Decisions
+
+#### Two-Column Layout + Status Bar (Hybrid Approach)
+**Decision**: Use two-column layout with bottom status bar for main interface
+- **Left column (30-40%)**: Target list with emoji indicators (🚨⚠️ for dangerous commands)
+  - Recent targets section
+  - Fast scanning and navigation
+  - Filtering support
+- **Right column (60-70%)**: Recipe preview pane
+  - Shows commands for selected target
+  - Safety warnings with severity, description, and suggestions (current implementation)
+  - Future: Syntax-highlighted multi-language recipes (feature #6)
+- **Bottom status bar**: Dynamic contextual information
+  - Stats: target count, dangerous count (e.g., "12 targets • 2 dangerous")
+  - OR contextual shortcuts that change based on selection
+  - Avoids redundancy - shows actionable info, not duplicate labels
+
+**Rationale**:
+- Proven pattern in successful TUI apps (glow, television, kanban, Bagels)
+- Provides detail without overwhelming the list view
+- Progressive enhancement: basic preview now, syntax highlighting later
+- Right pane serves dual purpose: safety info today, syntax highlighting tomorrow
+- Clean separation of concerns: navigation (left) + details (right) + actions (bottom)
+
+**Inspired by**: Glow (color palette and design), television (preview pane), and other Bubble Tea applications
+
 #### 4. Performance Profiling
 - Show execution time for each target
 - Highlight slow targets for optimization
@@ -54,6 +80,7 @@
 
 #### 7. Workspace/Project Management
 - Quick switching between different project Makefiles
+- Show in status bar what makefile is using now
 - Remember last-used targets per project
 - Support monorepo scenarios
 

@@ -1,2 +1,15 @@
 makefile: ./Makefile
 theme: default
+
+# Safety features are enabled by default
+# Uncomment and customize to change behavior:
+#
+# safety:
+#   enabled: true  # Set to false to disable all safety checks
+#
+#   # Exclude specific targets from safety checks:
+#   # exclude_targets:
+#   #   - clean
+#   #   - distclean
+#
+# See .lazymake.example.yaml for full configuration options

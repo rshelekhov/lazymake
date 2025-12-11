@@ -1,0 +1,144 @@
+# lazymake Configuration Example
+#
+# Place this file as:
+# - ~/.lazymake.yaml for global configuration
+# - ./.lazymake.yaml for project-specific configuration
+#
+# Global and project configs are merged:
+# - enabled: project overrides global
+# - enabled_rules, exclude_targets, custom_rules: union of both
+
+# Makefile path (default: "Makefile")
+makefile: Makefile
+
+# Theme (default: "default")
+theme: default
+
+# Safety Features Configuration
+safety:
+  # Master switch - enable/disable all safety checks
+  # Default: true (enabled by default to protect newcomers)
+  enabled: true
+
+  # Exclude specific targets from ALL safety checks
+  # Useful for targets you run frequently and trust completely
+  exclude_targets:
+    - clean          # Standard cleanup target
+    - distclean      # Deep cleanup
+    - reset-dev-db   # Known safe development operation
+
+  # Enable only specific built-in rules (omit to enable all 11 rules)
+  # Useful if you only care about certain types of dangerous operations
+  # Available rules: rm-rf-root, disk-wipe, database-drop, git-force-push,
+  #                  terraform-destroy, kubectl-delete, docker-system-prune,
+  #                  git-reset-hard, npm-uninstall-all, package-remove, chmod-777
+  #
+  # Example: Only check for the most critical operations
+  # enabled_rules:
+  #   - rm-rf-root
+  #   - database-drop
+  #   - git-force-push
+  #   - terraform-destroy
+  #   - kubectl-delete
+
+  # Custom rules - add project-specific dangerous patterns
+  custom_rules:
+    # Example 1: Production deployment detection
+    - id: "prod-deploy"
+      severity: critical  # critical, warning, or info
+      patterns:
+        - "kubectl apply.*production"
+        - "kubectl apply.*prod"
+        - "terraform apply.*prod"
+        - "helm.*--namespace=production"
+      description: "Deploying to production environment without review"
+      suggestion: "Get team approval before production deployments. Use staging first."
+
+    # Example 2: Database migrations in production
+    - id: "prod-migration"
+      severity: critical
+      patterns:
+        - "rails db:migrate.*RAILS_ENV=production"
+        - "alembic upgrade head.*production"
+        - "migrate.*--env=production"
+      description: "Running database migrations in production"
+      suggestion: "Backup database first. Test migration in staging. Have rollback plan ready."
+
+    # Example 3: AWS resource deletion
+    - id: "aws-resource-delete"
+      severity: critical
+      patterns:
+        - "aws.*delete-.*"
+        - "aws.*terminate-.*"
+        - "aws s3 rm.*--recursive"
+        - "aws rds delete-db-instance"
+      description: "Deleting AWS resources (instances, databases, S3 buckets)"
+      suggestion: "Verify resource names. Check for backups. Use AWS tags to protect critical resources."
+
+    # Example 4: Container registry operations
+    - id: "registry-cleanup"
+      severity: warning
+      patterns:
+        - "docker.*rmi.*-f"
+        - "docker image prune.*-a"
+        - "gcr.io.*delete"
+      description: "Removing Docker images or cleaning container registries"
+      suggestion: "Verify you're not deleting production images. Check image tags carefully."
+
+    # Example 5: Certificate/key operations
+    - id: "cert-key-ops"
+      severity: warning
+      patterns:
+        - "openssl.*-out.*key"
+        - "rm.*\\.(pem|key|crt|p12|pfx)"
+        - "vault.*delete.*secret"
+      description: "Operations involving certificates or secret keys"
+      suggestion: "Backup certificates before regenerating. Document key rotation procedures."
+
+    # Example 6: Cache invalidation
+    - id: "cache-invalidate"
+      severity: warning
+      patterns:
+        - "redis-cli.*FLUSHALL"
+        - "redis-cli.*FLUSHDB"
+        - "memcached.*flush_all"
+      description: "Invalidating entire cache (may cause performance degradation)"
+      suggestion: "Warn team about cache flush. Monitor application performance after."
+
+# Common Configuration Scenarios
+#
+# Scenario 1: Disable safety for experienced team (global ~/.lazymake.yaml)
+# safety:
+#   enabled: false
+#
+# Scenario 2: Enable only for critical operations (project .lazymake.yaml)
+# safety:
+#   enabled: true
+#   enabled_rules:
+#     - rm-rf-root
+#     - database-drop
+#     - terraform-destroy
+#
+# Scenario 3: Trust all cleanup targets (project .lazymake.yaml)
+# safety:
+#   exclude_targets:
+#     - clean
+#     - distclean
+#     - purge
+#     - reset
+#     - nuke-dev
+#     - nuke-test
+#
+# Scenario 4: Strict safety for production project (project .lazymake.yaml)
+# safety:
+#   enabled: true  # All built-in rules enabled
+#   custom_rules:
+#     - id: "any-prod-operation"
+#       severity: critical
+#       patterns: [".*prod.*", ".*production.*"]
+#       description: "Any operation mentioning production"
+#       suggestion: "Triple-check production operations"
+#
+# Scenario 5: Development-only project (project .lazymake.yaml)
+# safety:
+#   enabled: false  # Safe to disable for purely local dev projects
