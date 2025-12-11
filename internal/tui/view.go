@@ -23,6 +23,8 @@ func (m Model) View() string {
 		return m.renderGraphView()
 	case StateOutput:
 		return m.renderOutputView()
+	case StateConfirmDangerous:
+		return m.renderConfirmView()
 	case StateList:
 		return m.renderListView()
 	default:

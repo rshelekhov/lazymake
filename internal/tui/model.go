@@ -20,6 +20,7 @@ const (
 	StateOutput
 	StateHelp
 	StateGraph
+	StateConfirmDangerous
 )
 
 type Model struct {
@@ -46,6 +47,9 @@ type Model struct {
 	History       *history.History
 	MakefilePath  string   // Absolute path to current Makefile
 	RecentTargets []Target // Cached recent targets for current Makefile
+
+	// Confirmation state
+	PendingTarget *Target // Target awaiting dangerous command confirmation
 
 	// Dimensions
 	Width  int

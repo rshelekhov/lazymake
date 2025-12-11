@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/executor"
+	"github.com/rshelekhov/lazymake/internal/safety"
 )
 
 func (m Model) Init() tea.Cmd {
@@ -25,6 +26,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateHelp(msg)
 	case StateGraph:
 		return m.updateGraph(msg)
+	case StateConfirmDangerous:
+		return m.updateConfirmDangerous(msg)
 	case StateExecuting:
 		return m.updateExecuting(msg)
 	default:
@@ -70,6 +73,16 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			selected := m.List.SelectedItem()
 			if target, ok := selected.(Target); ok {
+				// Check if target is critical and requires confirmation
+				if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
+					// Show confirmation dialog for critical targets
+					targetCopy := target
+					m.PendingTarget = &targetCopy
+					m.State = StateConfirmDangerous
+					return m, nil
+				}
+
+				// Safe or non-critical target - execute immediately
 				// Record execution in history BEFORE starting
 				m.History.RecordExecution(m.MakefilePath, target.Name)
 				_ = m.History.Save() // Async, ignore errors (non-critical)
@@ -263,6 +276,49 @@ func computeViewportSize(winWidth, winHeight int) (int, int) {
 	}
 
 	return viewportWidth, viewportHeight
+}
+
+// updateConfirmDangerous handles the dangerous command confirmation dialog
+func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+
+		case "esc":
+			// Cancel confirmation, return to list
+			m.State = StateList
+			m.PendingTarget = nil
+			return m, nil
+
+		case "enter":
+			// Proceed with execution of dangerous target
+			if m.PendingTarget != nil {
+				target := *m.PendingTarget
+
+				// Record execution in history
+				m.History.RecordExecution(m.MakefilePath, target.Name)
+				_ = m.History.Save()
+
+				// Refresh recent targets
+				recentEntries := m.History.GetRecent(m.MakefilePath)
+				m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
+				// Clear pending target and start execution
+				m.PendingTarget = nil
+				m.State = StateExecuting
+				m.ExecutingTarget = target.Name
+				return m, executeTarget(target.Name)
+			}
+		}
+
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+
+	return m, nil
 }
 
 // Custom message for execution results
