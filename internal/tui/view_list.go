@@ -131,6 +131,13 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 			// Indent each recipe line with tab
 			util.WriteString(&builder, recipeStyle.Render("  "+line)+"\n")
 		}
+
+		// Graph view hint
+		util.WriteString(&builder, "\n")
+		hintStyle := lipgloss.NewStyle().
+			Foreground(SecondaryColor).
+			Italic(true)
+		util.WriteString(&builder, hintStyle.Render("  💡 Press 'g' to view full dependency graph")+"\n")
 	} else {
 		noRecipeStyle := lipgloss.NewStyle().
 			Foreground(MutedColor).

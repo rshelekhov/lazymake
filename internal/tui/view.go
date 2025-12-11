@@ -132,11 +132,35 @@ func (m Model) renderHelpView() string {
 
 // renderGraphView displays the dependency graph for the selected target
 func (m Model) renderGraphView() string {
+	if m.Width == 0 || m.Height == 0 {
+		// Fallback for zero dimensions
+		return "Loading graph..."
+	}
+
+	graphContent := m.renderGraphContent(m.Width)
+
+	legend := m.renderGraphLegend(m.Width)
+
+	statusBar := m.renderGraphStatusBar(m.Width)
+
+	sections := []string{graphContent}
+	if legend != "" {
+		sections = append(sections, legend)
+	}
+	sections = append(sections, statusBar)
+
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// renderGraphContent renders the main graph content with border
+func (m Model) renderGraphContent(width int) string {
 	var builder strings.Builder
 
+	// Title
 	title := TitleStyle.Render("Dependency Graph")
 	util.WriteString(&builder, title+"\n\n")
 
+	// Target info (if specific target selected)
 	if m.GraphTarget != "" {
 		targetInfo := lipgloss.NewStyle().
 			Foreground(PrimaryColor).
@@ -145,6 +169,7 @@ func (m Model) renderGraphView() string {
 		util.WriteString(&builder, targetInfo+"\n")
 	}
 
+	// Depth info
 	depthStr := "all levels"
 	if m.GraphDepth >= 0 {
 		depthStr = fmt.Sprintf("%d level(s)", m.GraphDepth+1)
@@ -152,15 +177,13 @@ func (m Model) renderGraphView() string {
 	depthInfo := lipgloss.NewStyle().
 		Foreground(MutedColor).
 		Render(fmt.Sprintf("Depth: %s", depthStr))
-
 	util.WriteString(&builder, depthInfo+"\n\n")
 
+	// Render tree
 	var graphToRender *graph.Graph
 	if m.GraphTarget != "" && m.Graph.Nodes[m.GraphTarget] != nil {
-		// Show subgraph for specific target
 		graphToRender = m.Graph.GetSubgraph(m.GraphTarget, m.GraphDepth)
 	} else {
-		// Show full graph
 		graphToRender = m.Graph
 	}
 
@@ -171,25 +194,127 @@ func (m Model) renderGraphView() string {
 	}
 
 	treeStr := graphToRender.RenderTree(renderer)
-	util.WriteString(&builder, treeStr+"\n")
+	util.WriteString(&builder, treeStr)
 
-	legend := graph.RenderLegend(m.ShowOrder, m.ShowCritical, m.ShowParallel)
-	if legend != "" {
-		legendStyled := lipgloss.NewStyle().
-			Foreground(MutedColor).
-			Render(legend)
-		util.WriteString(&builder, legendStyled+"\n")
+	// Apply border (matching main view pattern)
+	// Set width to full terminal width minus border
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Padding(1, 2).
+		Width(width - 2) // Account for border (2)
+
+	return containerStyle.Render(builder.String())
+}
+
+// renderGraphLegend renders an enhanced legend with color-coded symbols
+func (m Model) renderGraphLegend(width int) string {
+	if !m.ShowOrder && !m.ShowCritical && !m.ShowParallel {
+		return "" // Skip if no annotations enabled
 	}
 
-	util.WriteString(&builder, "\n")
-	controls := "g/esc = return • +/- = depth • o = order • c = critical • p = parallel • q = quit"
-	controlsStyled := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render(controls)
-	util.WriteString(&builder, controlsStyled)
+	var builder strings.Builder
 
-	containerStyle := lipgloss.NewStyle().Padding(1, 2)
-	return containerStyle.Render(builder.String())
+	// Build legend items with colors
+	var items []string
+
+	if m.ShowOrder {
+		item := lipgloss.NewStyle().
+			Foreground(SecondaryColor).
+			Bold(true).
+			Render("[N]") +
+			"  " +
+			lipgloss.NewStyle().
+				Foreground(TextColor).
+				Render("Execution Order")
+		items = append(items, item)
+	}
+
+	if m.ShowCritical {
+		item := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFD700")). // Gold
+			Bold(true).
+			Render(" ★ ") +
+			"  " +
+			lipgloss.NewStyle().
+				Foreground(TextColor).
+				Render("Critical Path")
+		items = append(items, item)
+	}
+
+	if m.ShowParallel {
+		item := lipgloss.NewStyle().
+			Foreground(SuccessColor). // Green
+			Bold(true).
+			Render(" ∥ ") +
+			"  " +
+			lipgloss.NewStyle().
+				Foreground(TextColor).
+				Render("Parallel Execution")
+		items = append(items, item)
+	}
+
+	// Join items
+	for _, item := range items {
+		util.WriteString(&builder, item+"\n")
+	}
+
+	// Apply border
+	// Set width to full terminal width minus border
+	legendStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Padding(1, 2).
+		Width(width - 2) // Account for border (2)
+
+	return legendStyle.Render(builder.String())
+}
+
+// renderGraphStatusBar renders the keyboard controls in status bar format
+func (m Model) renderGraphStatusBar(width int) string {
+	// Left side: graph stats
+	leftContent := ""
+	if m.GraphTarget != "" {
+		leftContent = fmt.Sprintf("Target: %s", m.GraphTarget)
+	} else if m.Graph != nil {
+		nodeCount := len(m.Graph.Nodes)
+		leftContent = fmt.Sprintf("%d nodes", nodeCount)
+	}
+
+	// Right side: keyboard shortcuts
+	rightContent := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
+
+	// Calculate widths (border=2 + padding=2)
+	contentWidth := width - 4
+	leftWidth := len(leftContent) + 2
+	rightWidth := contentWidth - leftWidth
+
+	// Apply styles
+	leftStyle := lipgloss.NewStyle().Foreground(MutedColor)
+	rightStyle := lipgloss.NewStyle().Foreground(MutedColor).Align(lipgloss.Right)
+
+	left := leftStyle.Width(leftWidth).Render(leftContent)
+	right := rightStyle.Width(rightWidth).Render(rightContent)
+
+	content := left + right
+
+	// Place content (single line height)
+	placedContent := lipgloss.Place(
+		contentWidth,
+		1,
+		lipgloss.Left,
+		lipgloss.Center,
+		content,
+	)
+
+	// Wrap in border (matching view_list.go pattern)
+	statusBarStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Foreground(MutedColor).
+		Padding(0, 1)
+
+	return statusBarStyle.Render(placedContent)
 }
 
 // renderOutputView displays output of the executed target
