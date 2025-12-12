@@ -145,6 +145,13 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		util.WriteString(&builder, noRecipeStyle.Render("  (no recipe - meta target)")+"\n")
 	}
 
+	// Variables section (if any variables used by this target)
+	targetVariables := m.getVariablesForTarget(target.Name)
+	if len(targetVariables) > 0 {
+		util.WriteString(&builder, "\n")
+		util.WriteString(&builder, renderVariablesSection(targetVariables))
+	}
+
 	// Safety warnings (if dangerous)
 	if target.IsDangerous && len(target.SafetyMatches) > 0 {
 		util.WriteString(&builder, "\n")
@@ -449,6 +456,69 @@ func renderRecentTargetInfo(target Target) string {
 	statsStyle := lipgloss.NewStyle().Foreground(TextColor)
 	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Last run: %s\n", formatDuration(stats.LastDuration))))
 	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+
+	return builder.String()
+}
+
+// getVariablesForTarget returns variables used by a specific target
+func (m Model) getVariablesForTarget(targetName string) []string {
+	var result []string
+
+	for _, variable := range m.Variables {
+		for _, usedTarget := range variable.UsedByTargets {
+			if usedTarget == targetName {
+				// Format: NAME = value
+				result = append(result, fmt.Sprintf("%s = %s", variable.Name, variable.ExpandedValue))
+				break
+			}
+		}
+	}
+
+	return result
+}
+
+// renderVariablesSection renders the variables used by a target
+func renderVariablesSection(vars []string) string {
+	if len(vars) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	// Separator
+	separator := lipgloss.NewStyle().
+		Foreground(MutedColor).
+		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	util.WriteString(&builder, separator+"\n\n")
+
+	// Header
+	header := lipgloss.NewStyle().
+		Foreground(SecondaryColor).
+		Bold(true).
+		Render("  📦 Variables Used")
+	util.WriteString(&builder, header+"\n\n")
+
+	// List variables (max 5, show "and N more")
+	displayCount := min(len(vars), 5)
+	varStyle := lipgloss.NewStyle().Foreground(TextColor)
+
+	for i := 0; i < displayCount; i++ {
+		util.WriteString(&builder, varStyle.Render("    "+vars[i])+"\n")
+	}
+
+	if len(vars) > 5 {
+		moreStyle := lipgloss.NewStyle().
+			Foreground(MutedColor).
+			Italic(true)
+		util.WriteString(&builder, moreStyle.Render(fmt.Sprintf("    ... and %d more\n", len(vars)-5)))
+	}
+
+	// Hint to view all
+	util.WriteString(&builder, "\n")
+	hintStyle := lipgloss.NewStyle().
+		Foreground(SecondaryColor).
+		Italic(true)
+	util.WriteString(&builder, hintStyle.Render("    💡 Press 'v' to view all variables")+"\n")
 
 	return builder.String()
 }

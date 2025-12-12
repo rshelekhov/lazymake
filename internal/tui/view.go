@@ -27,6 +27,8 @@ func (m Model) View() string {
 		return m.renderOutputView()
 	case StateConfirmDangerous:
 		return m.renderConfirmView()
+	case StateVariables:
+		return m.renderVariablesView()
 	case StateList:
 		return m.renderListView()
 	default:

@@ -32,6 +32,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateConfirmDangerous(msg)
 	case StateExecuting:
 		return m.updateExecuting(msg)
+	case StateVariables:
+		return m.updateVariables(msg)
 	default:
 		return m, nil
 	}
@@ -61,6 +63,12 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "?":
 			m.State = StateHelp
+			return m, nil
+
+		case "v":
+			// Toggle variable inspector view
+			m.State = StateVariables
+			m.VariableListIndex = 0
 			return m, nil
 
 		case "g":
@@ -391,4 +399,38 @@ func tickTimer() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return timerTickMsg{}
 	})
+}
+
+// updateVariables handles the variable inspector view state
+func (m Model) updateVariables(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+
+		case "esc", "v":
+			// Return to list view
+			m.State = StateList
+			return m, nil
+
+		case "up", "k":
+			// Navigate up in variable list
+			if m.VariableListIndex > 0 {
+				m.VariableListIndex--
+			}
+
+		case "down", "j":
+			// Navigate down in variable list
+			if m.VariableListIndex < len(m.Variables)-1 {
+				m.VariableListIndex++
+			}
+		}
+
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+	}
+
+	return m, nil
 }
