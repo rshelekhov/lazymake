@@ -62,6 +62,15 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
   - Persistent across sessions: History stored in `~/.cache/lazymake/history.json`
   - Navigation: Arrow keys skip over section headers and separators
 
+- **Performance profiling**: Track execution time and identify performance regressions
+  - Real-time execution timer: Updates every 100ms with progress indicators (🟢 on track, 🔵 finishing up, 🔴 slower than usual)
+  - Automatic regression detection: Alerts when targets are >25% slower than average
+  - Context-aware display: Performance info shown only when relevant (regressed or recent targets)
+  - Visual indicators: 📈 for regressed targets, duration badges color-coded by performance
+  - Performance history: Stores last 10 executions per target with stats (avg, min, max)
+  - Post-execution alerts: Warnings appear after slow runs with actionable insights
+  - Persistent tracking: Performance data survives across sessions
+
 - **Dangerous command detection**: Protect against accidental destructive operations
   - Visual indicators: 🚨 for critical, ⚠️ for warning-level dangerous commands
   - Two-column layout: Recipe preview shows exactly what will execute
@@ -74,7 +83,6 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
 ### Planned
 
 #### High Priority
-- **Performance profiling**: Track execution time and build history to identify slow targets
 - **Better error handling**: Parse and highlight common Makefile errors with helpful suggestions
 
 ### Nice to Have
@@ -207,15 +215,21 @@ lazymake tracks your most frequently used targets to speed up repetitive workflo
 
 ```
 RECENT
-⏱  test        Run all tests
-⏱  build       Build the application
-⏱  lint        Run linters
+⏱  test        Run all tests                          8.1s
+⏱  build       Build the application                  3.4s
+⏱  lint        Run linters                            0.3s
 ──────────────────────────────────
 ALL TARGETS
 ▶ build        Build the application
   clean        Clean build artifacts
+📈 test        Run all tests                          8.1s
   deploy       Deploy to production
 ```
+
+**Indicators:**
+- ⏱ = Recently executed (with duration badge)
+- 📈 = Performance regression detected (>25% slower)
+- Duration badges color-coded: green (<1s), cyan (normal), orange (regressed)
 
 ### Benefits
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/graph"
+	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/util"
 )
@@ -17,7 +18,7 @@ func (m Model) View() string {
 
 	switch m.State {
 	case StateExecuting:
-		return "\n  ⏳ Executing: make " + m.ExecutingTarget + "\n\n  Please wait...\n"
+		return m.renderExecutingView()
 	case StateHelp:
 		return m.renderHelpView()
 	case StateGraph:
@@ -326,6 +327,25 @@ func (m Model) renderOutputView() string {
 		header = SuccessStyle.Render("✓ Success: make " + m.ExecutingTarget)
 	}
 
+	// Check for performance regression
+	var regressionAlert string
+	for _, target := range m.Targets {
+		if target.Name == m.ExecutingTarget && target.PerfStats != nil && target.PerfStats.IsRegressed {
+			stats := target.PerfStats
+			change := int(((float64(stats.LastDuration) - float64(stats.AvgDuration)) / float64(stats.AvgDuration)) * 100)
+
+			alertStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("220")).
+				Bold(true)
+
+			regressionAlert = "\n" + alertStyle.Render(fmt.Sprintf("⚠️  This run took %s (%d%% slower than usual avg %s)",
+				formatDuration(stats.LastDuration),
+				change,
+				formatDuration(stats.AvgDuration)))
+			break
+		}
+	}
+
 	contentWidth := getContentWidth(m.Width)
 	// Calculate inner width for text: subtract border (2) + padding (4) = 6
 	innerWidth := max(contentWidth-6, 20)
@@ -340,7 +360,7 @@ func (m Model) renderOutputView() string {
 		Foreground(MutedColor).
 		Render("\nPress esc to return • q to quit")
 
-	return "\n" + header + "\n\n" + viewportStyle.Render(m.Viewport.View()) + footer
+	return "\n" + header + regressionAlert + "\n\n" + viewportStyle.Render(m.Viewport.View()) + footer
 }
 
 // getContentWidth calculates responsive width for content blocks
@@ -348,4 +368,49 @@ func (m Model) renderOutputView() string {
 func getContentWidth(terminalWidth int) int {
 	width := min(max(int(float64(terminalWidth)*0.9), 40), 120)
 	return width
+}
+
+// renderExecutingView renders the execution screen with real-time timer
+func (m Model) renderExecutingView() string {
+	elapsed := m.ExecutionElapsed
+
+	// Get performance stats for the executing target
+	var stats *history.PerformanceStats
+	for _, target := range m.Targets {
+		if target.Name == m.ExecutingTarget {
+			stats = target.PerfStats
+			break
+		}
+	}
+
+	var statusLine string
+	if stats != nil && stats.AvgDuration > 0 {
+		// Show progress indicator
+		progress := float64(elapsed) / float64(stats.AvgDuration)
+		avgStr := formatDuration(stats.AvgDuration)
+
+		var progressIndicator string
+		if progress < 0.8 {
+			progressIndicator = "🟢 on track"
+		} else if progress < 1.2 {
+			progressIndicator = "🔵 finishing up"
+		} else {
+			progressIndicator = "🔴 slower than usual"
+		}
+
+		statusLine = fmt.Sprintf("  Elapsed: %s / ~%s  %s",
+			formatDuration(elapsed),
+			avgStr,
+			progressIndicator)
+	} else {
+		// Simple timer (no performance history)
+		statusLine = fmt.Sprintf("  Elapsed: %s", formatDuration(elapsed))
+	}
+
+	header := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(PrimaryColor).
+		Render("\n  ⏳ Executing: make " + m.ExecutingTarget)
+
+	return header + "\n\n" + statusLine + "\n\n  Please wait...\n"
 }

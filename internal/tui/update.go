@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -93,7 +95,12 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				m.State = StateExecuting
 				m.ExecutingTarget = target.Name
-				return m, executeTarget(target.Name)
+				m.ExecutionStartTime = time.Now()
+				m.ExecutionElapsed = 0
+				return m, tea.Batch(
+					executeTarget(target.Name),
+					tickTimer(), // Start timer
+				)
 			}
 
 		case "down", "j":
@@ -246,11 +253,34 @@ func (m Model) updateGraph(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case timerTickMsg:
+		// Update elapsed time
+		if m.State == StateExecuting {
+			m.ExecutionElapsed = time.Since(m.ExecutionStartTime)
+			return m, tickTimer() // Continue ticking
+		}
+		return m, nil // Stop if not executing
+
 	case executeFinishedMsg:
+		// Timer stops automatically (state changes from StateExecuting)
+
+		// Record execution with timing data
+		success := msg.result.Err == nil
+		m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, msg.result.Duration, success)
+		_ = m.History.Save() // Async, ignore errors
+
+		// Refresh performance stats for all targets
+		enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
+
+		// Refresh recent targets to show updated timing
+		recentEntries := m.History.GetRecent(m.MakefilePath)
+		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
 		m.State = StateOutput
 		m.Output = msg.result.Output
 		m.ExecutionError = msg.result.Err
 		m.initViewport(msg.result.Output)
+
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
@@ -274,8 +304,15 @@ func (m *Model) resizeViewport() {
 func computeViewportSize(winWidth, winHeight int) (int, int) {
 	width := getContentWidth(winWidth)
 
-	viewportWidth := width - 6      // 2 border + 4 padding
-	viewportHeight := winHeight - 8 // header/footer + borders
+	viewportWidth := width - 6 // 2 border + 4 padding
+
+	// Account for UI elements:
+	// - Header (1 line) + newline (1)
+	// - Potential regression alert (1-2 lines)
+	// - Viewport border (2 lines)
+	// - Footer (2 lines: newline + text)
+	// Total overhead: ~8-9 lines
+	viewportHeight := winHeight - 10
 
 	if viewportWidth < 20 {
 		viewportWidth = 20
@@ -318,7 +355,12 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.PendingTarget = nil
 				m.State = StateExecuting
 				m.ExecutingTarget = target.Name
-				return m, executeTarget(target.Name)
+				m.ExecutionStartTime = time.Now()
+				m.ExecutionElapsed = 0
+				return m, tea.Batch(
+					executeTarget(target.Name),
+					tickTimer(), // Start timer
+				)
 			}
 		}
 
@@ -335,9 +377,18 @@ type executeFinishedMsg struct {
 	result executor.Result
 }
 
+// Custom message for timer ticks
+type timerTickMsg struct{}
+
 func executeTarget(target string) tea.Cmd {
 	return func() tea.Msg {
 		result := executor.Execute(target)
 		return executeFinishedMsg{result: result}
 	}
+}
+
+func tickTimer() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return timerTickMsg{}
+	})
 }

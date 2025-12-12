@@ -151,6 +151,13 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		util.WriteString(&builder, renderSafetyWarnings(target.SafetyMatches))
 	}
 
+	// Performance section (context-aware)
+	perfSection := renderPerformanceSection(*target)
+	if perfSection != "" {
+		util.WriteString(&builder, "\n")
+		util.WriteString(&builder, perfSection)
+	}
+
 	// Padding(1,2) = 2 vertical + 4 horizontal
 	// Border = 2 vertical + 2 horizontal
 	// Total overhead: 4 vertical, 6 horizontal
@@ -271,6 +278,7 @@ func (m Model) renderStatusBar() string {
 	// Count stats
 	totalTargets := 0
 	dangerousCount := 0
+	regressedCount := 0
 
 	for _, item := range m.List.Items() {
 		if target, ok := item.(Target); ok {
@@ -278,16 +286,24 @@ func (m Model) renderStatusBar() string {
 			if target.IsDangerous {
 				dangerousCount++
 			}
+			if target.PerfStats != nil && target.PerfStats.IsRegressed {
+				regressedCount++
+			}
 		}
 	}
 
 	// Left side: stats
-	var leftContent string
+	leftStats := []string{fmt.Sprintf("%d targets", totalTargets)}
+
 	if dangerousCount > 0 {
-		leftContent = fmt.Sprintf("%d targets • %d dangerous", totalTargets, dangerousCount)
-	} else {
-		leftContent = fmt.Sprintf("%d targets", totalTargets)
+		leftStats = append(leftStats, fmt.Sprintf("%d dangerous", dangerousCount))
 	}
+
+	if regressedCount > 0 {
+		leftStats = append(leftStats, fmt.Sprintf("%d regressed 📈", regressedCount))
+	}
+
+	leftContent := strings.Join(leftStats, " • ")
 
 	// Right side: shortcuts - dynamically build from key bindings
 	var rightContent string
@@ -351,4 +367,88 @@ func formatKeyBindings(bindings []key.Binding) string {
 		parts = append(parts, help.Key+": "+help.Desc)
 	}
 	return strings.Join(parts, " • ")
+}
+
+// renderPerformanceSection returns context-aware performance info
+// Returns empty string if no performance data or not relevant to show
+func renderPerformanceSection(target Target) string {
+	if target.PerfStats == nil {
+		return "" // No data, no section
+	}
+
+	stats := target.PerfStats
+
+	// Context-aware content
+	if stats.IsRegressed {
+		return renderRegressionAlert(target)
+	} else if target.IsRecent && stats.ExecutionCount > 0 {
+		return renderRecentTargetInfo(target)
+	}
+
+	return "" // Default: no section
+}
+
+// renderRegressionAlert renders a warning about performance regression
+func renderRegressionAlert(target Target) string {
+	stats := target.PerfStats
+	change := int(((float64(stats.LastDuration) - float64(stats.AvgDuration)) / float64(stats.AvgDuration)) * 100)
+
+	var builder strings.Builder
+
+	// Separator
+	separator := lipgloss.NewStyle().
+		Foreground(MutedColor).
+		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	util.WriteString(&builder, separator+"\n\n")
+
+	// Header
+	header := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("220")).
+		Bold(true).
+		Render("  📈 Performance Regression Detected")
+	util.WriteString(&builder, header+"\n\n")
+
+	// Stats
+	statsStyle := lipgloss.NewStyle().Foreground(TextColor)
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Current:  %s\n", formatDuration(stats.LastDuration))))
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (last %d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+
+	changeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Bold(true)
+	util.WriteString(&builder, statsStyle.Render("    Change:   "))
+	util.WriteString(&builder, changeStyle.Render(fmt.Sprintf("+%d%% slower", change))+"\n\n")
+
+	// Hint
+	hintStyle := lipgloss.NewStyle().
+		Foreground(SecondaryColor).
+		Italic(true)
+	util.WriteString(&builder, hintStyle.Render("    💡 This target recently got slower - investigate recent changes"))
+
+	return builder.String()
+}
+
+// renderRecentTargetInfo renders performance info for recently executed targets
+func renderRecentTargetInfo(target Target) string {
+	stats := target.PerfStats
+
+	var builder strings.Builder
+
+	// Separator
+	separator := lipgloss.NewStyle().
+		Foreground(MutedColor).
+		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	util.WriteString(&builder, separator+"\n\n")
+
+	// Header
+	header := lipgloss.NewStyle().
+		Foreground(SecondaryColor).
+		Bold(true).
+		Render("  ⏱ Performance")
+	util.WriteString(&builder, header+"\n\n")
+
+	// Stats
+	statsStyle := lipgloss.NewStyle().Foreground(TextColor)
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Last run: %s\n", formatDuration(stats.LastDuration))))
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+
+	return builder.String()
 }

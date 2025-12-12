@@ -2,6 +2,7 @@ package tui
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -51,6 +52,10 @@ type Model struct {
 
 	// Confirmation state
 	PendingTarget *Target // Target awaiting dangerous command confirmation
+
+	// Execution timing
+	ExecutionStartTime time.Time
+	ExecutionElapsed   time.Duration
 
 	// Key bindings for status bar display
 	KeyBindings []key.Binding
@@ -105,6 +110,12 @@ func NewModel(makefilePath string) Model {
 		}
 	}
 
+	// Get absolute Makefile path early (needed for performance enrichment)
+	absPath, err := filepath.Abs(makefilePath)
+	if err != nil {
+		absPath = makefilePath // Fallback to original path
+	}
+
 	// Load history
 	hist, err := history.Load()
 	if err != nil {
@@ -112,15 +123,12 @@ func NewModel(makefilePath string) Model {
 		hist = &history.History{Entries: make(map[string][]history.Entry)}
 	}
 
-	// Get absolute Makefile path
-	absPath, err := filepath.Abs(makefilePath)
-	if err != nil {
-		absPath = makefilePath // Fallback to original path
-	}
-
 	// Filter valid targets from history
 	targetNames := extractTargetNames(tuiTargets)
 	hist.FilterValid(absPath, targetNames)
+
+	// Enrich targets with performance stats
+	enrichTargetsWithPerformance(hist, absPath, tuiTargets)
 
 	// Get recent entries and build recent targets list
 	recentEntries := hist.GetRecent(absPath)
@@ -218,6 +226,13 @@ func extractTargetNames(targets []Target) []string {
 	return names
 }
 
+// enrichTargetsWithPerformance populates PerfStats for all targets
+func enrichTargetsWithPerformance(hist *history.History, makefilePath string, targets []Target) {
+	for i := range targets {
+		targets[i].PerfStats = hist.GetPerformanceStats(makefilePath, targets[i].Name)
+	}
+}
+
 // buildRecentTargets creates TUI targets from history entries
 func buildRecentTargets(entries []history.Entry, allTargets []Target) []Target {
 	if len(entries) == 0 {
@@ -234,7 +249,7 @@ func buildRecentTargets(entries []history.Entry, allTargets []Target) []Target {
 	recentTargets := make([]Target, 0, len(entries))
 	for _, entry := range entries {
 		if t, ok := targetMap[entry.Name]; ok {
-			// Create a copy and mark as recent (preserves all fields including safety)
+			// Create a copy and mark as recent (preserves all fields including safety & performance)
 			recent := t
 			recent.IsRecent = true
 			recentTargets = append(recentTargets, recent)
