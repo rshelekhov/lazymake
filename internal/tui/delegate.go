@@ -3,10 +3,12 @@ package tui
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
 )
@@ -23,6 +25,9 @@ type Target struct {
 	IsDangerous   bool                 // Whether target has dangerous commands
 	DangerLevel   safety.Severity      // Highest severity level
 	SafetyMatches []safety.MatchResult // All matched safety rules
+
+	// Performance fields
+	PerfStats *history.PerformanceStats // nil if no data
 }
 
 // Implement list.Item interface
@@ -75,7 +80,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	// Build the target name with indicators (priority: danger > recent)
+	// Build the target name with indicators (priority: danger > regression > recent)
 	var targetName string
 
 	// Danger indicators take priority
@@ -89,8 +94,10 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 			// SeverityInfo - no indicator
 			targetName = target.Name
 		}
+	} else if target.PerfStats != nil && target.PerfStats.IsRegressed {
+		targetName = "📈 " + target.Name // Regression indicator
 	} else if target.IsRecent {
-		targetName = "⏱  " + target.Name
+		targetName = "⏱  " + target.Name // Recent indicator
 	} else {
 		targetName = target.Name
 	}
@@ -131,5 +138,49 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		str += "\n" + wrappedDescStyle.Render(target.Description)
 	}
 
+	// Add duration badge on line 3 if appropriate
+	if shouldShowDurationBadge(target) {
+		durationStr := formatDuration(target.PerfStats.LastDuration)
+		color := getDurationColor(target.PerfStats)
+		badge := lipgloss.NewStyle().
+			Foreground(color).
+			Align(lipgloss.Right).
+			PaddingLeft(3).
+			Width(availableWidth).
+			Render(durationStr)
+		str += "\n" + badge
+	}
+
 	_, _ = fmt.Fprint(w, str)
+}
+
+// shouldShowDurationBadge returns true if we should show duration badge for this target
+func shouldShowDurationBadge(target Target) bool {
+	if target.PerfStats == nil {
+		return false
+	}
+	// Show if: regressed or recent (users judge "slow" by seeing duration)
+	return target.PerfStats.IsRegressed || target.IsRecent
+}
+
+// formatDuration formats a duration for display
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	} else if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	} else {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+}
+
+// getDurationColor returns the color for a duration badge
+func getDurationColor(stats *history.PerformanceStats) lipgloss.Color {
+	if stats.IsRegressed {
+		return lipgloss.Color("220") // Orange (warning)
+	} else if stats.AvgDuration < time.Second {
+		return lipgloss.Color("42") // Green (fast)
+	} else {
+		return lipgloss.Color("86") // Cyan (normal)
+	}
 }
