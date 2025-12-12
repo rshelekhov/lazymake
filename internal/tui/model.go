@@ -12,6 +12,7 @@ import (
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
+	"github.com/rshelekhov/lazymake/internal/variables"
 )
 
 type AppState int
@@ -23,6 +24,7 @@ const (
 	StateHelp
 	StateGraph
 	StateConfirmDangerous
+	StateVariables
 )
 
 type Model struct {
@@ -44,6 +46,10 @@ type Model struct {
 	ShowOrder    bool   // Show execution order numbers
 	ShowCritical bool   // Show critical path markers
 	ShowParallel bool   // Show parallel markers
+
+	// Variable inspector state
+	Variables         []variables.Variable
+	VariableListIndex int
 
 	// History state
 	History       *history.History
@@ -74,6 +80,19 @@ func NewModel(makefilePath string) Model {
 	}
 
 	depGraph := graph.BuildGraph(targets)
+
+	// Parse and analyze variables
+	vars, err := variables.ParseVariables(makefilePath)
+	if err != nil {
+		// Graceful degradation: continue without variables
+		vars = []variables.Variable{}
+	} else {
+		// Expand variables using make
+		_ = variables.ExpandVariables(makefilePath, vars)
+
+		// Analyze usage across targets
+		variables.AnalyzeUsage(vars, targets)
+	}
 
 	// Load safety configuration and run checks
 	safetyConfig, err := safety.LoadConfig()
@@ -202,18 +221,20 @@ func NewModel(makefilePath string) Model {
 	}
 
 	return Model{
-		List:          l,
-		State:         StateList,
-		Targets:       tuiTargets,
-		Graph:         depGraph,
-		GraphDepth:    -1,
-		ShowOrder:     true,
-		ShowCritical:  true,
-		ShowParallel:  true,
-		History:       hist,
-		MakefilePath:  absPath,
-		RecentTargets: recentTargets,
-		KeyBindings:   keyBindings,
+		List:              l,
+		State:             StateList,
+		Targets:           tuiTargets,
+		Graph:             depGraph,
+		GraphDepth:        -1,
+		ShowOrder:         true,
+		ShowCritical:      true,
+		ShowParallel:      true,
+		Variables:         vars,
+		VariableListIndex: 0,
+		History:           hist,
+		MakefilePath:      absPath,
+		RecentTargets:     recentTargets,
+		KeyBindings:       keyBindings,
 	}
 }
 

@@ -1,5 +1,11 @@
 .PHONY: build install test clean run release snapshot
 
+BINARY_NAME := lazymake
+VERSION = 1.0.0
+GOFLAGS = -v -race
+LDFLAGS = -ldflags "-X main.version=$(VERSION)"
+BUILD_DIR ?= ./bin
+
 build: ## Build the application
 	go build -o lazymake cmd/lazymake/main.go
 

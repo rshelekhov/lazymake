@@ -12,6 +12,7 @@ A beautiful terminal user interface for browsing and executing Makefile targets.
   - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Writing Self-Documenting Makefiles](#writing-self-documenting-makefiles)
 - [Recent History & Smart Navigation](#recent-history--smart-navigation)
+- [Variable Inspector: Understanding Your Build Configuration](#variable-inspector-understanding-your-build-configuration)
 - [Understanding Dependency Graphs](#understanding-dependency-graphs)
 - [Safety Features: Preventing Accidental Disasters](#safety-features-preventing-accidental-disasters)
   - [Visual Indicators](#visual-indicators)
@@ -80,6 +81,16 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
   - Configurable: Customize rules, exclude targets, disable globally
   - Safe defaults: Enabled by default to protect newcomers to projects
 
+- **Variable inspector**: Understand and track Makefile variables
+  - Full-screen view: Press `v` to browse all variables with navigation
+  - Context panel: Shows variables used by the selected target in recipe preview
+  - Hybrid parsing: Extracts definitions from Makefile + expands values using make
+  - Variable types: Supports all assignment operators (=, :=, +=, ?=, !=)
+  - Usage tracking: Shows which targets use each variable
+  - Export detection: Identifies variables exported to environment
+  - Dual display: Shows both raw values and fully expanded values
+  - Smart navigation: Scrollable list with up/down or j/k keys
+
 ### Planned
 
 #### High Priority
@@ -88,8 +99,7 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
 ### Nice to Have
 - Multi-language recipe support with syntax highlighting
 - Workspace/project management for monorepos
-- Variable inspector and runtime overrides
-- Dry-run preview with warnings for destructive operations
+- Variable runtime overrides through TUI
 - Watch mode and CI/CD integration
 
 ## Installation
@@ -149,6 +159,7 @@ lazymake -t <theme-name>
 - `↑/↓` or `j/k` - Navigate targets
 - `Enter` - Execute selected target
 - `g` - View dependency graph for selected target
+- `v` - View variable inspector
 - `?` - Toggle help view
 - `/` - Filter/search targets
 - `q` or `ctrl+c` - Quit
@@ -160,6 +171,11 @@ lazymake -t <theme-name>
 - `o` - Toggle execution order numbers `[N]`
 - `c` - Toggle critical path markers `★`
 - `p` - Toggle parallel opportunity markers `∥`
+- `q` or `ctrl+c` - Quit
+
+#### Variable Inspector
+- `v` or `esc` - Return to list view
+- `↑/↓` or `j/k` - Navigate variables
 - `q` or `ctrl+c` - Quit
 
 #### Output View
@@ -236,6 +252,134 @@ ALL TARGETS
 - **Faster workflows**: No need to scroll or type to find common targets
 - **Context awareness**: Different projects show different recent targets
 - **Zero configuration**: Works automatically from the first execution
+
+## Variable Inspector: Understanding Your Build Configuration
+
+lazymake helps you understand and track Makefile variables, making it easy to see what values are used and where they come from.
+
+### Two Ways to View Variables
+
+#### 1. Full-Screen Inspector (Press `v`)
+
+Browse all variables in your Makefile with detailed information:
+
+```
+┌─ Variable Inspector ──────────────────────────────────────┐
+│                                                            │
+│ 6 variables • 4 used • 2 unused                           │
+│                                                            │
+│ BINARY_NAME          [:=]  Simply Expanded                │
+│   Raw:      lazymake                                       │
+│   Expanded: lazymake                                       │
+│   Used by:  build, install (2 targets)                    │
+│                                                            │
+│ VERSION              [=]   Recursive                       │
+│   Raw:      1.0.0                                          │
+│   Expanded: 1.0.0                                          │
+│   Used by:  build (1 target)                              │
+│                                                            │
+│ GOFLAGS              [=]   Recursive                       │
+│   Raw:      -v -race                                       │
+│   Expanded: -v -race                                       │
+│   Used by:  build, test (2 targets)                       │
+│                                                            │
+│ LDFLAGS              [=]   Recursive                       │
+│   Raw:      -ldflags "-X main.version=$(VERSION)"         │
+│   Expanded: -ldflags "-X main.version=1.0.0"              │
+│   Used by:  build (1 target)                              │
+│                                                            │
+│ BUILD_DIR            [?=]  Conditional                     │
+│   Raw:      ./bin                                          │
+│   Expanded: ./bin                                          │
+│   Used by:  build, clean (2 targets)                      │
+│                                                            │
+│ PATH                                                       │
+│   Exported to environment                                  │
+│   Not used by any target                                   │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+  v/esc: return • ↑↓/j/k: navigate • q: quit
+```
+
+#### 2. Context Panel (Automatic)
+
+When you select a target, the recipe preview shows variables it uses:
+
+```
+┌─────────────────────┬────────────────────────────────────────┐
+│ ALL TARGETS         │ build:                                 │
+│ > build             │                                        │
+│   test              │   go build $(GOFLAGS) $(LDFLAGS) \    │
+│   clean             │     -o $(BUILD_DIR)/$(BINARY_NAME)    │
+│   install           │                                        │
+│                     │   💡 Press 'g' to view full graph      │
+│                     │                                        │
+│                     │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
+│                     │                                        │
+│                     │   📦 Variables Used                    │
+│                     │                                        │
+│                     │     GOFLAGS = -v -race                 │
+│                     │     LDFLAGS = -ldflags "-X main..."    │
+│                     │     BUILD_DIR = ./bin                  │
+│                     │     BINARY_NAME = lazymake             │
+│                     │                                        │
+│                     │     💡 Press 'v' to view all variables │
+└─────────────────────┴────────────────────────────────────────┘
+```
+
+### Variable Types Explained
+
+lazymake recognizes all Makefile variable assignment operators:
+
+- **`=` Recursive**: Expanded when used (can reference later variables)
+- **`:=` Simply Expanded**: Expanded when defined (like shell variables)
+- **`+=` Append**: Adds to existing value
+- **`?=` Conditional**: Sets only if not already defined
+- **`!=` Shell**: Executes shell command and captures output
+
+### How It Works
+
+1. **Parse Definitions**: Extracts variable assignments from Makefile text
+2. **Expand Values**: Runs `make --print-data-base` to get fully expanded values
+3. **Track Usage**: Scans all target recipes to find variable references
+4. **Display Context**: Shows raw vs expanded values and which targets use them
+
+### Example Makefile
+
+```makefile
+# Variable definitions
+BINARY_NAME := lazymake
+VERSION = 1.0.0
+GOFLAGS = -v -race
+LDFLAGS = -ldflags "-X main.version=$(VERSION)"
+BUILD_DIR ?= ./bin
+
+export PATH
+
+build: ## Build the application
+	go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)
+
+test: ## Run tests
+	go test $(GOFLAGS) ./...
+
+clean: ## Clean build artifacts
+	rm -rf $(BUILD_DIR)
+```
+
+### Benefits
+
+- **Understand configuration**: See what values are actually used
+- **Debug issues**: Compare raw vs expanded values to spot errors
+- **Track dependencies**: Know which targets are affected by variable changes
+- **Onboarding**: New developers can understand build configuration instantly
+- **Environment awareness**: Identify which variables are exported
+
+### Navigation
+
+- **`v`**: Open variable inspector from list view
+- **`↑/↓` or `j/k`**: Navigate between variables
+- **`v` or `esc`**: Return to list view
+- **Auto-scroll**: Inspector automatically scrolls to keep selected variable visible
 
 ## Understanding Dependency Graphs
 

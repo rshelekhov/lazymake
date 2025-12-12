@@ -61,7 +61,7 @@
 
 **Inspired by**: Glow (color palette and design), television (preview pane), and other Bubble Tea applications
 
-#### 4. Performance Profiling
+#### ✅ 4. Performance Profiling
 - Show execution time for each target
 - Highlight slow targets for optimization
 - Track build time history and trends
@@ -89,12 +89,14 @@
 - Simulate CI environment locally
 - Companies with CI/CD report 30-50% increase in deployment frequency
 
-#### 9. Variable Inspector
-- Display all Makefile variables and their values
-- Show where variables are defined and used
-- Allow runtime variable override through TUI
+#### ✅ 9. Variable Inspector
+- Display all Makefile variables and their values in full-screen view (press 'v')
+- Show variables used by selected target in context panel (recipe preview)
+- Track where variables are defined and which targets use them
+- Hybrid parsing: extract from Makefile text + expand with `make --print-data-base`
+- **Implementation complete**: Parse variables during init, show in two UI modes (full-screen + context panel)
 
-#### 10. Dry-run Preview
+#### ✅ 10. Dry-run Preview
 - Show what commands will execute before running (make -n)
 - Estimated execution time based on history
 - Warning for destructive operations (clean, rm, etc.)
