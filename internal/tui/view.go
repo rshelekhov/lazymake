@@ -42,15 +42,33 @@ func (m Model) renderErrorView() string {
 	// Calculate inner width for text: subtract border (2) + padding (4) = 6
 	innerWidth := max(contentWidth-6, 20)
 
-	errorStyle := lipgloss.NewStyle().
+	// errorStyle := lipgloss.NewStyle().
+	// 	Foreground(ErrorColor).
+	// 	Bold(true).
+	// 	Border(lipgloss.RoundedBorder()).
+	// 	BorderForeground(ErrorColor).
+	// 	Padding(1, 2).
+	// 	Width(innerWidth)
+	//
+	// return "\n" + errorStyle.Render("Error: "+m.Err.Error()) + "\n\n  Press q to quit\n"
+
+	errorMsg := lipgloss.NewStyle().
 		Foreground(ErrorColor).
-		Bold(true).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ErrorColor).
 		Padding(1, 2).
-		Width(innerWidth)
+		Width(innerWidth).
+		Render("Error: " + m.Err.Error())
 
-	return "\n" + errorStyle.Render("Error: "+m.Err.Error()) + "\n\n  Press q to quit\n"
+	content := "\n" + errorMsg + "\n\n  Press q to quit\n"
+
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Padding(1, 2).
+		Width(contentWidth - 2)
+
+	return containerStyle.Render(content)
 }
 
 // renderHelpView displays all targets with their descriptions
@@ -120,17 +138,16 @@ func (m Model) renderHelpView() string {
 	helpContent += "  " + lipgloss.NewStyle().Foreground(SecondaryColor).Render("Cyan") + " = ## documented target (recommended)\n"
 	helpContent += "  " + lipgloss.NewStyle().Foreground(MutedColor).Render("Gray") + " = # regular comment\n"
 
-	// Footer with keyboard shortcuts
-	footer := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render("\nPress ? to toggle help • g to view dependency graph • esc to return • q to quit")
-	helpContent += footer
-
 	// Wrap in a container with padding (no width constraint to avoid layout issues)
 	containerStyle := lipgloss.NewStyle().
 		Padding(1, 2)
 
-	return containerStyle.Render(helpContent)
+	content := containerStyle.Render(helpContent)
+
+	// Status bar with keyboard shortcuts
+	statusBar := renderStatusBar(m.Width, "", "?: toggle help • g: graph • esc: return • q: quit")
+
+	return content + "\n" + statusBar
 }
 
 // renderGraphView displays the dependency graph for the selected target
@@ -287,50 +304,24 @@ func (m Model) renderGraphStatusBar(width int) string {
 	// Right side: keyboard shortcuts
 	rightContent := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
 
-	// Calculate widths (border=2 + padding=2)
-	contentWidth := width - 4
-	leftWidth := len(leftContent) + 2
-	rightWidth := contentWidth - leftWidth
-
-	// Apply styles
-	leftStyle := lipgloss.NewStyle().Foreground(MutedColor)
-	rightStyle := lipgloss.NewStyle().Foreground(MutedColor).Align(lipgloss.Right)
-
-	left := leftStyle.Width(leftWidth).Render(leftContent)
-	right := rightStyle.Width(rightWidth).Render(rightContent)
-
-	content := left + right
-
-	// Place content (single line height)
-	placedContent := lipgloss.Place(
-		contentWidth,
-		1,
-		lipgloss.Left,
-		lipgloss.Center,
-		content,
-	)
-
-	// Wrap in border (matching view_list.go pattern)
-	statusBarStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Foreground(MutedColor).
-		Padding(0, 1)
-
-	return statusBarStyle.Render(placedContent)
+	// Use the reusable status bar component
+	return renderStatusBar(width, leftContent, rightContent)
 }
 
 // renderOutputView displays output of the executed target
 func (m Model) renderOutputView() string {
+	var builder strings.Builder
+
+	// Header inside the box
 	var header string
 	if m.ExecutionError != nil {
 		header = ErrorStyle.Render("❌ Failed: make " + m.ExecutingTarget)
 	} else {
 		header = SuccessStyle.Render("✓ Success: make " + m.ExecutingTarget)
 	}
+	util.WriteString(&builder, header+"\n")
 
 	// Check for performance regression
-	var regressionAlert string
 	for _, target := range m.Targets {
 		if target.Name == m.ExecutingTarget && target.PerfStats != nil && target.PerfStats.IsRegressed {
 			stats := target.PerfStats
@@ -340,29 +331,35 @@ func (m Model) renderOutputView() string {
 				Foreground(lipgloss.Color("220")).
 				Bold(true)
 
-			regressionAlert = "\n" + alertStyle.Render(fmt.Sprintf("⚠️  This run took %s (%d%% slower than usual avg %s)",
+			regressionAlert := alertStyle.Render(fmt.Sprintf("⚠️  This run took %s (%d%% slower than usual avg %s)",
 				formatDuration(stats.LastDuration),
 				change,
 				formatDuration(stats.AvgDuration)))
+			util.WriteString(&builder, "\n"+regressionAlert+"\n")
 			break
 		}
 	}
 
-	contentWidth := getContentWidth(m.Width)
+	// Add viewport content
+	util.WriteString(&builder, "\n"+m.Viewport.View())
+
+	// contentWidth := getContentWidth(m.Width)
 	// Calculate inner width for text: subtract border (2) + padding (4) = 6
-	innerWidth := max(contentWidth-6, 20)
+	// innerWidth := max(contentWidth-6, 20)
+
+	contentWidth := m.Width - 2
 
 	viewportStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(SecondaryColor).
 		Padding(1, 2).
-		Width(innerWidth)
+		// Width(innerWidth)
+		Width(contentWidth)
 
-	footer := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render("\nPress esc to return • q to quit")
+	// Status bar with shortcuts
+	statusBar := renderStatusBar(m.Width, "", "esc: return • q: quit")
 
-	return "\n" + header + regressionAlert + "\n\n" + viewportStyle.Render(m.Viewport.View()) + footer
+	return "\n" + viewportStyle.Render(builder.String()) + "\n" + statusBar
 }
 
 // getContentWidth calculates responsive width for content blocks
@@ -375,6 +372,7 @@ func getContentWidth(terminalWidth int) int {
 // renderExecutingView renders the execution screen with real-time timer
 func (m Model) renderExecutingView() string {
 	elapsed := m.ExecutionElapsed
+	width := m.Width
 
 	// Get performance stats for the executing target
 	var stats *history.PerformanceStats
@@ -387,23 +385,10 @@ func (m Model) renderExecutingView() string {
 
 	var statusLine string
 	if stats != nil && stats.AvgDuration > 0 {
-		// Show progress indicator
-		progress := float64(elapsed) / float64(stats.AvgDuration)
 		avgStr := formatDuration(stats.AvgDuration)
-
-		var progressIndicator string
-		if progress < 0.8 {
-			progressIndicator = "🟢 on track"
-		} else if progress < 1.2 {
-			progressIndicator = "🔵 finishing up"
-		} else {
-			progressIndicator = "🔴 slower than usual"
-		}
-
-		statusLine = fmt.Sprintf("  Elapsed: %s / ~%s  %s",
+		statusLine = fmt.Sprintf("  Elapsed: %s / ~%s avg",
 			formatDuration(elapsed),
-			avgStr,
-			progressIndicator)
+			avgStr)
 	} else {
 		// Simple timer (no performance history)
 		statusLine = fmt.Sprintf("  Elapsed: %s", formatDuration(elapsed))
@@ -414,5 +399,13 @@ func (m Model) renderExecutingView() string {
 		Foreground(PrimaryColor).
 		Render("\n  ⏳ Executing: make " + m.ExecutingTarget)
 
-	return header + "\n\n" + statusLine + "\n\n  Please wait...\n"
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(SecondaryColor).
+		Padding(1, 2).
+		Width(width - 2)
+
+	content := header + "\n\n" + statusLine + "\n\n  Please wait...\n"
+
+	return containerStyle.Render(content)
 }

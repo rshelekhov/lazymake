@@ -74,7 +74,7 @@ func (m Model) renderVariablesView() string {
 	}
 
 	// Status bar with keyboard shortcuts
-	statusBar := renderVariablesStatusBar()
+	statusBar := renderStatusBar(m.Width, fmt.Sprintf("%d variables", totalVars), "v/esc: return • ↑↓/jk: navigate • q: quit")
 	util.WriteString(&builder, "\n"+statusBar)
 
 	return builder.String()
@@ -163,25 +163,6 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 	util.WriteString(&builder, "\n")
 
 	return builder.String()
-}
-
-// renderVariablesStatusBar renders the status bar for variable inspector view
-func renderVariablesStatusBar() string {
-	shortcuts := []string{
-		"v/esc: return",
-		"↑↓/j/k: navigate",
-		"q: quit",
-	}
-
-	statusText := strings.Join(shortcuts, " • ")
-
-	statusStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Border(lipgloss.NormalBorder(), true, false, false, false).
-		BorderForeground(SecondaryColor).
-		Padding(0, 2)
-
-	return statusStyle.Render(statusText)
 }
 
 // countUsedVariables counts how many variables are used by at least one target
