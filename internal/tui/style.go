@@ -4,12 +4,13 @@ import "github.com/charmbracelet/lipgloss"
 
 // Color palette
 var (
-	PrimaryColor   = lipgloss.Color("205") // Pink
-	SecondaryColor = lipgloss.Color("86")  // Cyan
-	SuccessColor   = lipgloss.Color("42")  // Green
-	ErrorColor     = lipgloss.Color("196") // Red
-	MutedColor     = lipgloss.Color("241") // Gray
-	TextColor      = lipgloss.Color("252") // Light gray
+	PrimaryColor   = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	SecondaryColor = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	SuccessColor   = lipgloss.Color("42")
+	ErrorColor     = lipgloss.AdaptiveColor{Light: "196", Dark: "196"}
+	MutedColor     = lipgloss.AdaptiveColor{Light: "241", Dark: "241"}
+	SeparatorColor = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	TextColor      = lipgloss.Color("252")
 )
 
 // Styles
@@ -34,7 +35,7 @@ var (
 
 	// DocDescriptionStyle is used for ## documented comments (industry standard)
 	DocDescriptionStyle = lipgloss.NewStyle().
-				Foreground(SecondaryColor). // Cyan to distinguish from regular comments
+				Foreground(SecondaryColor).
 				PaddingLeft(3)
 
 	ErrorStyle = lipgloss.NewStyle().
@@ -57,6 +58,15 @@ var (
 
 	// SeparatorStyle is used for the line between sections
 	SeparatorStyle = lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(SeparatorColor).
 			PaddingLeft(1)
+
+	// StatusBarStyle is used for the status bars in different views
+	StatusBarStyle = lipgloss.NewStyle().
+		// Border(lipgloss.RoundedBorder()).
+		// BorderForeground(SecondaryColor).
+		// Foreground(MutedColor).
+		Foreground(lipgloss.AdaptiveColor{Light: "#343433", Dark: "#C1C6B2"}).
+		Background(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#353533"}).
+		Padding(0, 1)
 )

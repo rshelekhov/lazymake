@@ -123,7 +123,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		// Use different styles based on comment type
 		// ## comments use cyan (industry standard for documentation)
 		// # comments use gray (backward compatibility)
-		var descColor lipgloss.Color
+		var descColor lipgloss.AdaptiveColor
 		if target.CommentType == makefile.CommentDouble {
 			descColor = SecondaryColor // Cyan for documented comments
 		} else {

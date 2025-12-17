@@ -41,7 +41,7 @@ func (m Model) renderConfirmView() string {
 
 			// Rule header with severity
 			var severityStr string
-			var severityColor lipgloss.Color
+			var severityColor lipgloss.AdaptiveColor
 
 			switch match.Severity {
 			case safety.SeverityCritical:
@@ -49,7 +49,7 @@ func (m Model) renderConfirmView() string {
 				severityColor = ErrorColor
 			case safety.SeverityWarning:
 				severityStr = "WARNING"
-				severityColor = lipgloss.Color("#FFA500")
+				severityColor = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
 			case safety.SeverityInfo:
 				severityStr = "INFO"
 				severityColor = SecondaryColor

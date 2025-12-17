@@ -200,7 +200,7 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 
 		// Severity indicator and rule ID
 		var severityStr string
-		var severityColor lipgloss.Color
+		var severityColor lipgloss.AdaptiveColor
 
 		switch match.Severity {
 		case safety.SeverityCritical:
@@ -208,7 +208,7 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			severityColor = ErrorColor
 		case safety.SeverityWarning:
 			severityStr = "⚠️  WARNING"
-			severityColor = lipgloss.Color("#FFA500") // Orange
+			severityColor = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
 		case safety.SeverityInfo:
 			severityStr = "ℹ️  INFO"
 			severityColor = SecondaryColor
@@ -333,37 +333,8 @@ func (m Model) renderStatusBar() string {
 		rightContent = formatKeyBindings(m.KeyBindings)
 	}
 
-	// Calculate content width (border=2 + padding=2)
-	contentWidth := m.Width - 4
-	leftWidth := len(leftContent) + 2
-	rightWidth := contentWidth - leftWidth
-
-	// Build status bar with two sections
-	leftStyle := lipgloss.NewStyle().Foreground(MutedColor)
-	rightStyle := lipgloss.NewStyle().Foreground(MutedColor).Align(lipgloss.Right)
-
-	left := leftStyle.Width(leftWidth).Render(leftContent)
-	right := rightStyle.Width(rightWidth).Render(rightContent)
-
-	content := left + right
-
-	// Use lipgloss.Place to force content into exact width
-	placedContent := lipgloss.Place(
-		contentWidth,
-		1, // Single line height
-		lipgloss.Left,
-		lipgloss.Center,
-		content,
-	)
-
-	// Wrap in border WITHOUT Width (let it wrap naturally)
-	statusBarStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Foreground(MutedColor).
-		Padding(0, 1)
-
-	return statusBarStyle.Render(placedContent)
+	// Use the reusable status bar component
+	return renderStatusBar(m.Width, leftContent, rightContent)
 }
 
 // formatKeyBindings formats key bindings as "key: description • key: description • ..."

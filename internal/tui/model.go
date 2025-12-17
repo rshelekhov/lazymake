@@ -8,10 +8,13 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rshelekhov/lazymake/config"
+	"github.com/rshelekhov/lazymake/internal/export"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
+	"github.com/rshelekhov/lazymake/internal/shell"
 	"github.com/rshelekhov/lazymake/internal/variables"
 )
 
@@ -63,6 +66,10 @@ type Model struct {
 	ExecutionStartTime time.Time
 	ExecutionElapsed   time.Duration
 
+	// Export and shell integration
+	Exporter         *export.Exporter
+	ShellIntegration *shell.Integration
+
 	// Key bindings for status bar display
 	KeyBindings []key.Binding
 
@@ -73,7 +80,9 @@ type Model struct {
 	Err error
 }
 
-func NewModel(makefilePath string) Model {
+func NewModel(cfg *config.Config) Model {
+	makefilePath := cfg.MakefilePath
+
 	targets, err := makefile.Parse(makefilePath)
 	if err != nil {
 		return Model{Err: err}
@@ -220,6 +229,18 @@ func NewModel(makefilePath string) Model {
 		}
 	}
 
+	// Initialize export if enabled
+	var exporter *export.Exporter
+	if cfg.Export != nil && cfg.Export.Enabled {
+		exporter, _ = export.NewExporter(cfg.Export)
+	}
+
+	// Initialize shell integration if enabled
+	var shellInteg *shell.Integration
+	if cfg.ShellIntegration != nil && cfg.ShellIntegration.Enabled {
+		shellInteg, _ = shell.NewIntegration(cfg.ShellIntegration)
+	}
+
 	return Model{
 		List:              l,
 		State:             StateList,
@@ -234,6 +255,8 @@ func NewModel(makefilePath string) Model {
 		History:           hist,
 		MakefilePath:      absPath,
 		RecentTargets:     recentTargets,
+		Exporter:          exporter,
+		ShellIntegration:  shellInteg,
 		KeyBindings:       keyBindings,
 	}
 }
@@ -278,4 +301,26 @@ func buildRecentTargets(entries []history.Entry, allTargets []Target) []Target {
 	}
 
 	return recentTargets
+}
+
+// rebuildListItems reconstructs the list items from current targets and recent targets
+func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
+	items := make([]list.Item, 0, len(allTargets)+len(recentTargets)+3)
+
+	if len(recentTargets) > 0 {
+		// Add recent section
+		items = append(items, HeaderTarget{Label: "RECENT"})
+		for _, t := range recentTargets {
+			items = append(items, t)
+		}
+		items = append(items, SeparatorTarget{})
+	}
+
+	// Add all targets section
+	items = append(items, HeaderTarget{Label: "ALL TARGETS"})
+	for _, t := range allTargets {
+		items = append(items, t)
+	}
+
+	return items
 }

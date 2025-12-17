@@ -142,3 +142,151 @@ safety:
 # Scenario 5: Development-only project (project .lazymake.yaml)
 # safety:
 #   enabled: false  # Safe to disable for purely local dev projects
+
+# Export Configuration
+# Export execution results to JSON/log files for analysis and debugging
+export:
+  # Enable/disable execution result exports
+  # Default: false (opt-in feature)
+  enabled: false
+
+  # Output directory for exported results
+  # Supports ~ expansion and environment variables
+  # Default: ~/.cache/lazymake/exports
+  output_dir: ~/.cache/lazymake/exports
+
+  # Export format: "json", "log", or "both"
+  # - json: Structured data for programmatic analysis, CI/CD integration
+  # - log: Human-readable text format for quick debugging
+  # - both: Create both JSON and log files
+  # Default: "json"
+  format: json
+
+  # File naming strategy: "timestamp", "target", or "sequential"
+  # - timestamp: {target}_{timestamp}.json (e.g., build_20251212_143022.json)
+  #   Best for historical analysis, keeps all execution records
+  # - target: {target}_latest.json (overwrites previous for same target)
+  #   Best for CI/CD where you only need latest result
+  # - sequential: {target}_{N}.json (incremental numbering)
+  #   Best for tracking execution series
+  # Default: "timestamp"
+  naming_strategy: timestamp
+
+  # Rotation settings - cleanup old exports
+  # All settings are optional, 0 means unlimited/disabled
+
+  # Maximum file size in MB before rotation (0 = unlimited)
+  # Files exceeding this size won't be created (prevents disk issues)
+  max_file_size_mb: 10
+
+  # Maximum number of files to keep per target (0 = unlimited)
+  # Only applies when naming_strategy is "timestamp" or "sequential"
+  # Older files are automatically deleted
+  max_files: 50
+
+  # Keep exports for N days (0 = forever)
+  # Files older than N days are automatically cleaned up
+  keep_days: 30
+
+  # Only export successful executions (ignore failures)
+  # Default: false (export everything including failures)
+  success_only: false
+
+  # Don't export results for these targets
+  # Useful for noisy/frequent targets like "test" or "watch"
+  exclude_targets:
+    - watch
+    - dev
+    - test-watch
+
+# Shell Integration Configuration
+# Add executed make commands to your shell history
+shell_integration:
+  # Enable/disable shell history integration
+  # Default: false (opt-in feature)
+  enabled: false
+
+  # Shell type: "auto", "bash", "zsh", or "none"
+  # - auto: Detect from $SHELL environment variable (recommended)
+  # - bash: Force bash history format
+  # - zsh: Force zsh history format (detects extended history automatically)
+  # - none: Disable shell integration
+  # Default: "auto"
+  shell: auto
+
+  # Override shell history file path
+  # Leave empty to use shell defaults:
+  # - bash: ~/.bash_history
+  # - zsh: ~/.zsh_history or $HISTFILE
+  # Default: "" (use shell default)
+  history_file: ""
+
+  # Include timestamp in history entry (for shells that support it)
+  # Only works with zsh extended history format (setopt EXTENDED_HISTORY)
+  # Automatically detected by reading existing history file
+  # Default: true
+  include_timestamp: true
+
+  # Custom format template for history entries
+  # Available variables: {target}, {makefile}, {dir}
+  # Examples:
+  # - "make {target}" (default, simple)
+  # - "make -f {makefile} {target}" (includes makefile path)
+  # - "cd {dir} && make {target}" (includes working directory)
+  # Default: "make {target}"
+  format_template: "make {target}"
+
+  # Don't add these targets to shell history
+  # Useful for meta-targets or help commands
+  exclude_targets:
+    - help
+    - list
+
+# Export Configuration Scenarios
+#
+# Scenario 1: Enable for CI/CD integration (export JSON only)
+# export:
+#   enabled: true
+#   format: json
+#   naming_strategy: target  # Overwrite latest result
+#   success_only: true
+#
+# Scenario 2: Debugging with logs (keep recent executions)
+# export:
+#   enabled: true
+#   format: both  # JSON + human-readable logs
+#   max_files: 20
+#   keep_days: 7
+#
+# Scenario 3: Long-term metrics collection
+# export:
+#   enabled: true
+#   format: json
+#   naming_strategy: timestamp
+#   keep_days: 90  # Keep 3 months of data
+#   exclude_targets:
+#     - help
+#     - list
+#     - clean
+
+# Shell Integration Scenarios
+#
+# Scenario 1: Enable for bash
+# shell_integration:
+#   enabled: true
+#   shell: bash
+#
+# Scenario 2: Enable for zsh with extended history
+# shell_integration:
+#   enabled: true
+#   shell: zsh
+#   include_timestamp: true
+#
+# Scenario 3: Custom format with context
+# shell_integration:
+#   enabled: true
+#   format_template: "make -f {makefile} {target}"
+#   exclude_targets:
+#     - help
+#     - list
+#     - show-%

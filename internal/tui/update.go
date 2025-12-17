@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/executor"
+	"github.com/rshelekhov/lazymake/internal/export"
 	"github.com/rshelekhov/lazymake/internal/safety"
 )
 
@@ -277,12 +280,39 @@ func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, msg.result.Duration, success)
 		_ = m.History.Save() // Async, ignore errors
 
+		// Export execution result (async, non-blocking)
+		if m.Exporter != nil {
+			go func() {
+				record := export.NewExecutionRecord(
+					m.MakefilePath,
+					m.ExecutingTarget,
+					msg.result,
+				)
+				if err := m.Exporter.Export(record); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
+				}
+			}()
+		}
+
+		// Shell integration (async, non-blocking)
+		if m.ShellIntegration != nil {
+			go func() {
+				if err := m.ShellIntegration.RecordExecution(m.ExecutingTarget); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "Shell integration failed: %v\n", err)
+				}
+			}()
+		}
+
 		// Refresh performance stats for all targets
 		enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
 
 		// Refresh recent targets to show updated timing
 		recentEntries := m.History.GetRecent(m.MakefilePath)
 		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
+		// Rebuild and update list items to reflect new performance stats
+		updatedItems := rebuildListItems(m.RecentTargets, m.Targets)
+		m.List.SetItems(updatedItems)
 
 		m.State = StateOutput
 		m.Output = msg.result.Output
@@ -314,13 +344,17 @@ func computeViewportSize(winWidth, winHeight int) (int, int) {
 
 	viewportWidth := width - 6 // 2 border + 4 padding
 
-	// Account for UI elements:
-	// - Header (1 line) + newline (1)
-	// - Potential regression alert (1-2 lines)
-	// - Viewport border (2 lines)
-	// - Footer (2 lines: newline + text)
-	// Total overhead: ~8-9 lines
-	viewportHeight := winHeight - 10
+	// Account for UI elements in renderOutputView:
+	// - Leading newline: 1 line
+	// - Header: 1 line
+	// - Potential regression alert: 0-2 lines
+	// - Double newline: 2 lines
+	// - Viewport border: 2 lines (top + bottom)
+	// - Viewport padding: 2 lines (top + bottom)
+	// - Footer: 2 lines
+	// Total overhead: 10-12 lines
+	// Use 14 to include safety margin for text wrapping
+	viewportHeight := winHeight - 14
 
 	if viewportWidth < 20 {
 		viewportWidth = 20
