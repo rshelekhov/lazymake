@@ -1,122 +1,243 @@
 # lazymake
 
+[![GitHub release](https://img.shields.io/github/release/rshelekhov/lazymake.svg)](https://github.com/rshelekhov/lazymake/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rshelekhov/lazymake)](https://goreportcard.com/report/github.com/rshelekhov/lazymake)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/rshelekhov/lazymake?style=social)](https://github.com/rshelekhov/lazymake/stargazers)
+
 A beautiful terminal user interface for browsing and executing Makefile targets.
 
-## Table of Contents
+<!--
+GIF: Hero Demo (30 seconds)
+Recording instructions:
+1. Terminal size: 100x30 (standard width, comfortable height)
+2. Start: Launch `lazymake` in a project with multiple targets
+3. Sequence:
+   - Show main list view with targets (2s)
+   - Press '/' and type "build" to filter (2s)
+   - Clear search with ESC (1s)
+   - Navigate with arrow keys (2s)
+   - Press 'g' to view dependency graph (3s)
+   - Toggle annotations: 'o', 'c', 'p' (3s)
+   - Press 'g' to return (1s)
+   - Press 'v' to view variables (3s)
+   - Navigate variables (2s)
+   - Press 'v' to return (1s)
+   - Press 'w' to view workspace picker (3s)
+   - Navigate workspaces (2s)
+   - Press ESC to return (1s)
+   - Press Enter to execute selected target (3s)
+   - Show output view (3s)
+   - Press ESC to return (1s)
+4. Tools: Use VHS or asciinema + agg
+5. Export: 800px wide, optimized GIF (<5MB)
+-->
 
-- [Context](#context)
-- [Problems We Solve](#problems-we-solve)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Writing Self-Documenting Makefiles](#writing-self-documenting-makefiles)
-- [Recent History & Smart Navigation](#recent-history--smart-navigation)
-- [Variable Inspector: Understanding Your Build Configuration](#variable-inspector-understanding-your-build-configuration)
-- [Workspace Management: Working with Multiple Projects](#workspace-management-working-with-multiple-projects)
-- [Understanding Dependency Graphs](#understanding-dependency-graphs)
-- [Safety Features: Preventing Accidental Disasters](#safety-features-preventing-accidental-disasters)
-  - [Visual Indicators](#visual-indicators)
-  - [Two-Column Layout](#two-column-layout)
-  - [Confirmation Dialog](#confirmation-dialog)
-  - [Built-in Dangerous Patterns](#built-in-dangerous-patterns)
-  - [Context-Aware Detection](#context-aware-detection)
-  - [Configuration](#configuration)
-  - [Disabling Safety Checks](#disabling-safety-checks)
-- [Export & Shell Integration](#export--shell-integration)
-  - [Export Execution Results](#export-execution-results)
-  - [Shell Integration](#shell-integration)
+![Demo](docs/assets/demo.gif)
 
-## Context
+## Why lazymake?
 
-Make dominates build automation with 19% presence in top GitHub repos, but developers describe it as "fragile, dated, and anti-human by modern dev ergonomics." While Make is powerful and ubiquitous, its poor developer experience creates friction, especially for teams onboarding new developers or working with complex Makefiles.
+**Rant time:** Make is everywhere—19% of top GitHub repos use it—but its UX is stuck in 1976. Want to see available targets? Read the entire Makefile. Trying to understand dependencies? Good luck deciphering that DAG. New to a project? Hope someone documented their Makefile (spoiler: they didn't).
 
-## Problems We Solve
+You know the drill: Open Makefile. Scroll through 500 lines. Squint at cryptic tab characters. Wonder what `$(LDFLAGS)` actually expands to. Run the wrong target. Break production. Apologize in Slack.
 
-- **Poor discoverability**: Finding and understanding available Makefile targets requires reading the entire Makefile
-- **Dependency confusion**: 70% of development teams struggle with managing dependencies; over 60% of compilation delays stem from misconfigured dependencies
-- **Bad onboarding**: New developers face a steep learning curve with undocumented Makefile targets
-- **Lack of visibility**: No easy way to see execution time, dependencies, or what commands will actually run
-- **Frustrating errors**: Common issues like "missing separator" are cryptic and hard to debug
+**There's a better way.** lazymake turns your Makefile into an interactive, visual interface with dependency graphs, variable inspection, safety checks, and performance tracking. Browse targets like you're browsing code. See exactly what will execute before you run it. All with zero configuration.
+
+## Quick Start
+
+**Install:**
+```bash
+# macOS/Linux (Homebrew)
+brew install rshelekhov/tap/lazymake
+
+# Go developers
+go install github.com/rshelekhov/lazymake/cmd/lazymake@latest
+```
+
+**Run:**
+```bash
+# In any directory with a Makefile
+lazymake
+
+# Or specify a Makefile
+lazymake -f path/to/Makefile
+```
+
+That's it! No configuration needed. lazymake works with any existing Makefile.
 
 ## Features
 
-### ✅ Implemented
-- **Self-documenting help system**: Automatically extracts and displays comments from Makefile targets
-  - Supports industry-standard `##` comments for documentation
-  - Backward compatible with single `#` comments
-  - Inline comments (e.g., `build: ## Build the app`) take priority
-  - Press `?` to toggle help view showing all documented targets
-  - Visual distinction: cyan for `##` documented targets, gray for regular comments
+### Dependency Graph Visualization
 
-- **Dependency graph visualization**: Interactive ASCII tree showing target dependencies
-  - Press `g` on any target to view its dependency graph
-  - Execution order numbering `[N]` - shows the order targets will run
-  - Critical path markers `★` - highlights the longest dependency chain
-  - Parallel opportunities `∥` - identifies targets that can run concurrently
-  - Configurable depth control with `+/-` keys
-  - Toggle annotations on/off: `o` (order), `c` (critical), `p` (parallel)
-  - Smart detection: only marks meaningful build chains, not standalone targets
-  - Cycle detection with clear warnings for circular dependencies
+<!--
+GIF: Dependency Graph (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Sequence:
+   - Select a target with dependencies (2s)
+   - Press 'g' to view graph (2s)
+   - Show graph with all annotations (3s)
+   - Press '+' to increase depth (2s)
+   - Press 'o' to toggle execution order (2s)
+   - Press 'c' to toggle critical path (2s)
+   - Press 'p' to toggle parallel markers (2s)
+3. Highlight: All three annotation types visible
+4. Target: A target with meaningful dependencies (like 'all', 'build')
+-->
 
-- **Search & filtering with recent history**: Enhanced productivity for repetitive workflows
-  - Real-time fuzzy search: Type `/` to filter targets by name or description
-  - Recent targets tracking: Last 5 executed targets appear at the top with ⏱ indicator
-  - Per-Makefile history: Each project maintains its own execution history
-  - Automatic cleanup: Stale targets (removed from Makefile) are filtered automatically
-  - Persistent across sessions: History stored in `~/.cache/lazymake/history.json`
-  - Navigation: Arrow keys skip over section headers and separators
+![Dependency Graph](docs/assets/dependency-graph.gif)
 
-- **Performance profiling**: Track execution time and identify performance regressions
-  - Real-time execution timer: Updates every 100ms with progress indicators (🟢 on track, 🔵 finishing up, 🔴 slower than usual)
-  - Automatic regression detection: Alerts when targets are >25% slower than average
-  - Context-aware display: Performance info shown only when relevant (regressed or recent targets)
-  - Visual indicators: 📈 for regressed targets, duration badges color-coded by performance
-  - Performance history: Stores last 10 executions per target with stats (avg, min, max)
-  - Post-execution alerts: Warnings appear after slow runs with actionable insights
-  - Persistent tracking: Performance data survives across sessions
+See your build structure instantly. lazymake visualizes dependency chains with execution order, critical path markers, and parallel opportunities. Press `g` on any target to understand what will run and when.
 
-- **Dangerous command detection**: Protect against accidental destructive operations
-  - Visual indicators: 🚨 for critical, ⚠️ for warning-level dangerous commands
-  - Two-column layout: Recipe preview shows exactly what will execute
-  - Confirmation dialogs: Critical commands require explicit confirmation
-  - Context-aware detection: Smart severity adjustment based on target name and context
-  - Built-in rules: 11 dangerous patterns (rm -rf, database drops, terraform destroy, etc.)
-  - Configurable: Customize rules, exclude targets, disable globally
-  - Safe defaults: Enabled by default to protect newcomers to projects
+**Key features:**
+- 📊 Execution order numbering - see what runs first
+- ⭐ Critical path highlighting - identify build bottlenecks
+- ⚡ Parallel opportunity markers - speed up builds with `make -j`
+- 🔍 Smart cycle detection - catches circular dependencies
 
-- **Variable inspector**: Understand and track Makefile variables
-  - Full-screen view: Press `v` to browse all variables with navigation
-  - Context panel: Shows variables used by the selected target in recipe preview
-  - Hybrid parsing: Extracts definitions from Makefile + expands values using make
-  - Variable types: Supports all assignment operators (=, :=, +=, ?=, !=)
-  - Usage tracking: Shows which targets use each variable
-  - Export detection: Identifies variables exported to environment
-  - Dual display: Shows both raw values and fully expanded values
-  - Smart navigation: Scrollable list with up/down or j/k keys
+[📖 Full documentation](docs/features/dependency-graphs.md)
 
-- **Workspace/Project Management**: Quick switching between different projects
-  - Press `w` to open workspace picker with recent and discovered Makefiles
-  - Automatic discovery: Scans project tree (3 levels deep) to find all Makefiles
-  - Recent workspaces: Last 10 accessed Makefiles with "time ago" display and access count
-  - Discovered workspaces: Shows newly found Makefiles in project that haven't been used yet
-  - Favorite workspaces: Star frequently used projects (press `f` to toggle favorites)
-  - Status bar integration: Shows current Makefile path relative to working directory
-  - Per-project history: Each Makefile maintains its own execution history
-  - Smart exclusions: Skips `.git`, `node_modules`, `vendor`, build directories automatically
-  - Access tracking: Records access count and last accessed time per workspace
-  - Persistent storage: Workspace data saved in `~/.cache/lazymake/workspaces.json`
-  - Automatic cleanup: Removes workspace entries for deleted Makefiles
+### Variable Inspector
 
-### Planned
+<!--
+GIF: Variable Inspector (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Sequence:
+   - Main list view (1s)
+   - Press 'v' to open variable inspector (2s)
+   - Navigate through variables with j/k (4s)
+   - Show different variable types (=, :=, ?=) (3s)
+   - Highlight expanded vs raw values (3s)
+   - Show "Used by" section (2s)
+3. Use Makefile with 5-8 variables for good demo
+-->
 
-#### High Priority
-- **Better error handling**: Parse and highlight common Makefile errors with helpful suggestions
+![Variable Inspector](docs/assets/variable-inspector.gif)
 
-### Nice to Have
-- Multi-language recipe support with syntax highlighting
-- Variable runtime overrides through TUI
-- Watch mode and CI/CD integration
+Understand your build configuration. lazymake shows all Makefile variables with their raw and expanded values, which targets use them, and whether they're exported to the environment.
+
+**Key features:**
+- 📦 Full-screen variable browser - press `v` to explore
+- 🔄 Raw vs expanded values - debug variable expansion
+- 📍 Usage tracking - see which targets use each variable
+- 🏷️ Type detection - all assignment operators (=, :=, +=, ?=, !=)
+
+[📖 Full documentation](docs/features/variable-inspector.md)
+
+### Dangerous Command Detection
+
+<!--
+GIF: Safety Features (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Use examples/dangerous.mk for demo
+3. Sequence:
+   - Show list with 🚨 and ⚠️ indicators (3s)
+   - Select a 🚨 critical target (2s)
+   - Show recipe preview with danger warning (3s)
+   - Press Enter to trigger confirmation dialog (2s)
+   - Show full warning dialog (4s)
+   - Press ESC to cancel (1s)
+4. Target: Use a clearly dangerous command (rm -rf, DROP DATABASE)
+-->
+
+![Safety Features](docs/assets/safety-features.gif)
+
+Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels in the target list.
+
+**Key features:**
+- 🚨 Critical commands require confirmation - prevents irreversible mistakes
+- ⚠️ Warning indicators for risky operations
+- 🎯 Context-aware detection - adjusts severity based on target name
+- ⚙️ Customizable rules - add project-specific patterns
+
+[📖 Full documentation](docs/features/safety-features.md)
+
+### Recent History & Smart Search
+
+<!--
+GIF: History & Search (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Setup: Run 3-4 targets first to populate history
+3. Sequence:
+   - Show RECENT section at top (3s)
+   - Show duration badges (2s)
+   - Press '/' to search (1s)
+   - Type "test" to filter (2s)
+   - Show filtered results (2s)
+   - Clear search with ESC (1s)
+   - Show full list with recent targets (2s)
+   - Highlight ⏱ and 📈 indicators (2s)
+-->
+
+![History & Search](docs/assets/history-search.gif)
+
+Find targets fast. lazymake tracks your last 5 executed targets per project, showing them at the top for instant access. Real-time search filters by name and description.
+
+**Key features:**
+- ⏱️ Recent targets section - your most-used targets on top
+- 🔍 Fuzzy search - press `/` to filter instantly
+- 📈 Performance regression alerts - spot slow builds
+- 💾 Per-project history - separate tracking per Makefile
+
+[📖 Full documentation](docs/features/history-search.md)
+
+### Workspace Management
+
+<!--
+GIF: Workspace Management (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Setup: Project with multiple Makefiles (use examples/ or create test structure)
+3. Sequence:
+   - Main list view (1s)
+   - Press 'w' to open workspace picker (2s)
+   - Show recent workspaces with stars and timestamps (3s)
+   - Show discovered workspaces (2s)
+   - Navigate workspaces (2s)
+   - Press 'f' to toggle favorite (2s)
+   - Show star appears/disappears (2s)
+   - Press Enter to switch workspace (1s)
+4. Highlight: Stars, "time ago", access counts
+-->
+
+![Workspace Management](docs/assets/workspace-management.gif)
+
+Work with multiple projects seamlessly. Press `w` to see recent Makefiles and automatically discovered ones in your project tree. Star your favorites for quick access.
+
+**Key features:**
+- 🔄 Automatic discovery - finds all Makefiles up to 3 levels deep
+- ⭐ Favorites system - star frequently used projects
+- 🕐 Access tracking - shows "last used" and access count
+- 📁 Per-project history - each Makefile remembers its recent targets
+
+[📖 Full documentation](docs/features/workspace-management.md)
+
+### Performance Profiling
+
+Track execution times and catch performance regressions automatically. lazymake stores the last 10 executions per target and alerts you when a target is >25% slower than average.
+
+**Key features:**
+- ⏱️ Real-time execution timer - see progress with indicators
+- 📈 Automatic regression detection - spots slowdowns
+- 💾 Performance history - tracks avg, min, max durations
+- 🎨 Color-coded duration badges - visual performance indicators
+
+[📖 Full documentation](docs/features/performance-tracking.md)
+
+### Export & Shell Integration
+
+Export execution results to JSON/log files for analysis, or add make commands to your shell history for easy re-running outside lazymake.
+
+**Key features:**
+- 📄 Multiple export formats - JSON, logs, or both
+- 🔄 Automatic rotation - configurable file limits and cleanup
+- 🐚 Shell integration - bash/zsh history support
+- 📝 Custom templates - customize command format
+
+[📖 Full documentation](docs/features/export-shell-integration.md)
 
 ## Installation
 
@@ -164,896 +285,136 @@ lazymake
 
 # Specify a different Makefile
 lazymake -f path/to/Makefile
-
-# Use a custom theme
-lazymake -t <theme-name>
 ```
 
-### Keyboard Shortcuts
-
-#### Main List View
-- `↑/↓` or `j/k` - Navigate targets
-- `Enter` - Execute selected target
-- `g` - View dependency graph for selected target
-- `v` - View variable inspector
-- `w` - Open workspace picker to switch between Makefiles
-- `?` - Toggle help view
-- `/` - Filter/search targets
-- `q` or `ctrl+c` - Quit
-
-#### Graph View
-- `g` or `esc` - Return to list view
-- `+` or `=` - Show more dependency levels
-- `-` or `_` - Show fewer dependency levels
-- `o` - Toggle execution order numbers `[N]`
-- `c` - Toggle critical path markers `★`
-- `p` - Toggle parallel opportunity markers `∥`
-- `q` or `ctrl+c` - Quit
-
-#### Variable Inspector
-- `v` or `esc` - Return to list view
-- `↑/↓` or `j/k` - Navigate variables
-- `q` or `ctrl+c` - Quit
-
-#### Output View
-- `↑/↓` or `j/k` - Scroll through output
-- `esc` - Return to list view
-- `q` or `ctrl+c` - Quit
-
-#### Workspace Picker
-- `↑/↓` or `j/k` - Navigate workspace list
-- `Enter` - Switch to selected workspace
-- `f` - Toggle favorite for selected workspace
-- `esc` or `w` - Return to list view
-- `q` or `ctrl+c` - Quit
-
-Configuration can be set via `.lazymake.yaml` in your project directory.
-
-## Writing Self-Documenting Makefiles
-
-lazymake supports the industry-standard `##` convention for documenting Makefile targets. Use `##` comments to mark targets for documentation:
-
-```makefile
-.PHONY: build test deploy
-
-build: ## Build the application
-	go build -o app main.go
-
-test: ## Run all tests
-	go test ./...
-
-## Deploy to production
-deploy:
-	./scripts/deploy.sh
-```
-
-**Comment styles:**
-- `##` - Industry standard for documentation (shown in cyan)
-- `#` - Regular comments (shown in gray, backward compatible)
-- Inline comments (after `:`) override preceding comments
-
-**Best practices:**
-- Use `##` for targets you want to document for other developers
-- Use `#` for internal implementation notes
-- Keep descriptions concise (one line)
-- Place inline comments for quick reference: `target: ## Description`
-
-## Recent History & Smart Navigation
-
-lazymake tracks your most frequently used targets to speed up repetitive workflows. When you run the same 2-3 targets regularly (like `test`, `build`, `deploy`), they appear at the top of the list for instant access.
-
-### How It Works
-
-- **Automatic tracking**: Every time you execute a target, it's recorded in history
-- **Top 5 recent**: The last 5 executed targets appear in the "RECENT" section
-- **Visual indicator**: Recent targets are marked with a ⏱ clock emoji
-- **Per-project**: Each Makefile maintains separate history
-- **Smart cleanup**: Targets removed from the Makefile are automatically filtered out
-- **Persistent**: History survives across sessions
-
-### Example Display
-
-```
-RECENT
-⏱  test        Run all tests                          8.1s
-⏱  build       Build the application                  3.4s
-⏱  lint        Run linters                            0.3s
-──────────────────────────────────
-ALL TARGETS
-▶ build        Build the application
-  clean        Clean build artifacts
-📈 test        Run all tests                          8.1s
-  deploy       Deploy to production
-```
-
-**Indicators:**
-- ⏱ = Recently executed (with duration badge)
-- 📈 = Performance regression detected (>25% slower)
-- Duration badges color-coded: green (<1s), cyan (normal), orange (regressed)
-
-### Benefits
-
-- **Faster workflows**: No need to scroll or type to find common targets
-- **Context awareness**: Different projects show different recent targets
-- **Zero configuration**: Works automatically from the first execution
-
-## Variable Inspector: Understanding Your Build Configuration
-
-lazymake helps you understand and track Makefile variables, making it easy to see what values are used and where they come from.
-
-### Two Ways to View Variables
-
-#### 1. Full-Screen Inspector (Press `v`)
-
-Browse all variables in your Makefile with detailed information:
-
-```
-┌─ Variable Inspector ──────────────────────────────────────┐
-│                                                            │
-│ 6 variables • 4 used • 2 unused                           │
-│                                                            │
-│ BINARY_NAME          [:=]  Simply Expanded                │
-│   Raw:      lazymake                                       │
-│   Expanded: lazymake                                       │
-│   Used by:  build, install (2 targets)                    │
-│                                                            │
-│ VERSION              [=]   Recursive                       │
-│   Raw:      1.0.0                                          │
-│   Expanded: 1.0.0                                          │
-│   Used by:  build (1 target)                              │
-│                                                            │
-│ GOFLAGS              [=]   Recursive                       │
-│   Raw:      -v -race                                       │
-│   Expanded: -v -race                                       │
-│   Used by:  build, test (2 targets)                       │
-│                                                            │
-│ LDFLAGS              [=]   Recursive                       │
-│   Raw:      -ldflags "-X main.version=$(VERSION)"         │
-│   Expanded: -ldflags "-X main.version=1.0.0"              │
-│   Used by:  build (1 target)                              │
-│                                                            │
-│ BUILD_DIR            [?=]  Conditional                     │
-│   Raw:      ./bin                                          │
-│   Expanded: ./bin                                          │
-│   Used by:  build, clean (2 targets)                      │
-│                                                            │
-│ PATH                                                       │
-│   Exported to environment                                  │
-│   Not used by any target                                   │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
-  v/esc: return • ↑↓/j/k: navigate • q: quit
-```
-
-#### 2. Context Panel (Automatic)
-
-When you select a target, the recipe preview shows variables it uses:
-
-```
-┌─────────────────────┬────────────────────────────────────────┐
-│ ALL TARGETS         │ build:                                 │
-│ > build             │                                        │
-│   test              │   go build $(GOFLAGS) $(LDFLAGS) \    │
-│   clean             │     -o $(BUILD_DIR)/$(BINARY_NAME)    │
-│   install           │                                        │
-│                     │   💡 Press 'g' to view full graph      │
-│                     │                                        │
-│                     │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
-│                     │                                        │
-│                     │   📦 Variables Used                    │
-│                     │                                        │
-│                     │     GOFLAGS = -v -race                 │
-│                     │     LDFLAGS = -ldflags "-X main..."    │
-│                     │     BUILD_DIR = ./bin                  │
-│                     │     BINARY_NAME = lazymake             │
-│                     │                                        │
-│                     │     💡 Press 'v' to view all variables │
-└─────────────────────┴────────────────────────────────────────┘
-```
-
-### Variable Types Explained
-
-lazymake recognizes all Makefile variable assignment operators:
-
-- **`=` Recursive**: Expanded when used (can reference later variables)
-- **`:=` Simply Expanded**: Expanded when defined (like shell variables)
-- **`+=` Append**: Adds to existing value
-- **`?=` Conditional**: Sets only if not already defined
-- **`!=` Shell**: Executes shell command and captures output
-
-### How It Works
-
-1. **Parse Definitions**: Extracts variable assignments from Makefile text
-2. **Expand Values**: Runs `make --print-data-base` to get fully expanded values
-3. **Track Usage**: Scans all target recipes to find variable references
-4. **Display Context**: Shows raw vs expanded values and which targets use them
-
-### Example Makefile
-
-```makefile
-# Variable definitions
-BINARY_NAME := lazymake
-VERSION = 1.0.0
-GOFLAGS = -v -race
-LDFLAGS = -ldflags "-X main.version=$(VERSION)"
-BUILD_DIR ?= ./bin
-
-export PATH
-
-build: ## Build the application
-	go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)
-
-test: ## Run tests
-	go test $(GOFLAGS) ./...
-
-clean: ## Clean build artifacts
-	rm -rf $(BUILD_DIR)
-```
-
-### Benefits
-
-- **Understand configuration**: See what values are actually used
-- **Debug issues**: Compare raw vs expanded values to spot errors
-- **Track dependencies**: Know which targets are affected by variable changes
-- **Onboarding**: New developers can understand build configuration instantly
-- **Environment awareness**: Identify which variables are exported
-
-### Navigation
-
-- **`v`**: Open variable inspector from list view
-- **`↑/↓` or `j/k`**: Navigate between variables
-- **`v` or `esc`**: Return to list view
-- **Auto-scroll**: Inspector automatically scrolls to keep selected variable visible
-
-## Workspace Management: Working with Multiple Projects
-
-lazymake makes it easy to work with multiple projects and Makefiles. Press `w` to see recent workspaces and automatically discovered Makefiles in your project.
-
-### Workspace Picker (Press `w`)
-
-Access recent and discovered Makefiles with a single keypress:
-
-```
-┌─ Switch Workspace ────────────────────────────────────────┐
-│                                                            │
-│ ⭐ ./Makefile                                              │
-│    Last used: 2 minutes ago • 15 times                    │
-│                                                            │
-│    ../other-project/Makefile                              │
-│    Last used: 1 hour ago • 8 times                        │
-│                                                            │
-│    examples/dangerous.mk                                  │
-│    Discovered in project                                  │
-│                                                            │
-│    tools/Makefile                                         │
-│    Discovered in project                                  │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
-  2 recent • 2 discovered
-  enter: switch • f: favorite • esc/w: cancel
-```
-
-**Features:**
-- **Automatic discovery**: Scans your project tree (up to 3 levels deep) to find all Makefiles
-- **Recent workspaces**: Shows last 10 accessed Makefiles with access tracking
-- **Discovered workspaces**: Displays found Makefiles you haven't used yet
-- **Favorites first**: Star frequently used projects with `f` - they appear at the top
-- **Access tracking**: Displays "time ago" (e.g., "2 hours ago") and access count for recent workspaces
-- **Smart exclusions**: Skips `.git`, `node_modules`, `vendor`, build directories, and other common non-code paths
-- **Fast scanning**: 5-second timeout ensures responsiveness even in large projects
-
-### Status Bar Integration
-
-The current workspace is always visible in the status bar:
-
-```
-└──────────────────────────────────────────────────────────┘
-│ ./Makefile • 12 targets • 2 dangerous    enter: run • q │
-└──────────────────────────────────────────────────────────┘
-```
-
-The path is displayed relative to your current working directory:
-- `./Makefile` - in current directory
-- `../other/Makefile` - in sibling directory
-- `~/projects/foo/Makefile` - absolute path with `~` expansion
-
-### Per-Project History
-
-Each workspace automatically maintains its own execution history. When you switch between projects, you'll see the recent targets for that specific Makefile:
-
-```
-# Working in project A
-RECENT
-⏱  build-api    Build the API server       3.2s
-⏱  test-api     Run API tests              1.5s
-
-# Switch to project B (press 'w')
-RECENT
-⏱  deploy-prod  Deploy to production       45.1s
-⏱  build-web    Build web frontend         8.3s
-```
-
-This means:
-- Each Makefile remembers its own frequently used targets
-- No need to scroll through unrelated targets
-- Faster context switching between projects
-
-### Automatic Tracking
-
-lazymake automatically tracks workspace usage:
-- **On first use**: Creates workspace entry when you run a target
-- **On subsequent uses**: Updates access count and last accessed time
-- **On cleanup**: Removes entries for deleted Makefiles automatically
-- **Persistent**: Data survives across sessions in `~/.cache/lazymake/workspaces.json`
-
-### How Discovery Works
-
-When you press `w`, lazymake:
-1. **Records current Makefile** - Ensures your current file appears in the list
-2. **Scans project tree** - Searches up to 3 levels deep from current directory
-3. **Finds all Makefiles** - Detects `Makefile`, `makefile`, `GNUmakefile`, `*.mk`, `*.mak`
-4. **Applies exclusions** - Skips `.git`, `node_modules`, `vendor`, `build`, `dist`, `.cache`, etc.
-5. **Combines results** - Shows recent workspaces first, then newly discovered ones
-6. **Fast operation** - 5-second timeout prevents hanging on large projects
-
-### Use Cases
-
-#### 1. Monorepo Development
-
-Working with multiple Makefiles in a large repository:
-
-```
-my-monorepo/
-├── Makefile              # Root Makefile
-├── services/
-│   ├── api/Makefile      # API service
-│   ├── auth/Makefile     # Auth service
-│   └── worker/Makefile   # Background worker
-└── frontend/Makefile     # Frontend app
-```
-
-Press `w` to see all Makefiles automatically - no manual browsing needed!
-
-#### 2. Multi-Project Development
-
-Switching between different projects:
-- Press `w` to see recent projects and discovered Makefiles
-- Star your most frequently used projects with `f`
-- Favorites always appear at the top of the list
-
-#### 3. Onboarding
-
-New to a project? Press `w`:
-- Instantly see all available Makefiles
-- Discovered Makefiles show "Discovered in project"
-- Select one to start working - it gets added to your recent list
-
-### For Makefiles Outside Discovery Range
-
-If you need a Makefile that's:
-- More than 3 levels deep
-- In an excluded directory
-- Outside your current project
-
-Use the CLI flag:
-```bash
-lazymake -f path/to/Makefile
-```
-
-Once accessed, it appears in your recent workspaces list.
-
-### Navigation
-
-- **`w`**: Open workspace picker from list view
-- **`↑/↓` or `j/k`**: Navigate workspaces
-- **`f`**: Toggle favorite (star/unstar workspace)
-- **`enter`**: Switch to selected workspace
-- **`esc` or `w`**: Return to main list view
-
-## Understanding Dependency Graphs
-
-lazymake visualizes your Makefile's dependency structure to help you understand execution flow and optimize build times.
-
-### Example Graph
-
-```
-all [3] ★
-├── build [2] ★ ∥
-│   └── deps [1] ★
-└── test [2] ★ ∥
-    └── deps [1] (see above)
-```
-
-### Annotations Explained
-
-- **`[N]` Execution Order**: Numbers indicate the order targets will run
-  - `[1]` runs first (dependencies with no deps)
-  - `[2]` runs second (targets depending on `[1]`)
-  - `[3]` runs last (top-level targets)
-  - Targets with the same number can run in parallel
-
-- **`★` Critical Path**: Marks the longest chain of dependencies
-  - This is the minimum time needed to complete the build
-  - Optimizing these targets has the biggest impact on build time
-  - Only shown for targets that are part of dependency chains
-
-- **`∥` Parallel Opportunities**: Targets that can run concurrently
-  - Make can execute these simultaneously with `-j` flag
-  - Example: `make -j4` runs up to 4 targets in parallel
-  - Only shown for targets with actual dependencies to coordinate
-
-### Smart Detection
-
-lazymake intelligently identifies meaningful patterns:
-- **Standalone targets** (like `clean`, `lint`) are shown without markers
-- **Circular dependencies** are detected and displayed with warnings
-- **Shared dependencies** are marked with `(see above)` to avoid duplication
-
-### Use Cases
-
-1. **Onboarding**: New developers can see the build structure instantly
-2. **Optimization**: Identify bottlenecks in your build process
-3. **Debugging**: Understand why certain targets run before others
-4. **Parallelization**: Find opportunities to speed up builds with `-j`
-
-## Safety Features: Preventing Accidental Disasters
-
-lazymake protects you from accidentally running destructive commands by detecting dangerous patterns and requiring confirmation before execution.
-
-### Visual Indicators
-
-Targets are marked with emoji indicators based on danger level:
-
-```
-RECENT
-🚨  deploy-prod      Deploy to production
-⚠️  clean            Clean build artifacts
-──────────────────────────────────────────────
-ALL TARGETS
-    build            Build the application
-🚨  nuke-db          Drop production database
-⚠️  docker-clean     Clean Docker resources
-```
-
-- **🚨 Critical**: Commands that can cause irreversible damage (requires confirmation)
-- **⚠️ Warning**: Commands with potential side effects (executes immediately)
-- **No indicator**: Safe commands
-
-### Two-Column Layout
-
-The interface shows exactly what will execute:
-
-```
-┌─────────────────────┬────────────────────────────────────────┐
-│ RECENT              │ Recipe Preview                         │
-│ > 🚨 deploy-prod    │                                        │
-│   ⚠️  clean         │ deploy-prod:                           │
-│                     │   kubectl apply -f k8s/prod/           │
-│ ───────────────     │   terraform apply -var-file=prod.tfvars│
-│ ALL TARGETS         │                                        │
-│   build             │ Danger: terraform-destroy (CRITICAL)   │
-│   test              │ This destroys Terraform infrastructure │
-│                     │ 💡 Verify workspace first              │
-└─────────────────────┴────────────────────────────────────────┘
-│ 12 targets • 2 dangerous      enter: run • ?: help • q: quit │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Left column**: Target list with indicators
-**Right column**: Recipe commands + safety warnings
-**Bottom**: Stats and contextual shortcuts
-
-### Confirmation Dialog
-
-Critical commands show a prominent warning dialog:
-
-```
-╔════════════════════════════════════════════════════════╗
-║                                                        ║
-║     🚨 DANGEROUS COMMAND WARNING                       ║
-║                                                        ║
-║     Target: nuke-db                                    ║
-║                                                        ║
-║     CRITICAL: database-drop                            ║
-║     Command: psql -c 'DROP DATABASE production;'       ║
-║                                                        ║
-║     Drops databases or truncates tables. This causes   ║
-║     permanent data loss.                               ║
-║                                                        ║
-║     💡 Always backup before destructive database       ║
-║        operations. Verify database name.               ║
-║                                                        ║
-║     [Enter] Continue Anyway     [Esc] Cancel           ║
-║                                                        ║
-╚════════════════════════════════════════════════════════╝
-```
-
-- Press `Esc` to cancel safely
-- Press `Enter` to proceed with execution
-
-### Built-in Dangerous Patterns
-
-#### Critical (🚨 + Confirmation Required)
-
-- **rm-rf-root**: Recursive deletion of system paths (`rm -rf /`, `sudo rm -rf`)
-- **disk-wipe**: Disk formatting or block device writes (`dd`, `mkfs`)
-- **database-drop**: Database/table deletion (`DROP DATABASE`, `TRUNCATE TABLE`)
-- **git-force-push**: Force pushing to repositories (`git push -f`)
-- **terraform-destroy**: Infrastructure destruction (`terraform destroy`)
-- **kubectl-delete**: Kubernetes resource deletion (`kubectl delete namespace`)
-
-#### Warning (⚠️ Only)
-
-- **docker-system-prune**: Docker cleanup operations
-- **git-reset-hard**: Discarding uncommitted changes
-- **npm-uninstall-all**: Removing all dependencies
-- **package-remove**: System package removal
-- **chmod-777**: Overly permissive file permissions
-
-### Context-Aware Detection
-
-lazymake intelligently adjusts severity based on context:
-
-**Clean targets** (downgraded severity):
-```makefile
-clean:  ## Clean build artifacts
-	rm -rf build/  # WARNING instead of CRITICAL
-```
-
-**Production keywords** (elevated severity):
-```makefile
-deploy-prod:  ## Deploy to production
-	docker system prune  # CRITICAL instead of WARNING
-```
-
-**Interactive flags** (downgraded severity):
-```makefile
-dangerous-op:
-	rm -rfi build/  # WARNING instead of CRITICAL (has -i flag)
-```
-
-**Development targets** (downgraded for non-prod):
-```makefile
-test-cleanup:
-	terraform destroy  # WARNING instead of CRITICAL (test target)
-```
-
-### Configuration
-
-Create `.lazymake.yaml` in your project or home directory:
+## Keyboard Shortcuts
+
+| Key | Action | View |
+|-----|--------|------|
+| `↑/↓` or `j/k` | Navigate | All |
+| `Enter` | Execute target | Main list |
+| `g` | View dependency graph | Main list |
+| `v` | View variable inspector | Main list |
+| `w` | Open workspace picker | Main list |
+| `?` | Toggle help view | Main list |
+| `/` | Search/filter targets | Main list |
+| `+/-` | Adjust graph depth | Graph view |
+| `o/c/p` | Toggle graph annotations | Graph view |
+| `f` | Toggle favorite workspace | Workspace picker |
+| `Esc` | Return to previous view | All |
+| `q` or `Ctrl+C` | Quit | All |
+
+[📖 Complete keyboard shortcuts reference](docs/guides/keyboard-shortcuts.md)
+
+## Configuration
+
+lazymake works with zero configuration, but you can customize behavior with `.lazymake.yaml`:
 
 ```yaml
+# Project-specific config (./.lazymake.yaml)
 safety:
-  # Master switch (default: true)
   enabled: true
-
-  # Exclude specific targets from ALL checks
   exclude_targets:
     - clean
-    - distclean
-    - reset-dev-db
+    - test-cleanup
 
-  # Enable only specific built-in rules (omit to enable all)
-  enabled_rules:
-    - rm-rf-root
-    - database-drop
-    - git-force-push
-    - terraform-destroy
-    - kubectl-delete
-
-  # Add custom rules
-  custom_rules:
-    - id: "prod-deploy"
-      severity: critical  # critical, warning, or info
-      patterns:
-        - "kubectl apply.*production"
-        - "terraform apply.*prod"
-      description: "Deploying to production environment"
-      suggestion: "Verify environment and get team approval"
-```
-
-**Configuration merging**:
-- Settings from `~/.lazymake.yaml` (global) and `./.lazymake.yaml` (project) are merged
-- `enabled`: project overrides global
-- `enabled_rules`, `exclude_targets`, `custom_rules`: union of both
-
-### Disabling Safety Checks
-
-**Globally** (in `~/.lazymake.yaml`):
-```yaml
-safety:
-  enabled: false
-```
-
-**Per-project** (in `./.lazymake.yaml`):
-```yaml
-safety:
-  enabled: false
-```
-
-**Per-target** (exclude specific targets):
-```yaml
-safety:
-  exclude_targets:
-    - my-dangerous-but-safe-target
-    - another-excluded-target
-```
-
-### Why Default-Enabled?
-
-Safety checks are enabled by default because:
-1. **Protect newcomers**: Developers new to a project are most at risk
-2. **Non-intrusive**: Visual indicators don't block workflow
-3. **Easy to disable**: One config line turns it off if unwanted
-4. **Better safe than sorry**: Confirmation dialogs take 1 second; data recovery takes hours
-
-### Real-World Scenarios
-
-**Scenario 1: New developer runs `make clean`**
-```
-⚠️  clean  # Warning indicator shown
-# Recipe preview shows: rm -rf build/
-# Executes immediately (warning-level, clean target)
-```
-
-**Scenario 2: Accidentally select `make nuke-prod-db`**
-```
-🚨 nuke-prod-db  # Critical indicator shown
-# Presses Enter
-# Confirmation dialog appears with full warning
-# Presses Esc to cancel safely
-```
-
-**Scenario 3: Experienced dev working on deployment**
-```yaml
-# .lazymake.yaml
-safety:
-  exclude_targets:
-    - deploy-prod
-    - deploy-staging
-```
-
-## Export & Shell Integration
-
-lazymake can export execution results to JSON/log files and integrate with your shell history, making it easier to track builds, debug issues, and repeat commands.
-
-### Export Execution Results
-
-Export execution results to structured JSON files or human-readable logs for analysis, debugging, and CI/CD integration.
-
-#### Features
-
-- **Multiple formats**: Export to JSON, plain text logs, or both
-- **Flexible naming**: Choose between timestamp-based, target-based, or sequential naming
-- **Automatic rotation**: Keep storage under control with configurable file limits and age-based cleanup
-- **Rich metadata**: Captures exit codes, execution time, output, environment context, and more
-- **Filtering**: Export only successful executions or exclude specific targets
-- **Async operation**: Non-blocking exports don't slow down your workflow
-
-#### Exported Data
-
-Each execution record includes:
-- Target name and Makefile path
-- Start/end timestamps and duration
-- Exit code and success status
-- Complete stdout/stderr output
-- Working directory, user, and hostname
-- lazymake version
-
-#### Example JSON Export
-
-```json
-{
-  "timestamp": "2025-12-12T14:30:22.123Z",
-  "target_name": "build",
-  "makefile_path": "/path/to/Makefile",
-  "duration_ms": 2023,
-  "success": true,
-  "exit_code": 0,
-  "output": "go build -o bin/lazymake...",
-  "working_dir": "/path/to/project",
-  "user": "developer",
-  "hostname": "laptop.local"
-}
-```
-
-#### Example Log Export
-
-```
-================================================================================
-Lazymake Execution Log
-================================================================================
-Target:        build
-Makefile:      /path/to/Makefile
-Timestamp:     2025-12-12 14:30:22
-Duration:      2.023s
-Exit Code:     0
-Status:        SUCCESS
-Working Dir:   /path/to/project
-User:          developer
-Host:          laptop.local
-================================================================================
-
-OUTPUT:
-go build -o bin/lazymake cmd/lazymake/main.go
-Build complete: bin/lazymake
-
-================================================================================
-Execution completed successfully in 2.023s
-================================================================================
-```
-
-#### Configuration
-
-Add to `.lazymake.yaml`:
-
-```yaml
-export:
-  # Enable export (default: false)
-  enabled: true
-
-  # Output directory (default: ~/.cache/lazymake/exports)
-  output_dir: ~/.cache/lazymake/exports
-
-  # Format: "json", "log", or "both" (default: "json")
-  format: both
-
-  # Naming strategy (default: "timestamp")
-  # - timestamp: build_20251212_143022.json
-  # - target: build_latest.json (overwrites)
-  # - sequential: build_1.json, build_2.json, ...
-  naming_strategy: timestamp
-
-  # Rotation settings
-  max_files: 50        # Keep max 50 files per target
-  keep_days: 30        # Delete files older than 30 days
-  max_file_size_mb: 10 # Skip exports larger than 10MB
-
-  # Filtering
-  success_only: false  # Export all executions (default)
-  exclude_targets:     # Don't export these targets
-    - watch
-    - dev
-```
-
-#### Use Cases
-
-1. **CI/CD Integration**: Export JSON for automated analysis and metrics
-2. **Debugging**: Review detailed logs of failed builds
-3. **Performance Tracking**: Analyze execution times over time
-4. **Audit Trail**: Maintain records of production deployments
-
-### Shell Integration
-
-Add executed make commands to your shell history, making it easy to re-run commands outside of lazymake.
-
-#### Features
-
-- **Automatic detection**: Detects your shell (bash, zsh) from `$SHELL` environment variable
-- **Format support**: Handles both standard and extended zsh history formats
-- **File locking**: Safe concurrent writes prevent history corruption
-- **Custom templates**: Customize the command format added to history
-- **Filtering**: Exclude specific targets from history (e.g., `help`, `list`)
-- **Async operation**: Non-blocking writes don't slow down execution
-
-#### Supported Shells
-
-- **bash**: Appends to `~/.bash_history`
-- **zsh**: Appends to `~/.zsh_history` or `$HISTFILE`
-  - Automatically detects extended history format
-  - Includes timestamps when `setopt EXTENDED_HISTORY` is enabled
-- **fish**: Coming soon
-
-#### How It Works
-
-When you execute a target in lazymake, the command `make <target>` is added to your shell history. Later, you can:
-- Use `history` to see all your make commands
-- Press `↑` to cycle through recent make commands
-- Use `Ctrl+R` to search your make command history
-
-#### Example
-
-```bash
-# After running 'build' and 'test' targets in lazymake
-$ history | tail -5
-  498  make build
-  499  make test
-  500  make build
-  501  make lint
-  502  history | tail -5
-
-# Re-run using shell history
-$ make build  # Just press ↑ and Enter
-```
-
-#### Configuration
-
-Add to `.lazymake.yaml`:
-
-```yaml
-shell_integration:
-  # Enable shell integration (default: false)
-  enabled: true
-
-  # Shell type: "auto", "bash", "zsh", or "none" (default: "auto")
-  shell: auto
-
-  # Override history file path (default: use shell default)
-  history_file: ""
-
-  # Include timestamp for zsh extended history (default: true)
-  include_timestamp: true
-
-  # Custom format template (default: "make {target}")
-  # Available variables: {target}, {makefile}, {dir}
-  format_template: "make {target}"
-
-  # Exclude targets from history
-  exclude_targets:
-    - help
-    - list
-```
-
-#### Custom Format Templates
-
-Customize what gets added to your shell history:
-
-```yaml
-# Simple (default)
-format_template: "make {target}"
-# Result: make build
-
-# Include Makefile path
-format_template: "make -f {makefile} {target}"
-# Result: make -f /path/to/Makefile build
-
-# Include working directory
-format_template: "cd {dir} && make {target}"
-# Result: cd /path/to/project && make build
-```
-
-#### Benefits
-
-- **Seamless workflow**: Switch between TUI and command line easily
-- **Command history**: All make commands available via `history`
-- **Shell completion**: Works with your existing shell completion setup
-- **No lock-in**: Commands are standard make invocations
-
-#### Configuration Scenarios
-
-**Scenario 1: Enable for CI/CD analysis**
-```yaml
 export:
   enabled: true
   format: json
-  naming_strategy: target  # Keep only latest
-  success_only: true
-```
 
-**Scenario 2: Debugging with detailed logs**
-```yaml
-export:
-  enabled: true
-  format: both  # JSON + logs
-  max_files: 20
-  keep_days: 7
-```
-
-**Scenario 3: Shell integration for bash**
-```yaml
 shell_integration:
   enabled: true
-  shell: bash
+  shell: auto
 ```
 
-**Scenario 4: zsh with custom format**
-```yaml
-shell_integration:
-  enabled: true
-  shell: zsh
-  format_template: "make -f {makefile} {target}"
-  exclude_targets:
-    - help
-    - list
-```
+**Configuration file locations:**
+- `~/.lazymake.yaml` - Global configuration
+- `./.lazymake.yaml` - Project-specific (overrides global)
 
+**Common customizations:**
+- [Safety rules](docs/guides/configuration.md#safety-features) - Configure dangerous command detection
+- [Export settings](docs/guides/configuration.md#export-configuration) - Control execution result exports
+- [Shell integration](docs/guides/configuration.md#shell-integration) - Add commands to shell history
+
+[📖 Full configuration guide](docs/guides/configuration.md) | [📄 Example config](.lazymake.example.yaml)
+
+## Documentation
+
+### 📖 Guides
+- [Self-Documenting Makefiles](docs/guides/self-documenting-makefiles.md) - Write Makefiles that document themselves
+- [Keyboard Shortcuts Reference](docs/guides/keyboard-shortcuts.md) - Complete shortcut guide
+- [Configuration Guide](docs/guides/configuration.md) - All configuration options
+
+### ✨ Feature Deep Dives
+- [Dependency Graph Visualization](docs/features/dependency-graphs.md)
+- [Variable Inspector](docs/features/variable-inspector.md)
+- [Safety Features](docs/features/safety-features.md)
+- [Recent History & Smart Search](docs/features/history-search.md)
+- [Workspace Management](docs/features/workspace-management.md)
+- [Performance Profiling](docs/features/performance-tracking.md)
+- [Export & Shell Integration](docs/features/export-shell-integration.md)
+
+[📂 Browse all documentation](docs/)
+
+## FAQ
+
+**Q: Does lazymake work with GNU Make, BSD Make, etc?**
+A: Yes! lazymake works with any Make implementation. It parses the Makefile text and executes using your system's `make` command.
+
+**Q: Will this work with my existing Makefile?**
+A: Absolutely! No changes required. lazymake reads standard Makefiles. Add `##` comments for better documentation, but it works with any Makefile as-is.
+
+**Q: How do I disable safety checks for trusted targets?**
+A: Add `exclude_targets` to your `.lazymake.yaml`. See the [Configuration Guide](docs/guides/configuration.md#safety-features) for details.
+
+**Q: Can I use this in CI/CD?**
+A: lazymake is designed for interactive use. For CI/CD, use `make` directly. However, you can use the [export feature](docs/features/export-shell-integration.md) to log execution results for analysis.
+
+**Q: How does lazymake find Makefiles in my project?**
+A: Press `w` to scan up to 3 levels deep from your current directory, excluding common directories like `node_modules`, `.git`, etc. See [Workspace Management](docs/features/workspace-management.md) for details.
+
+**Q: Does lazymake modify my Makefile?**
+A: Never! lazymake is read-only. It parses your Makefile but never modifies it. All state (history, workspaces, performance data) is stored in `~/.cache/lazymake/`.
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Quick Start for Contributors
+
+1. Fork the repository
+2. Clone your fork
+3. Create a feature branch
+4. Make your changes
+5. Run tests: `make test`
+6. Submit a pull request
+
+## Alternatives
+
+If lazymake isn't your style, check out these other tools:
+
+- [**just**](https://github.com/casey/just) - Modern command runner with syntax inspired by make, simpler syntax
+- [**task**](https://github.com/go-task/task) - Task runner written in Go, uses YAML instead of Makefiles
+- [**mmake**](https://github.com/tj/mmake) - Modern make with improved error messages and better UX
+- [**mani**](https://github.com/alajmo/mani) - CLI tool to manage multiple repositories
+
+Each tool has different trade-offs. lazymake focuses on enhancing the Make experience with a TUI, while others aim to replace Make entirely or provide different workflow approaches.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+Built with:
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions for terminal UIs
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+
+Inspired by [lazygit](https://github.com/jesseduffield/lazygit) and [lazydocker](https://github.com/jesseduffield/lazydocker).
+
+---
+
+**Made with ❤️ by developers, for developers.**
+
+Star the repo if lazymake makes your Makefile workflows better!

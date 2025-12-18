@@ -1,5 +1,4 @@
 makefile: ./Makefile
-theme: default
 
 # Safety features are enabled by default
 # Uncomment and customize to change behavior:

@@ -8,7 +8,6 @@ import (
 
 type Config struct {
 	MakefilePath     string
-	Theme            string
 	Export           *export.Config
 	ShellIntegration *shell.Config
 }
@@ -16,7 +15,6 @@ type Config struct {
 func Load() (*Config, error) {
 	// Set defaults
 	viper.SetDefault("makefile", "Makefile")
-	viper.SetDefault("theme", "default")
 
 	// Export defaults
 	viper.SetDefault("export.enabled", false)
@@ -69,7 +67,6 @@ func Load() (*Config, error) {
 
 	return &Config{
 		MakefilePath:     viper.GetString("makefile"),
-		Theme:            viper.GetString("theme"),
 		Export:           exportConfig,
 		ShellIntegration: shellConfig,
 	}, nil

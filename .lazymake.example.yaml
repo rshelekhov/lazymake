@@ -11,9 +11,6 @@
 # Makefile path (default: "Makefile")
 makefile: Makefile
 
-# Theme (default: "default")
-theme: default
-
 # Safety Features Configuration
 safety:
   # Master switch - enable/disable all safety checks
