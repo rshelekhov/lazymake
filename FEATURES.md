@@ -78,12 +78,6 @@
 - Detect and syntax-highlight embedded languages (bash, python, etc.) in targets
 - Inspired by Just's ability to write recipes in any language
 
-#### 7. Workspace/Project Management
-- Quick switching between different project Makefiles
-- Show in status bar what makefile is using now
-- Remember last-used targets per project
-- Support monorepo scenarios
-
 #### 8. CI/CD Preview
 - Show which targets would run in CI
 - Simulate CI environment locally
@@ -110,6 +104,23 @@
 - Export execution results to JSON/log files
 - Shell integration for command history (bash, zsh)
 - **Implementation complete**: Both JSON and log export formats with configurable rotation, shell history integration with file locking for bash and zsh
+
+#### ✅ 7. Workspace/Project Management
+- Quick switching between different project Makefiles with press 'w'
+- Automatic discovery: Scans project tree (3 levels deep) to find all Makefiles automatically
+- Recent workspace list: Last 10 accessed Makefiles with "time ago" display and access count
+- Discovered workspaces: Shows newly found Makefiles in project that haven't been used yet
+- Favorite workspaces: Star frequently used projects (press 'f' to toggle)
+- Status bar integration: Shows current Makefile path (relative to cwd)
+- Per-project history: Already supported via feature #3 (each Makefile has its own execution history)
+- Monorepo support: Discovery navigates directory trees with smart exclusions
+- Smart exclusions: Skips `.git`, `node_modules`, `vendor`, `build`, `dist`, `.cache`, etc.
+- Access tracking: Records access count and last accessed time for each workspace
+- Persistent storage: Workspace data saved in `~/.cache/lazymake/workspaces.json`
+- Smart Makefile detection: Supports Makefile, makefile, GNUmakefile, *.mk, *.mak patterns
+- Automatic cleanup: Removes workspace entries for deleted Makefiles
+- Fast scanning: 5-second timeout ensures responsiveness in large projects
+- **Implementation complete**: Full workspace management with automatic discovery, recent list, favorites, and seamless switching
 
 ### Research Sources
 - [Makefile Success Stories from Open Source Projects](https://moldstud.com/articles/p-unlocking-makefiles-success-stories-from-leading-open-source-projects)

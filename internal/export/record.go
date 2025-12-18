@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rshelekhov/lazymake/internal/executor"
+	"github.com/rshelekhov/lazymake/version"
 )
 
 // ExecutionRecord represents a complete execution result for export
@@ -71,7 +72,7 @@ func NewExecutionRecord(makefilePath, targetName string, result executor.Result)
 		WorkingDir:      workingDir,
 		User:            currentUser,
 		Hostname:        hostname,
-		LazymakeVersion: "0.3.0", // TODO: Get from version constant
+		LazymakeVersion: version.Version,
 	}
 }
 

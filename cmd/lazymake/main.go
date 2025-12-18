@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rshelekhov/lazymake/config"
 	"github.com/rshelekhov/lazymake/internal/tui"
+	"github.com/rshelekhov/lazymake/internal/workspace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,7 +39,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Initialize workspace manager
+	workspaceMgr, err := workspace.Load()
+	if err != nil {
+		// Graceful degradation: continue with empty workspace manager
+		workspaceMgr = workspace.NewEmpty()
+	}
+
 	m := tui.NewModel(cfg)
+	m.WorkspaceManager = workspaceMgr
+
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

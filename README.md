@@ -13,6 +13,7 @@ A beautiful terminal user interface for browsing and executing Makefile targets.
 - [Writing Self-Documenting Makefiles](#writing-self-documenting-makefiles)
 - [Recent History & Smart Navigation](#recent-history--smart-navigation)
 - [Variable Inspector: Understanding Your Build Configuration](#variable-inspector-understanding-your-build-configuration)
+- [Workspace Management: Working with Multiple Projects](#workspace-management-working-with-multiple-projects)
 - [Understanding Dependency Graphs](#understanding-dependency-graphs)
 - [Safety Features: Preventing Accidental Disasters](#safety-features-preventing-accidental-disasters)
   - [Visual Indicators](#visual-indicators)
@@ -94,6 +95,19 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
   - Dual display: Shows both raw values and fully expanded values
   - Smart navigation: Scrollable list with up/down or j/k keys
 
+- **Workspace/Project Management**: Quick switching between different projects
+  - Press `w` to open workspace picker with recent and discovered Makefiles
+  - Automatic discovery: Scans project tree (3 levels deep) to find all Makefiles
+  - Recent workspaces: Last 10 accessed Makefiles with "time ago" display and access count
+  - Discovered workspaces: Shows newly found Makefiles in project that haven't been used yet
+  - Favorite workspaces: Star frequently used projects (press `f` to toggle favorites)
+  - Status bar integration: Shows current Makefile path relative to working directory
+  - Per-project history: Each Makefile maintains its own execution history
+  - Smart exclusions: Skips `.git`, `node_modules`, `vendor`, build directories automatically
+  - Access tracking: Records access count and last accessed time per workspace
+  - Persistent storage: Workspace data saved in `~/.cache/lazymake/workspaces.json`
+  - Automatic cleanup: Removes workspace entries for deleted Makefiles
+
 ### Planned
 
 #### High Priority
@@ -101,7 +115,6 @@ Make dominates build automation with 19% presence in top GitHub repos, but devel
 
 ### Nice to Have
 - Multi-language recipe support with syntax highlighting
-- Workspace/project management for monorepos
 - Variable runtime overrides through TUI
 - Watch mode and CI/CD integration
 
@@ -163,6 +176,7 @@ lazymake -t <theme-name>
 - `Enter` - Execute selected target
 - `g` - View dependency graph for selected target
 - `v` - View variable inspector
+- `w` - Open workspace picker to switch between Makefiles
 - `?` - Toggle help view
 - `/` - Filter/search targets
 - `q` or `ctrl+c` - Quit
@@ -184,6 +198,13 @@ lazymake -t <theme-name>
 #### Output View
 - `↑/↓` or `j/k` - Scroll through output
 - `esc` - Return to list view
+- `q` or `ctrl+c` - Quit
+
+#### Workspace Picker
+- `↑/↓` or `j/k` - Navigate workspace list
+- `Enter` - Switch to selected workspace
+- `f` - Toggle favorite for selected workspace
+- `esc` or `w` - Return to list view
 - `q` or `ctrl+c` - Quit
 
 Configuration can be set via `.lazymake.yaml` in your project directory.
@@ -383,6 +404,151 @@ clean: ## Clean build artifacts
 - **`↑/↓` or `j/k`**: Navigate between variables
 - **`v` or `esc`**: Return to list view
 - **Auto-scroll**: Inspector automatically scrolls to keep selected variable visible
+
+## Workspace Management: Working with Multiple Projects
+
+lazymake makes it easy to work with multiple projects and Makefiles. Press `w` to see recent workspaces and automatically discovered Makefiles in your project.
+
+### Workspace Picker (Press `w`)
+
+Access recent and discovered Makefiles with a single keypress:
+
+```
+┌─ Switch Workspace ────────────────────────────────────────┐
+│                                                            │
+│ ⭐ ./Makefile                                              │
+│    Last used: 2 minutes ago • 15 times                    │
+│                                                            │
+│    ../other-project/Makefile                              │
+│    Last used: 1 hour ago • 8 times                        │
+│                                                            │
+│    examples/dangerous.mk                                  │
+│    Discovered in project                                  │
+│                                                            │
+│    tools/Makefile                                         │
+│    Discovered in project                                  │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+  2 recent • 2 discovered
+  enter: switch • f: favorite • esc/w: cancel
+```
+
+**Features:**
+- **Automatic discovery**: Scans your project tree (up to 3 levels deep) to find all Makefiles
+- **Recent workspaces**: Shows last 10 accessed Makefiles with access tracking
+- **Discovered workspaces**: Displays found Makefiles you haven't used yet
+- **Favorites first**: Star frequently used projects with `f` - they appear at the top
+- **Access tracking**: Displays "time ago" (e.g., "2 hours ago") and access count for recent workspaces
+- **Smart exclusions**: Skips `.git`, `node_modules`, `vendor`, build directories, and other common non-code paths
+- **Fast scanning**: 5-second timeout ensures responsiveness even in large projects
+
+### Status Bar Integration
+
+The current workspace is always visible in the status bar:
+
+```
+└──────────────────────────────────────────────────────────┘
+│ ./Makefile • 12 targets • 2 dangerous    enter: run • q │
+└──────────────────────────────────────────────────────────┘
+```
+
+The path is displayed relative to your current working directory:
+- `./Makefile` - in current directory
+- `../other/Makefile` - in sibling directory
+- `~/projects/foo/Makefile` - absolute path with `~` expansion
+
+### Per-Project History
+
+Each workspace automatically maintains its own execution history. When you switch between projects, you'll see the recent targets for that specific Makefile:
+
+```
+# Working in project A
+RECENT
+⏱  build-api    Build the API server       3.2s
+⏱  test-api     Run API tests              1.5s
+
+# Switch to project B (press 'w')
+RECENT
+⏱  deploy-prod  Deploy to production       45.1s
+⏱  build-web    Build web frontend         8.3s
+```
+
+This means:
+- Each Makefile remembers its own frequently used targets
+- No need to scroll through unrelated targets
+- Faster context switching between projects
+
+### Automatic Tracking
+
+lazymake automatically tracks workspace usage:
+- **On first use**: Creates workspace entry when you run a target
+- **On subsequent uses**: Updates access count and last accessed time
+- **On cleanup**: Removes entries for deleted Makefiles automatically
+- **Persistent**: Data survives across sessions in `~/.cache/lazymake/workspaces.json`
+
+### How Discovery Works
+
+When you press `w`, lazymake:
+1. **Records current Makefile** - Ensures your current file appears in the list
+2. **Scans project tree** - Searches up to 3 levels deep from current directory
+3. **Finds all Makefiles** - Detects `Makefile`, `makefile`, `GNUmakefile`, `*.mk`, `*.mak`
+4. **Applies exclusions** - Skips `.git`, `node_modules`, `vendor`, `build`, `dist`, `.cache`, etc.
+5. **Combines results** - Shows recent workspaces first, then newly discovered ones
+6. **Fast operation** - 5-second timeout prevents hanging on large projects
+
+### Use Cases
+
+#### 1. Monorepo Development
+
+Working with multiple Makefiles in a large repository:
+
+```
+my-monorepo/
+├── Makefile              # Root Makefile
+├── services/
+│   ├── api/Makefile      # API service
+│   ├── auth/Makefile     # Auth service
+│   └── worker/Makefile   # Background worker
+└── frontend/Makefile     # Frontend app
+```
+
+Press `w` to see all Makefiles automatically - no manual browsing needed!
+
+#### 2. Multi-Project Development
+
+Switching between different projects:
+- Press `w` to see recent projects and discovered Makefiles
+- Star your most frequently used projects with `f`
+- Favorites always appear at the top of the list
+
+#### 3. Onboarding
+
+New to a project? Press `w`:
+- Instantly see all available Makefiles
+- Discovered Makefiles show "Discovered in project"
+- Select one to start working - it gets added to your recent list
+
+### For Makefiles Outside Discovery Range
+
+If you need a Makefile that's:
+- More than 3 levels deep
+- In an excluded directory
+- Outside your current project
+
+Use the CLI flag:
+```bash
+lazymake -f path/to/Makefile
+```
+
+Once accessed, it appears in your recent workspaces list.
+
+### Navigation
+
+- **`w`**: Open workspace picker from list view
+- **`↑/↓` or `j/k`**: Navigate workspaces
+- **`f`**: Toggle favorite (star/unstar workspace)
+- **`enter`**: Switch to selected workspace
+- **`esc` or `w`**: Return to main list view
 
 ## Understanding Dependency Graphs
 

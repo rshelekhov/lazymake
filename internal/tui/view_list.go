@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -299,8 +301,9 @@ func (m Model) renderStatusBar() string {
 		}
 	}
 
-	// Left side: stats
-	leftStats := []string{fmt.Sprintf("%d targets", totalTargets)}
+	// Left side: workspace path + stats
+	workspacePath := m.getWorkspaceDisplayPath()
+	leftStats := []string{workspacePath, fmt.Sprintf("%d targets", totalTargets)}
 
 	if dangerousCount > 0 {
 		leftStats = append(leftStats, fmt.Sprintf("%d dangerous", dangerousCount))
@@ -492,4 +495,23 @@ func renderVariablesSection(vars []string) string {
 	util.WriteString(&builder, hintStyle.Render("    💡 Press 'v' to view all variables")+"\n")
 
 	return builder.String()
+}
+
+// getWorkspaceDisplayPath returns the relative path to the current Makefile for display in status bar
+func (m Model) getWorkspaceDisplayPath() string {
+	if m.WorkspaceManager == nil {
+		return filepath.Base(m.MakefilePath)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return filepath.Base(m.MakefilePath)
+	}
+
+	relPath := m.WorkspaceManager.GetRelativePath(m.MakefilePath, cwd)
+	if relPath == "" {
+		return filepath.Base(m.MakefilePath)
+	}
+
+	return relPath
 }
