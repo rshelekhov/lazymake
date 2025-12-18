@@ -37,6 +37,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateExecuting(msg)
 	case StateVariables:
 		return m.updateVariables(msg)
+	case StateWorkspace:
+		return m.updateWorkspace(msg)
 	default:
 		return m, nil
 	}
@@ -72,6 +74,12 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Toggle variable inspector view
 			m.State = StateVariables
 			m.VariableListIndex = 0
+			return m, nil
+
+		case "w":
+			// Open workspace picker
+			m.State = StateWorkspace
+			m.initWorkspacePicker()
 			return m, nil
 
 		case "g":

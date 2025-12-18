@@ -16,6 +16,7 @@ import (
 	"github.com/rshelekhov/lazymake/internal/safety"
 	"github.com/rshelekhov/lazymake/internal/shell"
 	"github.com/rshelekhov/lazymake/internal/variables"
+	"github.com/rshelekhov/lazymake/internal/workspace"
 )
 
 type AppState int
@@ -28,6 +29,7 @@ const (
 	StateGraph
 	StateConfirmDangerous
 	StateVariables
+	StateWorkspace
 )
 
 type Model struct {
@@ -69,6 +71,10 @@ type Model struct {
 	// Export and shell integration
 	Exporter         *export.Exporter
 	ShellIntegration *shell.Integration
+
+	// Workspace management
+	WorkspaceManager *workspace.Manager
+	WorkspaceList    list.Model // For workspace picker UI
 
 	// Key bindings for status bar display
 	KeyBindings []key.Binding
@@ -323,4 +329,28 @@ func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
 	}
 
 	return items
+}
+
+// SwitchWorkspace reinitializes the model with a new Makefile path
+// This performs a full reinitialization to ensure clean state
+func (m Model) SwitchWorkspace(newMakefilePath string, cfg *config.Config) Model {
+	// Create new config with updated Makefile path
+	newCfg := *cfg
+	newCfg.MakefilePath = newMakefilePath
+
+	// Create fresh model with new Makefile
+	newModel := NewModel(&newCfg)
+
+	// Preserve UI state
+	newModel.Width = m.Width
+	newModel.Height = m.Height
+	newModel.WorkspaceManager = m.WorkspaceManager
+
+	// Record workspace access
+	if m.WorkspaceManager != nil {
+		m.WorkspaceManager.RecordAccess(newMakefilePath)
+		_ = m.WorkspaceManager.Save() // Async, ignore errors (non-critical)
+	}
+
+	return newModel
 }

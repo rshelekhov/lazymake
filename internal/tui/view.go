@@ -29,6 +29,8 @@ func (m Model) View() string {
 		return m.renderConfirmView()
 	case StateVariables:
 		return m.renderVariablesView()
+	case StateWorkspace:
+		return m.renderWorkspaceView()
 	case StateList:
 		return m.renderListView()
 	default:
