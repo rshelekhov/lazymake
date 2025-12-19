@@ -124,14 +124,24 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		Render(target.Name + ":")
 	util.WriteString(&builder, header+"\n\n")
 
-	// Recipe commands
+	// Recipe commands with syntax highlighting
 	if len(target.Recipe) > 0 {
-		recipeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF"))
+		// Detect language for syntax highlighting
+		language := m.Highlighter.DetectLanguage(target.Recipe, target.LanguageOverride)
 
+		// Highlight each line
 		for _, line := range target.Recipe {
-			// Indent each recipe line with tab
-			util.WriteString(&builder, recipeStyle.Render("  "+line)+"\n")
+			highlighted := m.Highlighter.HighlightLine(line, language)
+			util.WriteString(&builder, "  "+highlighted+"\n")
+		}
+
+		// Show language badge for non-bash languages
+		if language != "bash" && language != "" {
+			langBadge := lipgloss.NewStyle().
+				Foreground(SecondaryColor).
+				Italic(true).
+				Render(fmt.Sprintf("  [%s]", language))
+			util.WriteString(&builder, "\n"+langBadge+"\n")
 		}
 
 		// Graph view hint

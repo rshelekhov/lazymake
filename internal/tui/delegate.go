@@ -21,10 +21,11 @@ type Target struct {
 	IsRecent    bool // Marks targets that appear in recent history
 
 	// Recipe and safety fields
-	Recipe        []string             // Command lines to execute
-	IsDangerous   bool                 // Whether target has dangerous commands
-	DangerLevel   safety.Severity      // Highest severity level
-	SafetyMatches []safety.MatchResult // All matched safety rules
+	Recipe           []string             // Command lines to execute
+	LanguageOverride string               // Manual language override for syntax highlighting
+	IsDangerous      bool                 // Whether target has dangerous commands
+	DangerLevel      safety.Severity      // Highest severity level
+	SafetyMatches    []safety.MatchResult // All matched safety rules
 
 	// Performance fields
 	PerfStats *history.PerformanceStats // nil if no data

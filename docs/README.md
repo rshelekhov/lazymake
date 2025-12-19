@@ -12,6 +12,7 @@ This directory contains detailed guides and feature documentation to help you ge
 
 - [Dependency Graph Visualization](features/dependency-graphs.md) - Understand build dependencies with interactive graphs
 - [Variable Inspector](features/variable-inspector.md) - Inspect and track Makefile variables
+- [Syntax Highlighting](features/syntax-highlighting.md) - Automatic syntax highlighting for multi-language recipes
 - [Safety Features & Dangerous Command Detection](features/safety-features.md) - Protection against destructive operations
 - [Recent History & Smart Search](features/history-search.md) - Fast access to frequently used targets
 - [Workspace Management](features/workspace-management.md) - Work with multiple Makefiles across projects
@@ -26,7 +27,9 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
 
 - [Main README](../README.md) - Quick start and overview
 - [Example Configuration](./.lazymake.example.yaml) - Fully commented configuration examples
-- [Example Makefile](../examples/dangerous.mk) - Demonstration of safety features
+- [Example Makefiles](../examples/)
+  - [dangerous.mk](../examples/dangerous.mk) - Demonstration of safety features
+  - [highlighting.mk](../examples/highlighting.mk) - Multi-language syntax highlighting examples
 
 ---
 

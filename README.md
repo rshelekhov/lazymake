@@ -126,6 +126,36 @@ Understand your build configuration. lazymake shows all Makefile variables with 
 
 [📖 Full documentation](docs/features/variable-inspector.md)
 
+### Syntax Highlighting for Multi-Language Recipes
+
+<!--
+GIF: Syntax Highlighting (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Use examples/highlighting.mk for demo
+3. Sequence:
+   - Select a Python target with shebang (2s)
+   - Show highlighted Python code with [python] badge (3s)
+   - Select a Go target (2s)
+   - Show highlighted Go commands with [go] badge (3s)
+   - Select a Rust target (2s)
+   - Show highlighted Rust commands with [rust] badge (3s)
+4. Highlight: Different colors for keywords, strings, comments
+5. Show language badges appearing below recipes
+-->
+
+![Syntax Highlighting](docs/assets/syntax-highlighting.gif)
+
+Read code faster with automatic syntax highlighting. lazymake detects the language of your recipes (Python, Go, JavaScript, Rust, etc.) and applies appropriate syntax coloring. Works with shebangs, command detection, or manual overrides via comments.
+
+**Key features:**
+- 🎨 Automatic language detection - identifies Python, Go, JavaScript, Rust, and 100+ languages
+- 🏷️ Manual overrides - use `# language: python` comments when needed
+- 🔍 Smart detection - recognizes shebangs, command patterns (go, npm, cargo, pip)
+- 🌈 Terminal-optimized colors - monokai-inspired palette for readability
+
+[📖 Full documentation](docs/features/syntax-highlighting.md)
+
 ### Dangerous Command Detection
 
 <!--
@@ -349,6 +379,7 @@ shell_integration:
 ### ✨ Feature Deep Dives
 - [Dependency Graph Visualization](docs/features/dependency-graphs.md)
 - [Variable Inspector](docs/features/variable-inspector.md)
+- [Syntax Highlighting](docs/features/syntax-highlighting.md)
 - [Safety Features](docs/features/safety-features.md)
 - [Recent History & Smart Search](docs/features/history-search.md)
 - [Workspace Management](docs/features/workspace-management.md)
@@ -399,6 +430,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 Built with:
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
 - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions for terminal UIs
+- [Chroma](https://github.com/alecthomas/chroma) - Syntax highlighting library
 - [Cobra](https://github.com/spf13/cobra) - CLI framework
 
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit) and [lazydocker](https://github.com/jesseduffield/lazydocker).
