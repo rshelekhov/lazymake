@@ -2,8 +2,10 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -193,17 +195,17 @@ func IsMakefile(path string) bool {
 func FormatSize(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
-		return strings.Join([]string{string(rune(bytes)), "B"}, "")
+		return strconv.FormatInt(bytes, 10) + " B"
 	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	div := int64(unit)
+	exp := 0
+
+	for n := bytes / unit; n >= unit && exp < len(units)-1; n /= unit {
 		div *= unit
 		exp++
 	}
-	return strings.Join([]string{
-		strings.TrimRight(strings.TrimRight(
-			strings.Join([]string{string(rune(int(float64(bytes)/float64(div)*10)/10)), ".", string(rune(int(float64(bytes)/float64(div)*10)%10))}, ""),
-			"0"), "."),
-		[]string{"B", "KB", "MB", "GB", "TB"}[exp],
-	}, " ")
+
+	value := float64(bytes) / float64(div)
+	return fmt.Sprintf("%.1f %s", value, units[exp])
 }
