@@ -390,17 +390,6 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 5. Run tests: `make test`
 6. Submit a pull request
 
-## Alternatives
-
-If lazymake isn't your style, check out these other tools:
-
-- [**just**](https://github.com/casey/just) - Modern command runner with syntax inspired by make, simpler syntax
-- [**task**](https://github.com/go-task/task) - Task runner written in Go, uses YAML instead of Makefiles
-- [**mmake**](https://github.com/tj/mmake) - Modern make with improved error messages and better UX
-- [**mani**](https://github.com/alajmo/mani) - CLI tool to manage multiple repositories
-
-Each tool has different trade-offs. lazymake focuses on enhancing the Make experience with a TUI, while others aim to replace Make entirely or provide different workflow approaches.
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
