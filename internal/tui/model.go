@@ -86,12 +86,11 @@ type Model struct {
 	Err error
 }
 
-func NewModel(cfg *config.Config) Model {
-	makefilePath := cfg.MakefilePath
-
+// loadAndParseMakefile parses the makefile and related data
+func loadAndParseMakefile(makefilePath string) ([]makefile.Target, *graph.Graph, []variables.Variable, error) {
 	targets, err := makefile.Parse(makefilePath)
 	if err != nil {
-		return Model{Err: err}
+		return nil, nil, nil, err
 	}
 
 	depGraph := graph.BuildGraph(targets)
@@ -104,19 +103,22 @@ func NewModel(cfg *config.Config) Model {
 	} else {
 		// Expand variables using make
 		_ = variables.ExpandVariables(makefilePath, vars)
-
 		// Analyze usage across targets
 		variables.AnalyzeUsage(vars, targets)
 	}
 
-	// Load safety configuration and run checks
+	return targets, depGraph, vars, nil
+}
+
+// convertAndEnrichWithSafety converts makefile targets to TUI targets and adds safety checks
+func convertAndEnrichWithSafety(targets []makefile.Target) []Target {
+	// Load safety configuration
 	safetyConfig, err := safety.LoadConfig()
 	if err != nil {
-		// Graceful degradation: continue without safety checks
 		safetyConfig = safety.DefaultConfig()
 	}
 
-	var safetyResults map[string]*safety.SafetyCheckResult
+	var safetyResults map[string]*safety.CheckResult
 	if safetyConfig.Enabled {
 		checker, err := safety.NewChecker(safetyConfig)
 		if err == nil {
@@ -144,16 +146,15 @@ func NewModel(cfg *config.Config) Model {
 		}
 	}
 
-	// Get absolute Makefile path early (needed for performance enrichment)
-	absPath, err := filepath.Abs(makefilePath)
-	if err != nil {
-		absPath = makefilePath // Fallback to original path
-	}
+	return tuiTargets
+}
 
+// enrichWithHistory loads history and enriches targets with performance data
+// Returns the list of recent targets and the history object
+func enrichWithHistory(tuiTargets []Target, absPath string) ([]Target, *history.History) {
 	// Load history
 	hist, err := history.Load()
 	if err != nil {
-		// Graceful degradation: continue with empty history
 		hist = &history.History{Entries: make(map[string][]history.Entry)}
 	}
 
@@ -166,13 +167,14 @@ func NewModel(cfg *config.Config) Model {
 
 	// Get recent entries and build recent targets list
 	recentEntries := hist.GetRecent(absPath)
-	recentTargets := buildRecentTargets(recentEntries, tuiTargets)
+	return buildRecentTargets(recentEntries, tuiTargets), hist
+}
 
-	// Build items list with recent section
+// buildItemsList creates the list items for display
+func buildItemsList(tuiTargets, recentTargets []Target) []list.Item {
 	items := make([]list.Item, 0, len(tuiTargets)+len(recentTargets)+3)
 
 	if len(recentTargets) > 0 {
-		// Add recent section
 		items = append(items, HeaderTarget{Label: "RECENT"})
 		for _, t := range recentTargets {
 			items = append(items, t)
@@ -180,11 +182,35 @@ func NewModel(cfg *config.Config) Model {
 		items = append(items, SeparatorTarget{})
 	}
 
-	// Add all targets section
 	items = append(items, HeaderTarget{Label: "ALL TARGETS"})
 	for _, t := range tuiTargets {
 		items = append(items, t)
 	}
+
+	return items
+}
+
+func NewModel(cfg *config.Config) Model {
+	// Parse makefile and load data
+	targets, depGraph, vars, err := loadAndParseMakefile(cfg.MakefilePath)
+	if err != nil {
+		return Model{Err: err}
+	}
+
+	// Convert to TUI targets and enrich with safety checks
+	tuiTargets := convertAndEnrichWithSafety(targets)
+
+	// Get absolute path for history lookups
+	absPath, err := filepath.Abs(cfg.MakefilePath)
+	if err != nil {
+		absPath = cfg.MakefilePath
+	}
+
+	// Enrich with history and performance data
+	recentTargets, hist := enrichWithHistory(tuiTargets, absPath)
+
+	// Build items list for display
+	items := buildItemsList(tuiTargets, recentTargets)
 
 	// Define key bindings for both list and status bar display
 	keyBindings := []key.Binding{

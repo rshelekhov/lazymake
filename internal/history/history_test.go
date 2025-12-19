@@ -9,13 +9,8 @@ import (
 )
 
 func TestLoad_NonExistentFile(t *testing.T) {
-	// Create a temporary directory for test cache
-	tempDir := t.TempDir()
-	testPath := filepath.Join(tempDir, "history.json")
-
 	h := &History{
 		Entries: make(map[string][]Entry),
-		path:    testPath,
 	}
 
 	// Should return empty history if file doesn't exist

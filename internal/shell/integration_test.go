@@ -180,13 +180,13 @@ func TestBashWriterConcurrent(t *testing.T) {
 	numGoroutines := 10
 
 	for i := 0; i < numGoroutines; i++ {
-		go func(n int) {
+		go func() {
 			entry := "make test"
 			if err := writer.Append(entry); err != nil {
 				t.Errorf("Concurrent Append failed: %v", err)
 			}
 			done <- true
-		}(i)
+		}()
 	}
 
 	// Wait for all goroutines
