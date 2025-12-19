@@ -111,27 +111,25 @@ func DiscoverMakefiles(rootDir string, opts DiscoveryOptions) ([]DiscoveryResult
 					path:  fullPath,
 					depth: current.depth + 1,
 				})
-			} else {
+			} else if IsMakefile(entry.Name()) {
 				// Check if it's a Makefile
-				if IsMakefile(entry.Name()) {
-					// Get file info for mod time
-					info, err := entry.Info()
-					if err != nil {
-						continue
-					}
-
-					// Compute relative path from root
-					relPath, err := filepath.Rel(rootDir, fullPath)
-					if err != nil {
-						relPath = fullPath
-					}
-
-					results = append(results, DiscoveryResult{
-						Path:    fullPath,
-						RelPath: relPath,
-						ModTime: info.ModTime(),
-					})
+				// Get file info for mod time
+				info, err := entry.Info()
+				if err != nil {
+					continue
 				}
+
+				// Compute relative path from root
+				relPath, err := filepath.Rel(rootDir, fullPath)
+				if err != nil {
+					relPath = fullPath
+				}
+
+				results = append(results, DiscoveryResult{
+					Path:    fullPath,
+					RelPath: relPath,
+					ModTime: info.ModTime(),
+				})
 			}
 		}
 	}

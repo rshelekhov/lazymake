@@ -15,18 +15,20 @@ func adjustSeverity(target makefile.Target, rule Rule, matchedLine string) Sever
 	// Clean targets are expected to be destructive
 	if isCleanTarget(target.Name) {
 		// Downgrade severity for clean targets
-		if severity == SeverityCritical {
+		switch severity {
+		case SeverityCritical:
 			severity = SeverityWarning
-		} else if severity == SeverityWarning {
+		case SeverityWarning:
 			severity = SeverityInfo
 		}
 	}
 
 	// Commands with interactive confirmation flags are safer
 	if hasInteractiveFlag(matchedLine) {
-		if severity == SeverityCritical {
+		switch severity {
+		case SeverityCritical:
 			severity = SeverityWarning
-		} else if severity == SeverityWarning {
+		case SeverityWarning:
 			severity = SeverityInfo
 		}
 	}

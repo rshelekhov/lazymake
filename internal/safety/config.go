@@ -129,11 +129,12 @@ func mergeConfigs(global, project *Config) *Config {
 
 	// Project overrides global for enabled flag
 	// If both have defaults (true), use project's value
-	if project != nil {
+	switch {
+	case project != nil:
 		result.Enabled = project.Enabled
-	} else if global != nil {
+	case global != nil:
 		result.Enabled = global.Enabled
-	} else {
+	default:
 		result.Enabled = true // Default
 	}
 
