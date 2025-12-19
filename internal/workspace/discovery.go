@@ -206,6 +206,14 @@ func FormatSize(bytes int64) string {
 		exp++
 	}
 
+	// Clamp exp to valid range
+	if exp < 0 {
+		exp = 0
+	}
+	if exp >= len(units) {
+		exp = len(units) - 1
+	}
+
 	value := float64(bytes) / float64(div)
 	return fmt.Sprintf("%.1f %s", value, units[exp])
 }
