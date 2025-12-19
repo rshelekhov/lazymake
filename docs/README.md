@@ -2,13 +2,13 @@
 
 This directory contains detailed guides and feature documentation to help you get the most out of lazymake.
 
-## 📖 Guides
+## Guides
 
 - [Self-Documenting Makefiles](guides/self-documenting-makefiles.md) - Learn how to write Makefiles that document themselves
 - [Keyboard Shortcuts Reference](guides/keyboard-shortcuts.md) - Complete keyboard shortcuts for all views
 - [Configuration Guide](guides/configuration.md) - Comprehensive configuration options and examples
 
-## ✨ Features
+## Features
 
 - [Dependency Graph Visualization](features/dependency-graphs.md) - Understand build dependencies with interactive graphs
 - [Variable Inspector](features/variable-inspector.md) - Inspect and track Makefile variables
@@ -19,11 +19,11 @@ This directory contains detailed guides and feature documentation to help you ge
 - [Performance Profiling](features/performance-tracking.md) - Track execution times and detect regressions
 - [Export & Shell Integration](features/export-shell-integration.md) - Export results and integrate with shell history
 
-## 🤝 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
 
-## 📝 Other Resources
+## Other Resources
 
 - [Main README](../README.md) - Quick start and overview
 - [Example Configuration](./.lazymake.example.yaml) - Fully commented configuration examples

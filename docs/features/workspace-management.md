@@ -8,20 +8,20 @@ Access recent and discovered Makefiles with a single keypress:
 
 ```
 ┌─ Switch Workspace ────────────────────────────────────────┐
-│                                                            │
-│ ⭐ ./Makefile                                              │
+│                                                           │
+│    ./Makefile                                             │
 │    Last used: 2 minutes ago • 15 times                    │
-│                                                            │
+│                                                           │
 │    ../other-project/Makefile                              │
 │    Last used: 1 hour ago • 8 times                        │
-│                                                            │
+│                                                           │
 │    examples/dangerous.mk                                  │
 │    Discovered in project                                  │
-│                                                            │
+│                                                           │
 │    tools/Makefile                                         │
 │    Discovered in project                                  │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+│                                                           │
+└───────────────────────────────────────────────────────────┘
   2 recent • 2 discovered
   enter: switch • f: favorite • esc/w: cancel
 ```
@@ -41,7 +41,7 @@ The current workspace is always visible in the status bar:
 
 ```
 └──────────────────────────────────────────────────────────┘
-│ ./Makefile • 12 targets • 2 dangerous    enter: run • q │
+│ ./Makefile • 12 targets • 2 dangerous    enter: run • q  │
 └──────────────────────────────────────────────────────────┘
 ```
 

@@ -10,13 +10,13 @@ When viewing a target, recipes are automatically highlighted based on their dete
 ┌─────────────────────┬────────────────────────────────────────┐
 │ ALL TARGETS         │ build:                                 │
 │ > docker-build      │                                        │
-│   python-test       │   docker build -t myapp:latest .      │
-│   npm-install       │   docker push myapp:latest            │
-│   go-build          │   docker images | grep myapp          │
+│   python-test       │   docker build -t myapp:latest .       │
+│   npm-install       │   docker push myapp:latest             │
+│   go-build          │   docker images | grep myapp           │
 │                     │                                        │
 │                     │   [dockerfile]                         │
 │                     │                                        │
-│                     │   💡 Press 'g' to view full graph      │
+│                     │   Press 'g' to view full graph         │
 └─────────────────────┴────────────────────────────────────────┘
 ```
 
