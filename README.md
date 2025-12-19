@@ -1,5 +1,6 @@
 # lazymake
 
+[![CI](https://img.shields.io/github/actions/workflow/status/rshelekhov/lazymake/ci.yml?branch=main&label=CI)](https://github.com/rshelekhov/lazymake/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/release/rshelekhov/lazymake.svg)](https://github.com/rshelekhov/lazymake/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rshelekhov/lazymake)](https://goreportcard.com/report/github.com/rshelekhov/lazymake)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

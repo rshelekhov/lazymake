@@ -72,12 +72,8 @@ func parseMakeDatabase(output string) map[string]string {
 		}
 
 		// Check if we've reached the end of variables section
-		// (indicated by other section headers like "# Files", "# Implicit Rules", etc.)
-		if strings.HasPrefix(line, "# ") && !sourcePattern.MatchString(line) {
-			if strings.Contains(line, "Files") || strings.Contains(line, "Implicit") ||
-				strings.Contains(line, "Pattern") || strings.Contains(line, "VPATH") {
-				break
-			}
+		if isEndOfVariablesSection(line) {
+			break
 		}
 
 		// Track the current source (makefile, environment, etc.)
@@ -86,23 +82,46 @@ func parseMakeDatabase(output string) map[string]string {
 			continue
 		}
 
-		// Skip comment lines and empty lines
-		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		// Parse variable assignment
-		if matches := dbVarPattern.FindStringSubmatch(line); matches != nil {
-			varName := matches[1]
-			value := matches[3]
-
-			// Only store variables from makefile or environment
-			// Skip automatic and default variables unless they were explicitly defined
-			if currentSource == "makefile" || currentSource == "environment" {
-				result[varName] = value
-			}
+		// Parse and store variable if valid
+		if varName, value, ok := parseVariableLine(line, currentSource); ok {
+			result[varName] = value
 		}
 	}
 
 	return result
+}
+
+// isEndOfVariablesSection checks if we've reached the end of the variables section
+func isEndOfVariablesSection(line string) bool {
+	if !strings.HasPrefix(line, "# ") || sourcePattern.MatchString(line) {
+		return false
+	}
+	return strings.Contains(line, "Files") || strings.Contains(line, "Implicit") ||
+		strings.Contains(line, "Pattern") || strings.Contains(line, "VPATH")
+}
+
+// parseVariableLine parses a single variable line from make database output
+// Returns the variable name, value, and true if the line is a valid variable assignment
+func parseVariableLine(line, currentSource string) (varName, value string, ok bool) {
+	// Skip comment lines and empty lines
+	if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+		return "", "", false
+	}
+
+	// Parse variable assignment
+	matches := dbVarPattern.FindStringSubmatch(line)
+	if matches == nil {
+		return "", "", false
+	}
+
+	varName = matches[1]
+	value = matches[3]
+
+	// Only accept variables from makefile or environment
+	// Skip automatic and default variables unless they were explicitly defined
+	if currentSource != "makefile" && currentSource != "environment" {
+		return "", "", false
+	}
+
+	return varName, value, true
 }

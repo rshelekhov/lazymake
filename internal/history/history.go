@@ -99,7 +99,7 @@ func (h *History) Save() error {
 		return fmt.Errorf("failed to marshal history: %w", err)
 	}
 
-	if err := os.WriteFile(h.path, data, 0644); err != nil {
+	if err := os.WriteFile(h.path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write history file: %w", err)
 	}
 

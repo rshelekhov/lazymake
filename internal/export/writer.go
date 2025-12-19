@@ -23,7 +23,7 @@ func WriteJSON(record *ExecutionRecord, path string) error {
 	}
 
 	// Write to file atomically
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write JSON file: %w", err)
 	}
 
@@ -42,7 +42,7 @@ func WriteLog(record *ExecutionRecord, path string) error {
 	logContent := record.FormatLog()
 
 	// Write to file
-	if err := os.WriteFile(path, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(logContent), 0600); err != nil {
 		return fmt.Errorf("failed to write log file: %w", err)
 	}
 

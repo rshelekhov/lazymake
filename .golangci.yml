@@ -1,0 +1,88 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck      # Check for unchecked errors
+    - govet         # Reports suspicious constructs
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Go static analysis (includes gosimple and stylecheck)
+    - unused        # Find unused code
+
+    # Additional useful linters
+    - misspell      # Finds commonly misspelled English words
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Find unused function parameters
+    - gocyclo       # Check function complexity
+    - gocritic      # Opinionated Go linter
+    - gosec         # Security issues
+    - revive        # Fast, configurable, extensible, flexible linter
+    - whitespace    # Detection of leading and trailing whitespace
+
+  disable:
+    - exhaustruct   # Too strict for most projects
+    - varnamelen    # Too opinionated
+    - nlreturn      # Too strict about newlines
+    - wsl           # Too strict about whitespace
+    - funlen        # Function length can be subjective
+    - cyclop        # Duplicate of gocyclo
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+
+    gocyclo:
+      min-complexity: 15
+
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+        - fieldalignment  # Can be noisy
+
+    staticcheck:
+      checks: ["all"]
+
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+          arguments:
+            - "checkPrivateReceivers"
+            - "sayRepetitiveInsteadOfStutters"
+        - name: package-comments
+          disabled: true  # Not always needed
+        - name: unexported-return
+          disabled: false
+
+    gosec:
+      excludes:
+        - G104  # Duplicate of errcheck
+        - G304  # File path provided as taint input (too strict)
+
+    misspell:
+      locale: US
+
+    unparam:
+      check-exported: false
+
+  exclusions:
+    generated: lax
+    warn-unused: true
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+      - legacy
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec

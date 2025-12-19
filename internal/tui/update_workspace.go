@@ -18,7 +18,6 @@ type workspaceSwitchedMsg struct {
 // updateWorkspace handles updates when in workspace picker state
 func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case workspaceSwitchedMsg:
 		// Workspace switch completed
 		if msg.err != nil {
@@ -42,7 +41,7 @@ func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "f":
 			// Toggle favorite
-			return m.handleToggleFavorite()
+			return m.handleToggleFavorite(), nil
 
 		case "enter":
 			// Switch to selected workspace
@@ -87,7 +86,7 @@ func (m Model) handleWorkspaceSelection() (Model, tea.Cmd) {
 }
 
 // handleToggleFavorite toggles favorite status for selected workspace
-func (m Model) handleToggleFavorite() (Model, tea.Cmd) {
+func (m Model) handleToggleFavorite() Model {
 	selected := m.WorkspaceList.SelectedItem()
 	if ws, ok := selected.(WorkspaceItem); ok {
 		if m.WorkspaceManager != nil {
@@ -98,7 +97,7 @@ func (m Model) handleToggleFavorite() (Model, tea.Cmd) {
 			m.refreshWorkspaceList()
 		}
 	}
-	return m, nil
+	return m
 }
 
 // switchWorkspaceCmd performs the workspace switch asynchronously

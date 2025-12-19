@@ -62,7 +62,7 @@ func collectRules(config *Config) []Rule {
 
 // CheckTarget performs safety check on a single target
 // Returns nil if target is safe or excluded
-func (c *Checker) CheckTarget(target makefile.Target) *SafetyCheckResult {
+func (c *Checker) CheckTarget(target makefile.Target) *CheckResult {
 	// Skip if safety checks disabled
 	if !c.config.Enabled {
 		return nil
@@ -107,7 +107,7 @@ func (c *Checker) CheckTarget(target makefile.Target) *SafetyCheckResult {
 		return nil
 	}
 
-	return &SafetyCheckResult{
+	return &CheckResult{
 		TargetName:  target.Name,
 		IsDangerous: true,
 		DangerLevel: highestSeverity,
@@ -117,8 +117,8 @@ func (c *Checker) CheckTarget(target makefile.Target) *SafetyCheckResult {
 
 // CheckAllTargets performs safety check on all targets
 // Returns map of target name -> result (only includes dangerous targets)
-func (c *Checker) CheckAllTargets(targets []makefile.Target) map[string]*SafetyCheckResult {
-	results := make(map[string]*SafetyCheckResult)
+func (c *Checker) CheckAllTargets(targets []makefile.Target) map[string]*CheckResult {
+	results := make(map[string]*CheckResult)
 
 	for _, target := range targets {
 		if result := c.CheckTarget(target); result != nil {

@@ -75,8 +75,8 @@ type MatchResult struct {
 	Severity    Severity // Final severity (may be adjusted by context)
 }
 
-// SafetyCheckResult represents the complete safety check for a target
-type SafetyCheckResult struct {
+// CheckResult represents the complete safety check for a target
+type CheckResult struct {
 	TargetName  string
 	IsDangerous bool         // Has any matched safety rules
 	DangerLevel Severity     // Highest severity level

@@ -39,13 +39,8 @@ func ParseVariables(makefilePath string) ([]Variable, error) {
 		lineNum++
 		line := scanner.Text()
 
-		// Handle line continuations (backslash at end)
-		if strings.HasSuffix(strings.TrimRight(line, " \t"), "\\") {
-			if continuedLine == "" {
-				continuedLineStart = lineNum
-			}
-			// Remove the backslash and trailing whitespace, append the line
-			continuedLine += strings.TrimSuffix(strings.TrimRight(line, " \t"), "\\")
+		// Handle line continuations
+		if handleLineContinuation(line, &continuedLine, &continuedLineStart, lineNum) {
 			continue
 		}
 
@@ -56,77 +51,24 @@ func ParseVariables(makefilePath string) ([]Variable, error) {
 			continuedLine = ""
 		}
 
-		// Skip comments and empty lines
+		// Skip comments, empty lines, targets, and recipe lines
+		if shouldSkipLine(line) {
+			continue
+		}
+
 		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
-			continue
-		}
 
-		// Skip target definitions (lines with ':' that aren't variable assignments)
-		if strings.Contains(trimmedLine, ":") && !strings.Contains(trimmedLine, "=") {
-			continue
-		}
-
-		// Skip recipe lines (start with tab)
-		if strings.HasPrefix(line, "\t") {
-			continue
-		}
-
-		// Check for export with assignment: export VAR = value
-		if matches := exportWithAssignPattern.FindStringSubmatch(trimmedLine); matches != nil {
-			varName := matches[1]
-			operator := matches[2]
-			value := strings.TrimSpace(matches[3])
-
-			variables = append(variables, Variable{
-				Name:       varName,
-				RawValue:   value,
-				Type:       operatorToVarType(operator),
-				DefinedAt:  lineNum,
-				IsExported: true,
-			})
-			continue
-		}
-
-		// Check for export without assignment: export VAR
-		if matches := exportPattern.FindStringSubmatch(trimmedLine); matches != nil {
-			varName := matches[1]
-
-			// Mark existing variable as exported, or create a new one
-			found := false
-			for i := range variables {
-				if variables[i].Name == varName {
-					variables[i].IsExported = true
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				// Variable exported but not yet defined in this file
-				// It might be defined elsewhere or in environment
-				variables = append(variables, Variable{
-					Name:       varName,
-					Type:       VarEnvironment,
-					DefinedAt:  lineNum,
-					IsExported: true,
-				})
+		// Try to process as export statement
+		if variable, found := processExportStatement(trimmedLine, &variables, lineNum); found {
+			if variable.Name != "" { // New variable needs to be added
+				variables = append(variables, variable)
 			}
 			continue
 		}
 
-		// Check for regular variable assignment
-		if matches := varPattern.FindStringSubmatch(trimmedLine); matches != nil {
-			varName := matches[1]
-			operator := matches[2]
-			value := strings.TrimSpace(matches[3])
-
-			variables = append(variables, Variable{
-				Name:      varName,
-				RawValue:  value,
-				Type:      operatorToVarType(operator),
-				DefinedAt: lineNum,
-			})
+		// Try to process as regular variable assignment
+		if variable, found := processVariableAssignment(trimmedLine, lineNum); found {
+			variables = append(variables, variable)
 		}
 	}
 
@@ -135,6 +77,97 @@ func ParseVariables(makefilePath string) ([]Variable, error) {
 	}
 
 	return variables, nil
+}
+
+// handleLineContinuation manages line continuations (backslash at end)
+// Returns true if the line should be continued (and caller should skip processing)
+func handleLineContinuation(line string, continuedLine *string, continuedLineStart *int, lineNum int) bool {
+	if strings.HasSuffix(strings.TrimRight(line, " \t"), "\\") {
+		if *continuedLine == "" {
+			*continuedLineStart = lineNum
+		}
+		// Remove the backslash and trailing whitespace, append the line
+		*continuedLine += strings.TrimSuffix(strings.TrimRight(line, " \t"), "\\")
+		return true
+	}
+	return false
+}
+
+// shouldSkipLine checks if a line should be skipped during parsing
+func shouldSkipLine(line string) bool {
+	trimmedLine := strings.TrimSpace(line)
+
+	// Skip comments and empty lines
+	if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+		return true
+	}
+
+	// Skip target definitions (lines with ':' that aren't variable assignments)
+	if strings.Contains(trimmedLine, ":") && !strings.Contains(trimmedLine, "=") {
+		return true
+	}
+
+	// Skip recipe lines (start with tab)
+	if strings.HasPrefix(line, "\t") {
+		return true
+	}
+
+	return false
+}
+
+// processExportStatement handles export declarations
+// Returns the variable and true if this is an export statement
+// If the variable already exists and was just marked as exported, returns empty variable
+func processExportStatement(trimmedLine string, variables *[]Variable, lineNum int) (Variable, bool) {
+	// Check for export with assignment: export VAR = value
+	if matches := exportWithAssignPattern.FindStringSubmatch(trimmedLine); matches != nil {
+		return Variable{
+			Name:       matches[1],
+			RawValue:   strings.TrimSpace(matches[3]),
+			Type:       operatorToVarType(matches[2]),
+			DefinedAt:  lineNum,
+			IsExported: true,
+		}, true
+	}
+
+	// Check for export without assignment: export VAR
+	if matches := exportPattern.FindStringSubmatch(trimmedLine); matches != nil {
+		varName := matches[1]
+
+		// Mark existing variable as exported, or create a new one
+		for i := range *variables {
+			if (*variables)[i].Name == varName {
+				(*variables)[i].IsExported = true
+				return Variable{}, true // Return empty variable since we modified existing one
+			}
+		}
+
+		// Variable exported but not yet defined in this file
+		return Variable{
+			Name:       varName,
+			Type:       VarEnvironment,
+			DefinedAt:  lineNum,
+			IsExported: true,
+		}, true
+	}
+
+	return Variable{}, false
+}
+
+// processVariableAssignment handles regular variable assignments
+// Returns the variable and true if this is a valid assignment
+func processVariableAssignment(trimmedLine string, lineNum int) (Variable, bool) {
+	matches := varPattern.FindStringSubmatch(trimmedLine)
+	if matches == nil {
+		return Variable{}, false
+	}
+
+	return Variable{
+		Name:      matches[1],
+		RawValue:  strings.TrimSpace(matches[3]),
+		Type:      operatorToVarType(matches[2]),
+		DefinedAt: lineNum,
+	}, true
 }
 
 // operatorToVarType converts a Makefile assignment operator to a VarType

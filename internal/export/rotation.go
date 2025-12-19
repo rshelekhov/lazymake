@@ -14,22 +14,58 @@ func RotateFiles(outputDir, targetName string, config *Config) error {
 		return nil // No rotation configured
 	}
 
-	// Expand output directory
-	expandedDir := expandPath(outputDir)
-	if expandedDir == "" {
-		cacheDir, err := os.UserCacheDir()
-		if err != nil {
-			if home, err := os.UserHomeDir(); err == nil {
-				cacheDir = filepath.Join(home, ".cache")
-			}
-		}
-		expandedDir = filepath.Join(cacheDir, "lazymake", "exports")
-	}
+	// Expand and prepare output directory
+	expandedDir := getExpandedOutputDir(outputDir)
 
-	// Sanitize target name
+	// Sanitize target name for file matching
 	sanitized := strings.ReplaceAll(targetName, "/", "_")
 	sanitized = strings.ReplaceAll(sanitized, " ", "_")
 
+	// Collect file information
+	fileInfos := collectFileInfos(expandedDir, sanitized)
+	if len(fileInfos) == 0 {
+		return nil // No files to rotate
+	}
+
+	// Apply age-based rotation
+	if config.KeepDays > 0 {
+		fileInfos = applyAgeCutoff(fileInfos, config.KeepDays)
+	}
+
+	// Apply count-based rotation
+	if config.MaxFiles > 0 {
+		applyMaxFilesLimit(fileInfos, config.MaxFiles)
+	}
+
+	return nil
+}
+
+// getExpandedOutputDir expands the output directory path
+func getExpandedOutputDir(outputDir string) string {
+	expandedDir := expandPath(outputDir)
+	if expandedDir != "" {
+		return expandedDir
+	}
+
+	// Use default cache directory
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		if home, err := os.UserHomeDir(); err == nil {
+			cacheDir = filepath.Join(home, ".cache")
+		}
+	}
+	return filepath.Join(cacheDir, "lazymake", "exports")
+}
+
+// fileInfo holds information about a file for rotation
+type fileInfo struct {
+	path    string
+	modTime time.Time
+	size    int64
+}
+
+// collectFileInfos collects file information for rotation
+func collectFileInfos(expandedDir, sanitized string) []fileInfo {
 	// Find all files for this target (both .json and .log)
 	patterns := []string{
 		filepath.Join(expandedDir, sanitized+"*.json"),
@@ -46,16 +82,10 @@ func RotateFiles(outputDir, targetName string, config *Config) error {
 	}
 
 	if len(allFiles) == 0 {
-		return nil // No files to rotate
+		return nil
 	}
 
 	// Get file info for all files
-	type fileInfo struct {
-		path    string
-		modTime time.Time
-		size    int64
-	}
-
 	var fileInfos []fileInfo
 	for _, f := range allFiles {
 		info, err := os.Stat(f)
@@ -74,54 +104,57 @@ func RotateFiles(outputDir, targetName string, config *Config) error {
 		return fileInfos[i].modTime.Before(fileInfos[j].modTime)
 	})
 
-	// Apply KeepDays rotation
-	if config.KeepDays > 0 {
-		cutoff := time.Now().AddDate(0, 0, -config.KeepDays)
-		for _, fi := range fileInfos {
-			if fi.modTime.Before(cutoff) {
-				_ = os.Remove(fi.path)
-			}
-		}
+	return fileInfos
+}
 
-		// Re-filter fileInfos to only include non-removed files
-		var remainingFiles []fileInfo
-		for _, fi := range fileInfos {
-			if fi.modTime.After(cutoff) || fi.modTime.Equal(cutoff) {
-				remainingFiles = append(remainingFiles, fi)
-			}
+// applyAgeCutoff removes files older than the specified number of days
+func applyAgeCutoff(fileInfos []fileInfo, keepDays int) []fileInfo {
+	cutoff := time.Now().AddDate(0, 0, -keepDays)
+
+	// Remove old files
+	for _, fi := range fileInfos {
+		if fi.modTime.Before(cutoff) {
+			_ = os.Remove(fi.path)
 		}
-		fileInfos = remainingFiles
 	}
 
-	// Apply MaxFiles rotation
+	// Filter to keep only remaining files
+	var remainingFiles []fileInfo
+	for _, fi := range fileInfos {
+		if fi.modTime.After(cutoff) || fi.modTime.Equal(cutoff) {
+			remainingFiles = append(remainingFiles, fi)
+		}
+	}
+
+	return remainingFiles
+}
+
+// applyMaxFilesLimit removes excess files beyond the maximum count
+func applyMaxFilesLimit(fileInfos []fileInfo, maxFiles int) {
 	// Group files by extension to maintain balance
-	if config.MaxFiles > 0 {
-		jsonFiles := []string{}
-		logFiles := []string{}
+	jsonFiles := []string{}
+	logFiles := []string{}
 
-		for _, fi := range fileInfos {
-			if strings.HasSuffix(fi.path, ".json") {
-				jsonFiles = append(jsonFiles, fi.path)
-			} else if strings.HasSuffix(fi.path, ".log") {
-				logFiles = append(logFiles, fi.path)
-			}
-		}
-
-		// Remove oldest files if exceeding MaxFiles
-		if len(jsonFiles) > config.MaxFiles {
-			toRemove := jsonFiles[:len(jsonFiles)-config.MaxFiles]
-			for _, f := range toRemove {
-				_ = os.Remove(f)
-			}
-		}
-
-		if len(logFiles) > config.MaxFiles {
-			toRemove := logFiles[:len(logFiles)-config.MaxFiles]
-			for _, f := range toRemove {
-				_ = os.Remove(f)
-			}
+	for _, fi := range fileInfos {
+		if strings.HasSuffix(fi.path, ".json") {
+			jsonFiles = append(jsonFiles, fi.path)
+		} else if strings.HasSuffix(fi.path, ".log") {
+			logFiles = append(logFiles, fi.path)
 		}
 	}
 
-	return nil
+	// Remove oldest files if exceeding MaxFiles
+	if len(jsonFiles) > maxFiles {
+		toRemove := jsonFiles[:len(jsonFiles)-maxFiles]
+		for _, f := range toRemove {
+			_ = os.Remove(f)
+		}
+	}
+
+	if len(logFiles) > maxFiles {
+		toRemove := logFiles[:len(logFiles)-maxFiles]
+		for _, f := range toRemove {
+			_ = os.Remove(f)
+		}
+	}
 }

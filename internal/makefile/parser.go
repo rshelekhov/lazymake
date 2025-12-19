@@ -36,28 +36,23 @@ func Parse(filename string) ([]Target, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Makefile: %w", err)
 	}
-
 	defer file.Close()
 
 	var targets []Target
 	var lastComment commentInfo
-	var currentTargets []*Target // Track current targets for recipe accumulation (multi-target support)
-	var recipeLines []string     // Accumulate recipe lines
+	var currentTargets []*Target
+	var recipeLines []string
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		// Empty line: commit current targets and reset
+		// Empty line: commit and reset
 		if trimmed == "" {
-			if len(currentTargets) > 0 {
-				for _, target := range currentTargets {
-					target.Recipe = recipeLines
-				}
-				recipeLines = nil
-				currentTargets = nil
-			}
+			commitCurrentTargets(currentTargets, recipeLines)
+			currentTargets = nil
+			recipeLines = nil
 			lastComment = commentInfo{}
 			continue
 		}
@@ -65,127 +60,119 @@ func Parse(filename string) ([]Target, error) {
 		// Recipe line (starts with tab)
 		if after, ok := strings.CutPrefix(line, "\t"); ok {
 			if len(currentTargets) > 0 {
-				// Remove leading tab, keep the command
 				recipeLines = append(recipeLines, after)
 			}
 			continue
 		}
 
-		// Check for comment (## takes priority over #)
-		if comment, found := strings.CutPrefix(trimmed, "##"); found {
-			// Commit current targets before processing new comment
-			if len(currentTargets) > 0 {
-				for _, target := range currentTargets {
-					target.Recipe = recipeLines
-				}
-				recipeLines = nil
-				currentTargets = nil
-			}
-
+		// Check for comment
+		if comment, commentType, found := parseCommentLine(trimmed); found {
+			commitCurrentTargets(currentTargets, recipeLines)
+			currentTargets = nil
+			recipeLines = nil
 			lastComment = commentInfo{
-				text:        strings.TrimSpace(comment),
-				commentType: CommentDouble,
-			}
-			continue
-		} else if comment, found := strings.CutPrefix(trimmed, "#"); found {
-			// Commit current targets before processing new comment
-			if len(currentTargets) > 0 {
-				for _, target := range currentTargets {
-					target.Recipe = recipeLines
-				}
-				recipeLines = nil
-				currentTargets = nil
-			}
-
-			lastComment = commentInfo{
-				text:        strings.TrimSpace(comment),
-				commentType: CommentSingle,
+				text:        comment,
+				commentType: commentType,
 			}
 			continue
 		}
 
 		// Check for target definition
-		// Recipe lines start with a tab, so check the original line, not trimmed
 		if strings.Contains(line, ":") && !strings.HasPrefix(line, "\t") {
-			// Commit previous targets before starting new ones
-			if len(currentTargets) > 0 {
-				for _, target := range currentTargets {
-					target.Recipe = recipeLines
-				}
-				recipeLines = nil
-			}
-
-			parts := strings.SplitN(line, ":", 2)
-			targetName := strings.TrimSpace(parts[0])
-
-			// Skip special targets
-			if strings.HasPrefix(targetName, ".") || strings.Contains(targetName, "=") {
-				lastComment = commentInfo{}
-				currentTargets = nil
-				continue
-			}
-
-			// Extract inline comment from the dependency/recipe section (after the colon)
-			// Inline comments take priority over preceding comments
-			dependencies := parts[1]
-			inlineComment := extractInlineComment(dependencies)
-
-			// Extract the dependency list
-			// Need to clean the dependencies string by removing comments first
-			// Example: "deps compile ## Build" -> want just "deps compile"
-			cleanDeps := dependencies
-			if idx := strings.Index(dependencies, "#"); idx >= 0 {
-				// Remove everything from the first # onwards (the comment part)
-				cleanDeps = dependencies[:idx]
-			}
-			// Parse the cleaned dependency string to get individual target names
-			depList := parseDependencies(cleanDeps)
-
-			// Determine final description and comment type
-			finalDesc := lastComment.text
-			finalType := lastComment.commentType
-			if inlineComment.text != "" {
-				finalDesc = inlineComment.text
-				finalType = inlineComment.commentType
-			}
-
-			// Handle multiple targets on one line
-			// All targets on the same line share the same recipe
-			currentTargets = nil
-			startIdx := len(targets) // Remember where we started adding targets
-			names := strings.FieldsSeq(targetName)
-			for name := range names {
-				targets = append(targets, Target{
-					Name:         name,
-					Description:  finalDesc,
-					CommentType:  finalType,
-					Dependencies: depList,
-					Recipe:       nil, // Will be populated as we read recipe lines
-				})
-			}
-
-			// Now take pointers AFTER all targets are added (avoids pointer invalidation during slice growth)
-			for i := startIdx; i < len(targets); i++ {
-				currentTargets = append(currentTargets, &targets[i])
-			}
-
-			lastComment = commentInfo{}
+			currentTargets = processTargetLine(
+				line, &targets, currentTargets, recipeLines, lastComment)
 			recipeLines = nil
+			lastComment = commentInfo{}
 		}
 	}
 
-	// Commit final targets if any
-	if len(currentTargets) > 0 {
-		for _, target := range currentTargets {
-			target.Recipe = recipeLines
-		}
-	}
+	// Commit final targets
+	commitCurrentTargets(currentTargets, recipeLines)
 
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading Makefile: %w", err)
 	}
 
 	return targets, nil
+}
+
+// commitCurrentTargets commits recipe lines to current targets
+func commitCurrentTargets(currentTargets []*Target, recipeLines []string) {
+	if len(currentTargets) > 0 {
+		for _, target := range currentTargets {
+			target.Recipe = recipeLines
+		}
+	}
+}
+
+// parseCommentLine checks if a line is a comment and extracts it
+func parseCommentLine(trimmed string) (text string, commentType CommentType, found bool) {
+	// Check for ## comment (takes priority)
+	if comment, ok := strings.CutPrefix(trimmed, "##"); ok {
+		return strings.TrimSpace(comment), CommentDouble, true
+	}
+
+	// Check for # comment
+	if comment, ok := strings.CutPrefix(trimmed, "#"); ok {
+		return strings.TrimSpace(comment), CommentSingle, true
+	}
+
+	return "", CommentNone, false
+}
+
+// processTargetLine processes a target definition line
+func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
+	recipeLines []string, lastComment commentInfo) []*Target {
+	// Commit previous targets
+	commitCurrentTargets(currentTargets, recipeLines)
+
+	parts := strings.SplitN(line, ":", 2)
+	targetName := strings.TrimSpace(parts[0])
+
+	// Skip special targets
+	if strings.HasPrefix(targetName, ".") || strings.Contains(targetName, "=") {
+		return nil
+	}
+
+	// Extract inline comment and dependencies
+	dependencies := parts[1]
+	inlineComment := extractInlineComment(dependencies)
+
+	// Clean dependencies string
+	cleanDeps := dependencies
+	if idx := strings.Index(dependencies, "#"); idx >= 0 {
+		cleanDeps = dependencies[:idx]
+	}
+	depList := parseDependencies(cleanDeps)
+
+	// Determine final description and comment type
+	finalDesc := lastComment.text
+	finalType := lastComment.commentType
+	if inlineComment.text != "" {
+		finalDesc = inlineComment.text
+		finalType = inlineComment.commentType
+	}
+
+	// Add targets and track them
+	startIdx := len(*targets)
+	names := strings.FieldsSeq(targetName)
+	for name := range names {
+		*targets = append(*targets, Target{
+			Name:         name,
+			Description:  finalDesc,
+			CommentType:  finalType,
+			Dependencies: depList,
+			Recipe:       nil,
+		})
+	}
+
+	// Take pointers after all targets are added
+	var newCurrentTargets []*Target
+	for i := startIdx; i < len(*targets); i++ {
+		newCurrentTargets = append(newCurrentTargets, &(*targets)[i])
+	}
+
+	return newCurrentTargets
 }
 
 // extractInlineComment extracts a comment from the dependencies/recipe section

@@ -1,4 +1,4 @@
-.PHONY: build install test clean run release snapshot
+.PHONY: build install test lint lint-fix clean run release snapshot
 
 BINARY_NAME := lazymake
 VERSION = 1.0.0
@@ -21,6 +21,12 @@ run: ## Run the application without installing
 
 test: ## Run all tests
 	go test ./...
+
+lint: ## Run golangci-lint
+	golangci-lint run
+
+lint-fix: ## Run golangci-lint and auto-fix issues
+	golangci-lint run --fix
 
 clean: ## Clean build artifacts
 	rm -f lazymake

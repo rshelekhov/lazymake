@@ -84,21 +84,16 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	var targetName string
 
 	// Danger indicators take priority
-	if target.IsDangerous {
-		switch target.DangerLevel {
-		case safety.SeverityCritical:
-			targetName = "🚨 " + target.Name
-		case safety.SeverityWarning:
-			targetName = "⚠️  " + target.Name
-		default:
-			// SeverityInfo - no indicator
-			targetName = target.Name
-		}
-	} else if target.PerfStats != nil && target.PerfStats.IsRegressed {
+	switch {
+	case target.IsDangerous && target.DangerLevel == safety.SeverityCritical:
+		targetName = "🚨 " + target.Name
+	case target.IsDangerous && target.DangerLevel == safety.SeverityWarning:
+		targetName = "⚠️  " + target.Name
+	case target.PerfStats != nil && target.PerfStats.IsRegressed:
 		targetName = "📈 " + target.Name // Regression indicator
-	} else if target.IsRecent {
+	case target.IsRecent:
 		targetName = "⏱  " + target.Name // Recent indicator
-	} else {
+	default:
 		targetName = target.Name
 	}
 
@@ -165,22 +160,24 @@ func shouldShowDurationBadge(target Target) bool {
 
 // formatDuration formats a duration for display
 func formatDuration(d time.Duration) string {
-	if d < time.Second {
+	switch {
+	case d < time.Second:
 		return fmt.Sprintf("%dms", d.Milliseconds())
-	} else if d < time.Minute {
+	case d < time.Minute:
 		return fmt.Sprintf("%.1fs", d.Seconds())
-	} else {
+	default:
 		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
 	}
 }
 
 // getDurationColor returns the color for a duration badge
 func getDurationColor(stats *history.PerformanceStats) lipgloss.Color {
-	if stats.IsRegressed {
+	switch {
+	case stats.IsRegressed:
 		return lipgloss.Color("220") // Orange (warning)
-	} else if stats.AvgDuration < time.Second {
+	case stats.AvgDuration < time.Second:
 		return lipgloss.Color("42") // Green (fast)
-	} else {
+	default:
 		return lipgloss.Color("86") // Cyan (normal)
 	}
 }
