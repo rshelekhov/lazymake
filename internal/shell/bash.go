@@ -37,7 +37,9 @@ func (w *BashWriter) Append(entry string) error {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		return err
 	}
-	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	defer func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) // Explicitly ignore unlock error
+	}()
 
 	// Write entry with newline
 	_, err = f.WriteString(entry + "\n")

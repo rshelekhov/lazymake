@@ -84,7 +84,7 @@ func (m *Manager) Save() error {
 		return fmt.Errorf("failed to marshal workspaces: %w", err)
 	}
 
-	if err := os.WriteFile(m.path, data, 0644); err != nil {
+	if err := os.WriteFile(m.path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write workspaces file: %w", err)
 	}
 
