@@ -11,6 +11,7 @@ import (
 	"github.com/rshelekhov/lazymake/config"
 	"github.com/rshelekhov/lazymake/internal/export"
 	"github.com/rshelekhov/lazymake/internal/graph"
+	"github.com/rshelekhov/lazymake/internal/highlight"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
@@ -75,6 +76,9 @@ type Model struct {
 	// Workspace management
 	WorkspaceManager *workspace.Manager
 	WorkspaceList    list.Model // For workspace picker UI
+
+	// Syntax highlighting
+	Highlighter *highlight.Highlighter
 
 	// Key bindings for status bar display
 	KeyBindings []key.Binding
@@ -273,6 +277,9 @@ func NewModel(cfg *config.Config) Model {
 		shellInteg, _ = shell.NewIntegration(cfg.ShellIntegration)
 	}
 
+	// Initialize syntax highlighter
+	highlighter := highlight.NewHighlighter()
+
 	return Model{
 		List:              l,
 		State:             StateList,
@@ -289,6 +296,7 @@ func NewModel(cfg *config.Config) Model {
 		RecentTargets:     recentTargets,
 		Exporter:          exporter,
 		ShellIntegration:  shellInteg,
+		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
 	}
 }

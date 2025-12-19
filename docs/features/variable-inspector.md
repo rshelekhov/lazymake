@@ -10,39 +10,39 @@ Browse all variables in your Makefile with detailed information:
 
 ```
 ┌─ Variable Inspector ──────────────────────────────────────┐
-│                                                            │
+│                                                           │
 │ 6 variables • 4 used • 2 unused                           │
-│                                                            │
+│                                                           │
 │ BINARY_NAME          [:=]  Simply Expanded                │
-│   Raw:      lazymake                                       │
-│   Expanded: lazymake                                       │
+│   Raw:      lazymake                                      │
+│   Expanded: lazymake                                      │
 │   Used by:  build, install (2 targets)                    │
-│                                                            │
-│ VERSION              [=]   Recursive                       │
-│   Raw:      1.0.0                                          │
-│   Expanded: 1.0.0                                          │
+│                                                           │
+│ VERSION              [=]   Recursive                      │
+│   Raw:      1.0.0                                         │
+│   Expanded: 1.0.0                                         │
 │   Used by:  build (1 target)                              │
-│                                                            │
-│ GOFLAGS              [=]   Recursive                       │
-│   Raw:      -v -race                                       │
-│   Expanded: -v -race                                       │
+│                                                           │
+│ GOFLAGS              [=]   Recursive                      │
+│   Raw:      -v -race                                      │
+│   Expanded: -v -race                                      │
 │   Used by:  build, test (2 targets)                       │
-│                                                            │
-│ LDFLAGS              [=]   Recursive                       │
+│                                                           │
+│ LDFLAGS              [=]   Recursive                      │
 │   Raw:      -ldflags "-X main.version=$(VERSION)"         │
 │   Expanded: -ldflags "-X main.version=1.0.0"              │
 │   Used by:  build (1 target)                              │
-│                                                            │
-│ BUILD_DIR            [?=]  Conditional                     │
-│   Raw:      ./bin                                          │
-│   Expanded: ./bin                                          │
+│                                                           │
+│ BUILD_DIR            [?=]  Conditional                    │
+│   Raw:      ./bin                                         │
+│   Expanded: ./bin                                         │
 │   Used by:  build, clean (2 targets)                      │
-│                                                            │
-│ PATH                                                       │
-│   Exported to environment                                  │
-│   Not used by any target                                   │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+│                                                           │
+│ PATH                                                      │
+│   Exported to environment                                 │
+│   Not used by any target                                  │
+│                                                           │
+└───────────────────────────────────────────────────────────┘
   v/esc: return • ↑↓/j/k: navigate • q: quit
 ```
 
@@ -51,25 +51,25 @@ Browse all variables in your Makefile with detailed information:
 When you select a target, the recipe preview shows variables it uses:
 
 ```
-┌─────────────────────┬────────────────────────────────────────┐
-│ ALL TARGETS         │ build:                                 │
-│ > build             │                                        │
+┌─────────────────────┬───────────────────────────────────────┐
+│ ALL TARGETS         │ build:                                │
+│ > build             │                                       │
 │   test              │   go build $(GOFLAGS) $(LDFLAGS) \    │
 │   clean             │     -o $(BUILD_DIR)/$(BINARY_NAME)    │
-│   install           │                                        │
-│                     │   💡 Press 'g' to view full graph      │
-│                     │                                        │
-│                     │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │
-│                     │                                        │
-│                     │   📦 Variables Used                    │
-│                     │                                        │
-│                     │     GOFLAGS = -v -race                 │
-│                     │     LDFLAGS = -ldflags "-X main..."    │
-│                     │     BUILD_DIR = ./bin                  │
-│                     │     BINARY_NAME = lazymake             │
-│                     │                                        │
-│                     │     💡 Press 'v' to view all variables │
-└─────────────────────┴────────────────────────────────────────┘
+│   install           │                                       │
+│                     │   Press 'g' to view full graph        │
+│                     │                                       │
+│                     │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━    │
+│                     │                                       │
+│                     │   Variables Used                      │
+│                     │                                       │
+│                     │     GOFLAGS = -v -race                │
+│                     │     LDFLAGS = -ldflags "-X main..."   │
+│                     │     BUILD_DIR = ./bin                 │
+│                     │     BINARY_NAME = lazymake            │
+│                     │                                       │
+│                     │     Press 'v' to view all variables   │
+└─────────────────────┴───────────────────────────────────────┘
 ```
 
 ## Variable Types Explained

@@ -91,12 +91,12 @@ Recording instructions:
 See your build structure instantly. lazymake visualizes dependency chains with execution order, critical path markers, and parallel opportunities. Press `g` on any target to understand what will run and when.
 
 **Key features:**
-- 📊 Execution order numbering - see what runs first
-- ⭐ Critical path highlighting - identify build bottlenecks
-- ⚡ Parallel opportunity markers - speed up builds with `make -j`
-- 🔍 Smart cycle detection - catches circular dependencies
+- Execution order numbering - see what runs first
+- Critical path highlighting - identify build bottlenecks
+- Parallel opportunity markers - speed up builds with `make -j`
+- Smart cycle detection - catches circular dependencies
 
-[📖 Full documentation](docs/features/dependency-graphs.md)
+[Full documentation](docs/features/dependency-graphs.md)
 
 ### Variable Inspector
 
@@ -119,12 +119,42 @@ Recording instructions:
 Understand your build configuration. lazymake shows all Makefile variables with their raw and expanded values, which targets use them, and whether they're exported to the environment.
 
 **Key features:**
-- 📦 Full-screen variable browser - press `v` to explore
-- 🔄 Raw vs expanded values - debug variable expansion
-- 📍 Usage tracking - see which targets use each variable
-- 🏷️ Type detection - all assignment operators (=, :=, +=, ?=, !=)
+- Full-screen variable browser - press `v` to explore
+- Raw vs expanded values - debug variable expansion
+- Usage tracking - see which targets use each variable
+- Type detection - all assignment operators (=, :=, +=, ?=, !=)
 
-[📖 Full documentation](docs/features/variable-inspector.md)
+[Full documentation](docs/features/variable-inspector.md)
+
+### Syntax Highlighting for Multi-Language Recipes
+
+<!--
+GIF: Syntax Highlighting (15 seconds)
+Recording instructions:
+1. Terminal size: 100x30
+2. Use examples/highlighting.mk for demo
+3. Sequence:
+   - Select a Python target with shebang (2s)
+   - Show highlighted Python code with [python] badge (3s)
+   - Select a Go target (2s)
+   - Show highlighted Go commands with [go] badge (3s)
+   - Select a Rust target (2s)
+   - Show highlighted Rust commands with [rust] badge (3s)
+4. Highlight: Different colors for keywords, strings, comments
+5. Show language badges appearing below recipes
+-->
+
+![Syntax Highlighting](docs/assets/syntax-highlighting.gif)
+
+Read code faster with automatic syntax highlighting. lazymake detects the language of your recipes (Python, Go, JavaScript, Rust, etc.) and applies appropriate syntax coloring. Works with shebangs, command detection, or manual overrides via comments.
+
+**Key features:**
+- Automatic language detection - identifies Python, Go, JavaScript, Rust, and 100+ languages
+- Manual overrides - use `# language: python` comments when needed
+- Smart detection - recognizes shebangs, command patterns (go, npm, cargo, pip)
+- Terminal-optimized colors - monokai-inspired palette for readability
+
+[Full documentation](docs/features/syntax-highlighting.md)
 
 ### Dangerous Command Detection
 
@@ -148,12 +178,12 @@ Recording instructions:
 Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels in the target list.
 
 **Key features:**
-- 🚨 Critical commands require confirmation - prevents irreversible mistakes
-- ⚠️ Warning indicators for risky operations
-- 🎯 Context-aware detection - adjusts severity based on target name
-- ⚙️ Customizable rules - add project-specific patterns
+- Critical commands require confirmation - prevents irreversible mistakes
+- Warning indicators for risky operations
+- Context-aware detection - adjusts severity based on target name
+- Customizable rules - add project-specific patterns
 
-[📖 Full documentation](docs/features/safety-features.md)
+[Full documentation](docs/features/safety-features.md)
 
 ### Recent History & Smart Search
 
@@ -178,12 +208,12 @@ Recording instructions:
 Find targets fast. lazymake tracks your last 5 executed targets per project, showing them at the top for instant access. Real-time search filters by name and description.
 
 **Key features:**
-- ⏱️ Recent targets section - your most-used targets on top
-- 🔍 Fuzzy search - press `/` to filter instantly
-- 📈 Performance regression alerts - spot slow builds
-- 💾 Per-project history - separate tracking per Makefile
+- Recent targets section - your most-used targets on top
+- Fuzzy search - press `/` to filter instantly
+- Performance regression alerts - spot slow builds
+- Per-project history - separate tracking per Makefile
 
-[📖 Full documentation](docs/features/history-search.md)
+[Full documentation](docs/features/history-search.md)
 
 ### Workspace Management
 
@@ -209,36 +239,36 @@ Recording instructions:
 Work with multiple projects seamlessly. Press `w` to see recent Makefiles and automatically discovered ones in your project tree. Star your favorites for quick access.
 
 **Key features:**
-- 🔄 Automatic discovery - finds all Makefiles up to 3 levels deep
-- ⭐ Favorites system - star frequently used projects
-- 🕐 Access tracking - shows "last used" and access count
-- 📁 Per-project history - each Makefile remembers its recent targets
+- Automatic discovery - finds all Makefiles up to 3 levels deep
+- Favorites system - star frequently used projects
+- Access tracking - shows "last used" and access count
+- Per-project history - each Makefile remembers its recent targets
 
-[📖 Full documentation](docs/features/workspace-management.md)
+[Full documentation](docs/features/workspace-management.md)
 
 ### Performance Profiling
 
 Track execution times and catch performance regressions automatically. lazymake stores the last 10 executions per target and alerts you when a target is >25% slower than average.
 
 **Key features:**
-- ⏱️ Real-time execution timer - see progress with indicators
-- 📈 Automatic regression detection - spots slowdowns
-- 💾 Performance history - tracks avg, min, max durations
-- 🎨 Color-coded duration badges - visual performance indicators
+- Real-time execution timer - see progress with indicators
+- Automatic regression detection - spots slowdowns
+- Performance history - tracks avg, min, max durations
+- Color-coded duration badges - visual performance indicators
 
-[📖 Full documentation](docs/features/performance-tracking.md)
+[Full documentation](docs/features/performance-tracking.md)
 
 ### Export & Shell Integration
 
 Export execution results to JSON/log files for analysis, or add make commands to your shell history for easy re-running outside lazymake.
 
 **Key features:**
-- 📄 Multiple export formats - JSON, logs, or both
-- 🔄 Automatic rotation - configurable file limits and cleanup
-- 🐚 Shell integration - bash/zsh history support
-- 📝 Custom templates - customize command format
+- Multiple export formats - JSON, logs, or both
+- Automatic rotation - configurable file limits and cleanup
+- Shell integration - bash/zsh history support
+- Custom templates - customize command format
 
-[📖 Full documentation](docs/features/export-shell-integration.md)
+[Full documentation](docs/features/export-shell-integration.md)
 
 ## Installation
 
@@ -305,7 +335,7 @@ lazymake -f path/to/Makefile
 | `Esc` | Return to previous view | All |
 | `q` or `Ctrl+C` | Quit | All |
 
-[📖 Complete keyboard shortcuts reference](docs/guides/keyboard-shortcuts.md)
+[Complete keyboard shortcuts reference](docs/guides/keyboard-shortcuts.md)
 
 ## Configuration
 
@@ -337,25 +367,26 @@ shell_integration:
 - [Export settings](docs/guides/configuration.md#export-configuration) - Control execution result exports
 - [Shell integration](docs/guides/configuration.md#shell-integration) - Add commands to shell history
 
-[📖 Full configuration guide](docs/guides/configuration.md) | [📄 Example config](.lazymake.example.yaml)
+[Full configuration guide](docs/guides/configuration.md) | [Example config](.lazymake.example.yaml)
 
 ## Documentation
 
-### 📖 Guides
+### Guides
 - [Self-Documenting Makefiles](docs/guides/self-documenting-makefiles.md) - Write Makefiles that document themselves
 - [Keyboard Shortcuts Reference](docs/guides/keyboard-shortcuts.md) - Complete shortcut guide
 - [Configuration Guide](docs/guides/configuration.md) - All configuration options
 
-### ✨ Feature Deep Dives
+### Feature Deep Dives
 - [Dependency Graph Visualization](docs/features/dependency-graphs.md)
 - [Variable Inspector](docs/features/variable-inspector.md)
+- [Syntax Highlighting](docs/features/syntax-highlighting.md)
 - [Safety Features](docs/features/safety-features.md)
 - [Recent History & Smart Search](docs/features/history-search.md)
 - [Workspace Management](docs/features/workspace-management.md)
 - [Performance Profiling](docs/features/performance-tracking.md)
 - [Export & Shell Integration](docs/features/export-shell-integration.md)
 
-[📂 Browse all documentation](docs/)
+[Browse all documentation](docs/)
 
 ## FAQ
 
@@ -399,6 +430,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 Built with:
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
 - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions for terminal UIs
+- [Chroma](https://github.com/alecthomas/chroma) - Syntax highlighting library
 - [Cobra](https://github.com/spf13/cobra) - CLI framework
 
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit) and [lazydocker](https://github.com/jesseduffield/lazydocker).
