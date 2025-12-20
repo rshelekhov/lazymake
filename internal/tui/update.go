@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -117,7 +118,8 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ExecutionElapsed = 0
 				return m, tea.Batch(
 					executeTarget(target.Name),
-					tickTimer(), // Start timer
+					tickTimer(),   // Start timer
+					m.Spinner.Tick, // Start spinner animation
 				)
 			}
 
@@ -270,14 +272,26 @@ func (m Model) updateGraph(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case timerTickMsg:
 		// Update elapsed time
 		if m.State == StateExecuting {
 			m.ExecutionElapsed = time.Since(m.ExecutionStartTime)
-			return m, tickTimer() // Continue ticking
+			// Update spinner
+			m.Spinner, cmd = m.Spinner.Update(msg)
+			return m, tea.Batch(tickTimer(), cmd) // Continue ticking and spinning
 		}
 		return m, nil // Stop if not executing
+
+	case spinner.TickMsg:
+		// Handle spinner animation ticks
+		if m.State == StateExecuting {
+			m.Spinner, cmd = m.Spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 
 	case executeFinishedMsg:
 		// Timer stops automatically (state changes from StateExecuting)
@@ -408,7 +422,8 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ExecutionElapsed = 0
 				return m, tea.Batch(
 					executeTarget(target.Name),
-					tickTimer(), // Start timer
+					tickTimer(),   // Start timer
+					m.Spinner.Tick, // Start spinner animation
 				)
 			}
 		}

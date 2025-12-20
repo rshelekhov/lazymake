@@ -1,22 +1,33 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"time"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // renderStatusBar creates a reusable status bar with left and right content
 // This provides consistent layout and styling across all views
 func renderStatusBar(width int, leftContent, rightContent string) string {
-	contentWidth := width - 2
+	contentWidth := width - 4 // Account for padding
 	leftWidth := len(leftContent) + 2
 
 	// Ensure valid widths
 	rightWidth := max(contentWidth-leftWidth, 0)
 
 	// Apply styles with proper alignment
-	left := StatusBarStyle.Width(leftWidth).Render(leftContent)
-	right := StatusBarStyle.
+	// Left side is bold for better hierarchy
+	left := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Bold(true).
+		Width(leftWidth).
+		Render(leftContent)
+
+	// Right side is muted for secondary info
+	right := lipgloss.NewStyle().
+		Foreground(TextSecondary).
 		Width(rightWidth).
 		Align(lipgloss.Right).
-		Padding(0, 3, 0, 0).
 		Render(rightContent)
 
 	content := left + right
@@ -31,4 +42,108 @@ func renderStatusBar(width int, leftContent, rightContent string) string {
 	)
 
 	return StatusBarStyle.Render(placedContent)
+}
+
+// ModernBorder creates a refined border for main containers
+func ModernBorder(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(BorderColor).
+		Width(width).
+		Padding(2, 3)
+}
+
+// AccentBorder creates a border for focused/important elements
+func AccentBorder(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(BorderAccent).
+		Width(width).
+		Padding(2, 3)
+}
+
+// SubtleBox creates a subtle box for secondary content
+func SubtleBox(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(TextMuted).
+		Foreground(TextSecondary).
+		Width(width).
+		Padding(0, 1)
+}
+
+// Badge creates a modern pill-style badge
+func Badge(text string, fgColor, bgColor lipgloss.AdaptiveColor) string {
+	return lipgloss.NewStyle().
+		Foreground(fgColor).
+		Background(bgColor).
+		Padding(0, 1).
+		Bold(true).
+		Render(text)
+}
+
+// StatusPill creates a colored status indicator pill
+func StatusPill(status string) string {
+	var fg, bg lipgloss.AdaptiveColor
+
+	switch status {
+	case "success":
+		fg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}
+		bg = SuccessColor
+	case "error":
+		fg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}
+		bg = ErrorColor
+	case "warning":
+		fg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}
+		bg = WarningColor
+	case "info":
+		fg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}
+		bg = PrimaryColor
+	default:
+		fg = TextPrimary
+		bg = BackgroundSubtle
+	}
+
+	return Badge(status, fg, bg)
+}
+
+// DurationBadge creates a color-coded performance badge
+func DurationBadge(d time.Duration, isRegressed bool) string {
+	durationStr := formatDurationCompact(d)
+
+	var style lipgloss.Style
+	if isRegressed {
+		// Red/orange background for regressed
+		style = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+			Background(WarningColor).
+			Padding(0, 1).
+			Bold(true)
+	} else if d < time.Second {
+		// Green background for fast
+		style = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+			Background(SuccessColor).
+			Padding(0, 1)
+	} else {
+		// Blue background for normal
+		style = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+			Background(SecondaryColor).
+			Padding(0, 1)
+	}
+
+	return style.Render(durationStr)
+}
+
+// formatDurationCompact formats a duration for display in badges (compact form)
+func formatDurationCompact(d time.Duration) string {
+	switch {
+	case d < time.Second:
+		return d.Round(time.Millisecond).String()
+	case d < time.Minute:
+		return d.Round(100 * time.Millisecond).String()
+	default:
+		return d.Round(time.Second).String()
+	}
 }

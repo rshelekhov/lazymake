@@ -21,22 +21,26 @@ func (m Model) renderVariablesView() string {
 	title := TitleStyle.Render("Variable Inspector")
 	util.WriteString(&builder, title+"\n\n")
 
-	// Stats line
+	// Stats line with badges
 	totalVars := len(m.Variables)
 	usedVars := countUsedVariables(m.Variables)
 	unusedVars := totalVars - usedVars
 
 	statsStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextSecondary).
 		Padding(0, 2)
 
-	stats := fmt.Sprintf("%d variables • %d used • %d unused", totalVars, usedVars, unusedVars)
+	totalBadge := Badge(fmt.Sprintf("%d", totalVars), TextPrimary, BackgroundSubtle)
+	usedBadge := Badge(fmt.Sprintf("%d used", usedVars), lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}, SuccessColor)
+	unusedBadge := Badge(fmt.Sprintf("%d unused", unusedVars), TextSecondary, BackgroundSubtle)
+
+	stats := totalBadge + "  " + usedBadge + "  " + unusedBadge
 	util.WriteString(&builder, statsStyle.Render(stats)+"\n\n")
 
 	if totalVars == 0 {
 		// No variables found
 		emptyStyle := lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Italic(true).
 			Padding(0, 2)
 		util.WriteString(&builder, emptyStyle.Render("No variables found in Makefile")+"\n\n")
@@ -67,7 +71,7 @@ func (m Model) renderVariablesView() string {
 		if totalVars > varsPerScreen {
 			scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", startIdx+1, endIdx, totalVars)
 			scrollStyle := lipgloss.NewStyle().
-				Foreground(MutedColor).
+				Foreground(TextMuted).
 				Italic(true)
 			util.WriteString(&builder, "\n"+scrollStyle.Render(scrollInfo)+"\n")
 		}
@@ -89,31 +93,33 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		Foreground(PrimaryColor).
 		Bold(true)
 
-	badgeStyle := lipgloss.NewStyle().
-		Foreground(SecondaryColor).
-		Padding(0, 1)
-
 	// Different style for selected variable
 	if selected {
-		nameStyle = nameStyle.Background(PrimaryColor).Foreground(lipgloss.Color("#000000"))
-		badgeStyle = badgeStyle.Background(SecondaryColor).Foreground(lipgloss.Color("#000000"))
+		nameStyle = nameStyle.
+			Background(PrimaryColor).
+			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"})
 	}
 
-	badge := fmt.Sprintf("[%s]", v.Type.Symbol())
-	if v.Type.Symbol() == "" {
-		badge = ""
+	// Type badge using Badge component
+	typeBadge := ""
+	if v.Type.Symbol() != "" {
+		typeBadge = Badge(v.Type.Symbol(), TextSecondary, BackgroundSubtle) + " "
 	}
 
-	varHeader := fmt.Sprintf("  %s %s  %s",
+	typeLabel := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Render(v.Type.String())
+
+	varHeader := fmt.Sprintf("  %s  %s%s",
 		nameStyle.Render(v.Name),
-		badgeStyle.Render(badge),
-		v.Type.String(),
+		typeBadge,
+		typeLabel,
 	)
 	util.WriteString(&builder, varHeader+"\n")
 
 	// Indented content style
 	contentStyle := lipgloss.NewStyle().
-		Foreground(TextColor).
+		Foreground(TextSecondary).
 		Padding(0, 4)
 
 	// Raw value
@@ -154,7 +160,7 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		util.WriteString(&builder, usageStyle.Render(usageLine)+"\n")
 	} else {
 		unusedStyle := lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Italic(true).
 			Padding(0, 4)
 		util.WriteString(&builder, unusedStyle.Render("Not used by any target")+"\n")

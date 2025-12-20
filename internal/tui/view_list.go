@@ -31,9 +31,10 @@ func (m Model) renderListView() string {
 	statusBarHeight := 3
 	availableHeight := m.Height - statusBarHeight
 
-	// Calculate left column width (30% of terminal width, minimum 30 chars)
-	leftWidthPercent := 0.30
-	minLeftWidth := 30
+	// Calculate left column width (35% of terminal width, minimum 35 chars)
+	// Increased from 30% for better balance and more room for target names
+	leftWidthPercent := 0.35
+	minLeftWidth := 35
 
 	leftWidth := int(float64(m.Width) * leftWidthPercent)
 	if leftWidth < minLeftWidth && m.Width >= minLeftWidth*2 {
@@ -55,8 +56,8 @@ func (m Model) renderListView() string {
 	actualLeftWidth := lipgloss.Width(leftColumn)
 
 	// Calculate right column width based on ACTUAL measured left width
-	// This prevents any rounding errors or overflow
-	rightWidth := max(m.Width-actualLeftWidth, 10)
+	// Add 1-char gap between columns for breathing room
+	rightWidth := max(m.Width-actualLeftWidth-1, 10)
 
 	// Render right column with measured width
 	rightColumn := m.renderRecipePreview(selectedTarget, rightWidth, availableHeight)
@@ -81,9 +82,10 @@ func (m Model) renderListView() string {
 
 // renderTargetList renders the left column with target list and border
 func (m Model) renderTargetList(width, height int) string {
-	// Border adds 2 to height (1 top + 1 bottom) and 2 to width (1 left + 1 right)
-	contentWidth := width - 2
-	contentHeight := height - 2
+	// Border adds 2 to height and width, padding adds more
+	// Increased padding from (1, 2) implicit to (2, 3) for breathing room
+	contentWidth := width - 8  // 2 (border) + 6 (padding 3*2)
+	contentHeight := height - 6 // 2 (border) + 4 (padding 2*2)
 
 	// Set list size for this render - give full width for delegate to handle wrapping
 	m.List.SetSize(contentWidth, contentHeight)
@@ -101,10 +103,12 @@ func (m Model) renderTargetList(width, height int) string {
 		listContent,
 	)
 
-	// Apply border WITHOUT Width/Height (let it wrap the placed content naturally)
+	// Apply modern border with increased padding and margin
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor)
+		BorderForeground(BorderColor).
+		Padding(2, 3).
+		Margin(0, 0) // Left margin handled by join
 
 	return containerStyle.Render(placedContent)
 }
@@ -117,42 +121,56 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 
 	var builder strings.Builder
 
-	// Target name header
+	// Target name header with bottom border
+	contentWidth := width - 12 // Account for container padding and border
 	header := lipgloss.NewStyle().
-		Bold(true).
 		Foreground(PrimaryColor).
-		Render(target.Name + ":")
+		Bold(true).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(BorderColor).
+		PaddingBottom(1).
+		Width(contentWidth).
+		Render(target.Name)
 	util.WriteString(&builder, header+"\n\n")
 
-	// Recipe commands with syntax highlighting
+	// Recipe section with label
 	if len(target.Recipe) > 0 {
+		// Section label
+		recipeLabel := lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Bold(true).
+			Render("Recipe:")
+		util.WriteString(&builder, recipeLabel+"\n\n")
+
 		// Detect language for syntax highlighting
 		language := m.Highlighter.DetectLanguage(target.Recipe, target.LanguageOverride)
 
-		// Highlight each line
+		// Highlight each line with subtle background
 		for _, line := range target.Recipe {
 			highlighted := m.Highlighter.HighlightLine(line, language)
-			util.WriteString(&builder, "  "+highlighted+"\n")
+			codeLine := lipgloss.NewStyle().
+				Background(BackgroundSubtle).
+				Padding(0, 1).
+				Render("  " + highlighted)
+			util.WriteString(&builder, codeLine+"\n")
 		}
 
 		// Show language badge for non-bash languages
 		if language != "bash" && language != "" {
-			langBadge := lipgloss.NewStyle().
-				Foreground(SecondaryColor).
-				Italic(true).
-				Render(fmt.Sprintf("  [%s]", language))
-			util.WriteString(&builder, "\n"+langBadge+"\n")
+			langBadge := Badge(language, TextSecondary, BackgroundSubtle)
+			util.WriteString(&builder, "\n  "+langBadge+"\n")
 		}
 
-		// Graph view hint
+		// Graph view hint with icon
 		util.WriteString(&builder, "\n")
 		hintStyle := lipgloss.NewStyle().
-			Foreground(SecondaryColor).
+			Foreground(TextMuted).
 			Italic(true)
-		util.WriteString(&builder, hintStyle.Render("  💡 Press 'g' to view full dependency graph")+"\n")
+		util.WriteString(&builder, hintStyle.Render("  "+IconInfo+" Press 'g' to view dependency graph")+"\n")
 	} else {
 		noRecipeStyle := lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Italic(true)
 		util.WriteString(&builder, noRecipeStyle.Render("  (no recipe - meta target)")+"\n")
 	}
@@ -177,26 +195,28 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		util.WriteString(&builder, perfSection)
 	}
 
-	// Padding(1,2) = 2 vertical + 4 horizontal
+	// Padding(2,3) = 4 vertical + 6 horizontal
 	// Border = 2 vertical + 2 horizontal
-	// Total overhead: 4 vertical, 6 horizontal
-	contentWidth := width - 6
-	contentHeight := height - 4
+	// Total overhead: 6 vertical, 8 horizontal
+	containerContentWidth := width - 10
+	containerContentHeight := height - 8
 
 	// Use lipgloss.Place to force content into exact dimensions
 	placedContent := lipgloss.Place(
-		contentWidth,
-		contentHeight,
+		containerContentWidth,
+		containerContentHeight,
 		lipgloss.Left,
 		lipgloss.Top,
 		builder.String(),
 	)
 
-	// Apply padding and border WITHOUT Width/Height (let it wrap naturally)
+	// Apply modern border with subtle background and increased padding
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2)
+		BorderForeground(BorderColor).
+		Background(BackgroundSubtle).
+		Padding(2, 3).
+		Margin(0, 0)
 
 	return containerStyle.Render(placedContent)
 }
@@ -210,41 +230,52 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			util.WriteString(&builder, "\n")
 		}
 
-		// Severity indicator and rule ID
+		// Severity indicator and rule ID with modern icons
 		var severityStr string
+		var severityIcon string
 		var severityColor lipgloss.AdaptiveColor
 
 		switch match.Severity {
 		case safety.SeverityCritical:
-			severityStr = "🚨 CRITICAL"
+			severityIcon = IconDangerCritical
+			severityStr = "CRITICAL"
 			severityColor = ErrorColor
 		case safety.SeverityWarning:
-			severityStr = "⚠️  WARNING"
-			severityColor = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
+			severityIcon = IconDangerWarning
+			severityStr = "WARNING"
+			severityColor = WarningColor
 		case safety.SeverityInfo:
-			severityStr = "ℹ️  INFO"
+			severityIcon = IconInfo
+			severityStr = "INFO"
 			severityColor = SecondaryColor
 		}
 
-		severityHeader := lipgloss.NewStyle().
+		icon := lipgloss.NewStyle().
 			Foreground(severityColor).
 			Bold(true).
-			Render(severityStr + ": " + match.Rule.ID)
-		util.WriteString(&builder, severityHeader+"\n")
+			Render(severityIcon)
+
+		severityBadge := StatusPill(strings.ToLower(severityStr))
+
+		severityHeader := icon + " " + severityBadge + " " +
+			lipgloss.NewStyle().
+				Foreground(TextSecondary).
+				Render(match.Rule.ID)
+		util.WriteString(&builder, "  "+severityHeader+"\n")
 
 		// Matched line
 		if match.MatchedLine != "" {
 			matchedStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#666666")).
-				Render("  Matched: " + match.MatchedLine)
+				Foreground(TextMuted).
+				Render("    Matched: " + match.MatchedLine)
 			util.WriteString(&builder, matchedStyle+"\n")
 		}
 
 		// Description
 		if match.Rule.Description != "" {
 			descStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#AAAAAA"))
-			util.WriteString(&builder, descStyle.Render("  "+match.Rule.Description)+"\n")
+				Foreground(TextSecondary)
+			util.WriteString(&builder, descStyle.Render("    "+match.Rule.Description)+"\n")
 		}
 
 		// Suggestion
@@ -252,7 +283,7 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			suggestionStyle := lipgloss.NewStyle().
 				Foreground(SecondaryColor).
 				Italic(true)
-			util.WriteString(&builder, suggestionStyle.Render("  💡 "+match.Rule.Suggestion)+"\n")
+			util.WriteString(&builder, suggestionStyle.Render("    "+IconInfo+" "+match.Rule.Suggestion)+"\n")
 		}
 	}
 
@@ -264,14 +295,14 @@ func renderEmptyPreview(width, height int) string {
 	emptyText := "Select a target to preview recipe"
 
 	emptyStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextMuted).
 		Italic(true)
 
 	content := emptyStyle.Render(emptyText)
 
-	// Same dimensions as recipe preview
-	contentWidth := width - 6
-	contentHeight := height - 4
+	// Same dimensions as recipe preview (with new padding)
+	contentWidth := width - 10
+	contentHeight := height - 8
 
 	// Use lipgloss.Place to force content into exact dimensions
 	// Center the text within the space
@@ -283,11 +314,12 @@ func renderEmptyPreview(width, height int) string {
 		content,
 	)
 
-	// Wrap in border with padding WITHOUT Width/Height
+	// Wrap in modern border with subtle background
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2)
+		BorderForeground(BorderColor).
+		Background(BackgroundSubtle).
+		Padding(2, 3)
 
 	return borderStyle.Render(placedContent)
 }
@@ -386,33 +418,52 @@ func renderRegressionAlert(target Target) string {
 
 	var builder strings.Builder
 
-	// Separator
+	// Modern separator with subtle color
 	separator := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		Foreground(BorderColor).
+		Render("  " + strings.Repeat("─", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
-	// Header
-	header := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("220")).
+	// Header with icon and badge
+	icon := lipgloss.NewStyle().
+		Foreground(WarningColor).
 		Bold(true).
-		Render("  📈 Performance Regression Detected")
+		Render(IconRegression)
+
+	badge := StatusPill("warning")
+
+	header := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Bold(true).
+		Render("  " + icon + " Performance Regression " + badge)
 	util.WriteString(&builder, header+"\n\n")
 
-	// Stats
-	statsStyle := lipgloss.NewStyle().Foreground(TextColor)
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Current:  %s\n", formatDuration(stats.LastDuration))))
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (last %d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+	// Stats in a subtle box
+	statsContent := fmt.Sprintf(
+		"Current:  %s\nAverage:  %s (%d runs)\nChange:   %s",
+		formatDuration(stats.LastDuration),
+		formatDuration(stats.AvgDuration),
+		stats.ExecutionCount,
+		lipgloss.NewStyle().Foreground(WarningColor).Bold(true).Render(fmt.Sprintf("+%d%% slower", change)),
+	)
 
-	changeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Bold(true)
-	util.WriteString(&builder, statsStyle.Render("    Change:   "))
-	util.WriteString(&builder, changeStyle.Render(fmt.Sprintf("+%d%% slower", change))+"\n\n")
+	statsBox := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Background(BackgroundSubtle).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(BorderColor).
+		Padding(1, 2).
+		Render(statsContent)
 
-	// Hint
-	hintStyle := lipgloss.NewStyle().
-		Foreground(SecondaryColor).
-		Italic(true)
-	util.WriteString(&builder, hintStyle.Render("    💡 This target recently got slower - investigate recent changes"))
+	util.WriteString(&builder, "  "+statsBox+"\n\n")
+
+	// Helpful hint
+	hint := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Italic(true).
+		Render("  " + IconInfo + " This target recently got slower - investigate recent changes")
+
+	util.WriteString(&builder, hint)
 
 	return builder.String()
 }
@@ -423,21 +474,25 @@ func renderRecentTargetInfo(target Target) string {
 
 	var builder strings.Builder
 
-	// Separator
+	// Modern separator with subtle color
 	separator := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		Foreground(BorderColor).
+		Render("  " + strings.Repeat("─", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
-	// Header
-	header := lipgloss.NewStyle().
+	// Header with icon
+	icon := lipgloss.NewStyle().
 		Foreground(SecondaryColor).
+		Render(IconRecent)
+
+	header := lipgloss.NewStyle().
+		Foreground(TextSecondary).
 		Bold(true).
-		Render("  ⏱ Performance")
+		Render("  " + icon + " Performance")
 	util.WriteString(&builder, header+"\n\n")
 
 	// Stats
-	statsStyle := lipgloss.NewStyle().Foreground(TextColor)
+	statsStyle := lipgloss.NewStyle().Foreground(TextSecondary)
 	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Last run: %s\n", formatDuration(stats.LastDuration))))
 	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
 

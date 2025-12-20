@@ -18,11 +18,18 @@ func (m Model) renderConfirmView() string {
 
 	var builder strings.Builder
 
-	// Title with danger emoji
+	// Title with modern icon
+	icon := lipgloss.NewStyle().
+		Foreground(ErrorColor).
+		Bold(true).
+		Render(IconDangerCritical)
+
+	titleBadge := StatusPill("error")
+
 	title := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(ErrorColor).
-		Render("🚨 DANGEROUS COMMAND WARNING")
+		Foreground(TextPrimary).
+		Render(icon + " DANGEROUS COMMAND " + titleBadge)
 	util.WriteString(&builder, title+"\n\n")
 
 	// Target name
@@ -39,32 +46,43 @@ func (m Model) renderConfirmView() string {
 				util.WriteString(&builder, "\n")
 			}
 
-			// Rule header with severity
+			// Rule header with modern icon and badge
 			var severityStr string
+			var severityIcon string
 			var severityColor lipgloss.AdaptiveColor
 
 			switch match.Severity {
 			case safety.SeverityCritical:
-				severityStr = "CRITICAL"
+				severityIcon = IconDangerCritical
+				severityStr = "critical"
 				severityColor = ErrorColor
 			case safety.SeverityWarning:
-				severityStr = "WARNING"
-				severityColor = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
+				severityIcon = IconDangerWarning
+				severityStr = "warning"
+				severityColor = WarningColor
 			case safety.SeverityInfo:
-				severityStr = "INFO"
+				severityIcon = IconInfo
+				severityStr = "info"
 				severityColor = SecondaryColor
 			}
 
-			ruleHeader := lipgloss.NewStyle().
+			icon := lipgloss.NewStyle().
 				Foreground(severityColor).
 				Bold(true).
-				Render(severityStr + ": " + match.Rule.ID)
+				Render(severityIcon)
+
+			badge := StatusPill(severityStr)
+
+			ruleHeader := icon + " " + badge + " " +
+				lipgloss.NewStyle().
+					Foreground(TextSecondary).
+					Render(match.Rule.ID)
 			util.WriteString(&builder, ruleHeader+"\n")
 
 			// Matched command
 			if match.MatchedLine != "" {
 				matchedStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#666666")).
+					Foreground(TextMuted).
 					Render("Command: " + match.MatchedLine)
 				util.WriteString(&builder, matchedStyle+"\n")
 			}
@@ -72,7 +90,7 @@ func (m Model) renderConfirmView() string {
 			// Description
 			if match.Rule.Description != "" {
 				descStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#CCCCCC"))
+					Foreground(TextSecondary)
 				util.WriteString(&builder, "\n"+descStyle.Render(match.Rule.Description)+"\n")
 			}
 
@@ -81,7 +99,7 @@ func (m Model) renderConfirmView() string {
 				suggestionStyle := lipgloss.NewStyle().
 					Foreground(SecondaryColor).
 					Italic(true)
-				util.WriteString(&builder, "\n"+suggestionStyle.Render("💡 "+match.Rule.Suggestion)+"\n")
+				util.WriteString(&builder, "\n"+suggestionStyle.Render(IconInfo+" "+match.Rule.Suggestion)+"\n")
 			}
 		}
 	}
@@ -90,7 +108,7 @@ func (m Model) renderConfirmView() string {
 
 	// Actions
 	actionsStyle := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextSecondary).
 		Align(lipgloss.Center)
 
 	enterAction := lipgloss.NewStyle().
@@ -99,12 +117,12 @@ func (m Model) renderConfirmView() string {
 		Render("[Enter]")
 
 	escAction := lipgloss.NewStyle().
-		Foreground(SecondaryColor).
+		Foreground(SuccessColor).
 		Bold(true).
 		Render("[Esc]")
 
 	actions := actionsStyle.Render(
-		enterAction + " Continue Anyway     " + escAction + " Cancel",
+		enterAction + " Continue Anyway     " + escAction + " Cancel (Recommended)",
 	)
 	util.WriteString(&builder, actions)
 
@@ -112,11 +130,12 @@ func (m Model) renderConfirmView() string {
 	contentWidth := min(80, m.Width-10)
 	contentHeight := 0 // Auto-height
 
-	// Wrap in prominent border
+	// Wrap in prominent border with subtle background
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(ErrorColor).
-		Padding(2, 4).
+		Background(BackgroundSubtle).
+		Padding(3, 4).
 		Width(contentWidth).
 		Height(contentHeight).
 		Align(lipgloss.Center)

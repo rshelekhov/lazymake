@@ -385,29 +385,58 @@ func (m Model) renderExecutingView() string {
 		}
 	}
 
-	var statusLine string
+	var builder strings.Builder
+
+	// Title with spinner
+	title := lipgloss.NewStyle().
+		Foreground(PrimaryColor).
+		Bold(true).
+		Render(m.Spinner.View() + " Executing: make " + m.ExecutingTarget)
+	builder.WriteString("\n" + title + "\n\n")
+
+	// Progress bar (if we have avg duration to estimate)
 	if stats != nil && stats.AvgDuration > 0 {
-		avgStr := formatDuration(stats.AvgDuration)
-		statusLine = fmt.Sprintf("  Elapsed: %s / ~%s avg",
-			formatDuration(elapsed),
-			avgStr)
+		// Calculate progress percentage
+		progress := float64(elapsed) / float64(stats.AvgDuration)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+
+		// Render progress bar
+		progressBar := m.Progress.ViewAs(progress)
+
+		// Time display
+		timeStyle := lipgloss.NewStyle().
+			Foreground(TextSecondary)
+		timeDisplay := timeStyle.Render(
+			fmt.Sprintf("  %s / ~%s avg",
+				formatDuration(elapsed),
+				formatDuration(stats.AvgDuration)))
+
+		builder.WriteString("  " + progressBar + "\n")
+		builder.WriteString(timeDisplay + "\n\n")
 	} else {
-		// Simple timer (no performance history)
-		statusLine = fmt.Sprintf("  Elapsed: %s", formatDuration(elapsed))
+		// Simple elapsed time
+		timeStyle := lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Render("  Elapsed: " + formatDuration(elapsed))
+		builder.WriteString(timeStyle + "\n\n")
 	}
 
-	header := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(PrimaryColor).
-		Render("\n  ⏳ Executing: make " + m.ExecutingTarget)
+	// Wait message
+	waitMsg := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Italic(true).
+		Render("  Please wait...")
+	builder.WriteString(waitMsg + "\n")
 
+	// Modern container with accent border and subtle background
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(width - 2)
+		BorderForeground(BorderAccent).
+		Background(BackgroundSubtle).
+		Padding(2, 3).
+		Width(width - 4)
 
-	content := header + "\n\n" + statusLine + "\n\n  Please wait...\n"
-
-	return containerStyle.Render(content)
+	return containerStyle.Render(builder.String())
 }

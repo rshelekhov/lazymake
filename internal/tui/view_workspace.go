@@ -23,12 +23,13 @@ func (m Model) renderWorkspaceList() string {
 	// Render workspace list
 	builder.WriteString(m.WorkspaceList.View())
 
-	// Apply border style matching other views
+	// Apply modern border style with subtle background and increased padding
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(m.Width - 2)
+		BorderForeground(BorderColor).
+		Background(BackgroundSubtle).
+		Padding(2, 3).
+		Width(m.Width - 4)
 
 	content := containerStyle.Render(builder.String())
 
@@ -46,11 +47,14 @@ func (m Model) renderWorkspaceList() string {
 		}
 	}
 
+	// Stats with badges
 	var leftContent string
 	if discoveredCount > 0 {
-		leftContent = fmt.Sprintf("%d recent • %d discovered", recentCount, discoveredCount)
+		recentBadge := Badge(fmt.Sprintf("%d recent", recentCount), TextSecondary, BackgroundSubtle)
+		discoveredBadge := Badge(fmt.Sprintf("%d discovered", discoveredCount), TextSecondary, BackgroundSubtle)
+		leftContent = recentBadge + "  " + discoveredBadge
 	} else {
-		leftContent = fmt.Sprintf("%d workspaces", recentCount)
+		leftContent = Badge(fmt.Sprintf("%d workspaces", recentCount), TextSecondary, BackgroundSubtle)
 	}
 	rightContent := "enter: switch • f: favorite • esc/w: cancel • q: quit"
 

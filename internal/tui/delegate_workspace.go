@@ -43,9 +43,12 @@ func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item
 	// Line 1: Favorite indicator + path
 	var prefix string
 	if ws.Workspace.IsFavorite {
-		prefix = "⭐ "
+		favoriteIcon := lipgloss.NewStyle().
+			Foreground(WarningColor).
+			Render(IconFavorite)
+		prefix = favoriteIcon + " "
 	} else {
-		prefix = "   "
+		prefix = "  "
 	}
 
 	// Style the path
@@ -57,7 +60,7 @@ func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item
 	line1 := pathStyle.Render(prefix + ws.RelPath)
 
 	// Line 2: Metadata (last accessed time, access count)
-	metaStyle := lipgloss.NewStyle().Foreground(MutedColor)
+	metaStyle := lipgloss.NewStyle().Foreground(TextMuted)
 
 	var line2 string
 	if ws.Workspace.AccessCount > 0 {
