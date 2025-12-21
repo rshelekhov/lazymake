@@ -1,4 +1,6 @@
-# lazymake
+<img src="./assets/lazymake-logo.svg" alt="LAZYMAKE" width="600">
+
+</br>
 
 [![CI](https://img.shields.io/github/actions/workflow/status/rshelekhov/lazymake/ci.yml?branch=main&label=CI)](https://github.com/rshelekhov/lazymake/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/release/rshelekhov/lazymake.svg)](https://github.com/rshelekhov/lazymake/releases)
