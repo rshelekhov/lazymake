@@ -178,7 +178,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 		// Use different description color for ## comments
 		if target.CommentType == makefile.CommentDouble {
-			descStyle = descStyle.Foreground(SecondaryColor)
+			descStyle = descStyle.Foreground(TextSecondary)
 		}
 	} else {
 		titleStyle = d.Styles.NormalTitle
@@ -186,7 +186,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 		// Use different description color for ## comments
 		if target.CommentType == makefile.CommentDouble {
-			descStyle = descStyle.Foreground(SecondaryColor)
+			descStyle = descStyle.Foreground(TextSecondary)
 		}
 	}
 
