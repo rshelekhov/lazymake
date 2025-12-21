@@ -32,7 +32,6 @@ func (m Model) renderListView() string {
 	availableHeight := m.Height - statusBarHeight
 
 	// Calculate left column width (35% of terminal width, minimum 35 chars)
-	// Increased from 30% for better balance and more room for target names
 	leftWidthPercent := 0.35
 	minLeftWidth := 35
 
@@ -84,7 +83,7 @@ func (m Model) renderListView() string {
 func (m Model) renderTargetList(width, height int) string {
 	// Border adds 2 to height and width, padding adds more
 	// Increased padding from (1, 2) implicit to (2, 3) for breathing room
-	contentWidth := width - 8  // 2 (border) + 6 (padding 3*2)
+	contentWidth := width - 8   // 2 (border) + 6 (padding 3*2)
 	contentHeight := height - 6 // 2 (border) + 4 (padding 2*2)
 
 	// Set list size for this render - give full width for delegate to handle wrapping
@@ -146,20 +145,18 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		// Detect language for syntax highlighting
 		language := m.Highlighter.DetectLanguage(target.Recipe, target.LanguageOverride)
 
-		// Highlight each line with subtle background
+		// Highlight each line
 		for _, line := range target.Recipe {
 			highlighted := m.Highlighter.HighlightLine(line, language)
-			codeLine := lipgloss.NewStyle().
-				Background(BackgroundSubtle).
-				Padding(0, 1).
-				Render("  " + highlighted)
-			util.WriteString(&builder, codeLine+"\n")
+			util.WriteString(&builder, highlighted+"\n")
 		}
 
 		// Show language badge for non-bash languages
 		if language != "bash" && language != "" {
-			langBadge := Badge(language, TextSecondary, BackgroundSubtle)
-			util.WriteString(&builder, "\n  "+langBadge+"\n")
+			langBadge := lipgloss.NewStyle().
+				Foreground(TextSecondary).
+				Render(language)
+			util.WriteString(&builder, "\n"+langBadge+"\n")
 		}
 
 		// Graph view hint with icon
@@ -167,12 +164,12 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		hintStyle := lipgloss.NewStyle().
 			Foreground(TextMuted).
 			Italic(true)
-		util.WriteString(&builder, hintStyle.Render("  "+IconInfo+" Press 'g' to view dependency graph")+"\n")
+		util.WriteString(&builder, hintStyle.Render(IconInfo+" Press 'g' to view dependency graph")+"\n")
 	} else {
 		noRecipeStyle := lipgloss.NewStyle().
 			Foreground(TextMuted).
 			Italic(true)
-		util.WriteString(&builder, noRecipeStyle.Render("  (no recipe - meta target)")+"\n")
+		util.WriteString(&builder, noRecipeStyle.Render("(no recipe - meta target)")+"\n")
 	}
 
 	// Variables section (if any variables used by this target)
@@ -210,11 +207,10 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		builder.String(),
 	)
 
-	// Apply modern border with subtle background and increased padding
+	// Apply modern border with increased padding
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColor).
-		Background(BackgroundSubtle).
 		Padding(2, 3).
 		Margin(0, 0)
 
@@ -261,13 +257,13 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			lipgloss.NewStyle().
 				Foreground(TextSecondary).
 				Render(match.Rule.ID)
-		util.WriteString(&builder, "  "+severityHeader+"\n")
+		util.WriteString(&builder, severityHeader+"\n")
 
 		// Matched line
 		if match.MatchedLine != "" {
 			matchedStyle := lipgloss.NewStyle().
 				Foreground(TextMuted).
-				Render("    Matched: " + match.MatchedLine)
+				Render("Matched: " + match.MatchedLine)
 			util.WriteString(&builder, matchedStyle+"\n")
 		}
 
@@ -275,7 +271,7 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 		if match.Rule.Description != "" {
 			descStyle := lipgloss.NewStyle().
 				Foreground(TextSecondary)
-			util.WriteString(&builder, descStyle.Render("    "+match.Rule.Description)+"\n")
+			util.WriteString(&builder, descStyle.Render(match.Rule.Description)+"\n")
 		}
 
 		// Suggestion
@@ -283,7 +279,7 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			suggestionStyle := lipgloss.NewStyle().
 				Foreground(SecondaryColor).
 				Italic(true)
-			util.WriteString(&builder, suggestionStyle.Render("    "+IconInfo+" "+match.Rule.Suggestion)+"\n")
+			util.WriteString(&builder, suggestionStyle.Render(IconInfo+" "+match.Rule.Suggestion)+"\n")
 		}
 	}
 
@@ -314,11 +310,10 @@ func renderEmptyPreview(width, height int) string {
 		content,
 	)
 
-	// Wrap in modern border with subtle background
+	// Wrap in modern border
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColor).
-		Background(BackgroundSubtle).
 		Padding(2, 3)
 
 	return borderStyle.Render(placedContent)
@@ -345,8 +340,7 @@ func (m Model) renderStatusBar() string {
 
 	// Base status bar style - with background for entire bar
 	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Background(BackgroundSubtle)
+		Foreground(TextPrimary)
 
 	// Colored nugget style (only for first item)
 	coloredNuggetStyle := lipgloss.NewStyle().
@@ -426,6 +420,7 @@ func (m Model) renderStatusBar() string {
 
 	return statusBarStyle.
 		Width(m.Width).
+		Padding(1, 0).
 		Render(bar)
 }
 
@@ -468,7 +463,7 @@ func renderRegressionAlert(target Target) string {
 	// Modern separator with subtle color
 	separator := lipgloss.NewStyle().
 		Foreground(BorderColor).
-		Render("  " + strings.Repeat("─", 50))
+		Render(strings.Repeat("─", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
 	// Header with icon and badge
@@ -482,7 +477,7 @@ func renderRegressionAlert(target Target) string {
 	header := lipgloss.NewStyle().
 		Foreground(TextPrimary).
 		Bold(true).
-		Render("  " + icon + " Performance Regression " + badge)
+		Render(icon + " Performance Regression " + badge)
 	util.WriteString(&builder, header+"\n\n")
 
 	// Stats in a subtle box
@@ -496,19 +491,18 @@ func renderRegressionAlert(target Target) string {
 
 	statsBox := lipgloss.NewStyle().
 		Foreground(TextSecondary).
-		Background(BackgroundSubtle).
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(BorderColor).
 		Padding(1, 2).
 		Render(statsContent)
 
-	util.WriteString(&builder, "  "+statsBox+"\n\n")
+	util.WriteString(&builder, statsBox+"\n\n")
 
 	// Helpful hint
 	hint := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Italic(true).
-		Render("  " + IconInfo + " This target recently got slower - investigate recent changes")
+		Render(IconInfo + " This target recently got slower - investigate recent changes")
 
 	util.WriteString(&builder, hint)
 
@@ -524,7 +518,7 @@ func renderRecentTargetInfo(target Target) string {
 	// Modern separator with subtle color
 	separator := lipgloss.NewStyle().
 		Foreground(BorderColor).
-		Render("  " + strings.Repeat("─", 50))
+		Render(strings.Repeat("─", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
 	// Header with icon
@@ -535,13 +529,13 @@ func renderRecentTargetInfo(target Target) string {
 	header := lipgloss.NewStyle().
 		Foreground(TextSecondary).
 		Bold(true).
-		Render("  " + icon + " Performance")
+		Render(icon + " Performance")
 	util.WriteString(&builder, header+"\n\n")
 
 	// Stats
 	statsStyle := lipgloss.NewStyle().Foreground(TextSecondary)
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Last run: %s\n", formatDuration(stats.LastDuration))))
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("    Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("Last run: %s\n", formatDuration(stats.LastDuration))))
+	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
 
 	return builder.String()
 }
@@ -573,30 +567,30 @@ func renderVariablesSection(vars []string) string {
 
 	// Separator
 	separator := lipgloss.NewStyle().
-		Foreground(MutedColor).
-		Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		Foreground(TextMuted).
+		Render(strings.Repeat("━", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
 	// Header
 	header := lipgloss.NewStyle().
 		Foreground(SecondaryColor).
 		Bold(true).
-		Render("  📦 Variables Used")
+		Render("📦 Variables Used")
 	util.WriteString(&builder, header+"\n\n")
 
 	// List variables (max 5, show "and N more")
 	displayCount := min(len(vars), 5)
-	varStyle := lipgloss.NewStyle().Foreground(TextColor)
+	varStyle := lipgloss.NewStyle().Foreground(TextPrimary)
 
 	for i := 0; i < displayCount; i++ {
-		util.WriteString(&builder, varStyle.Render("    "+vars[i])+"\n")
+		util.WriteString(&builder, varStyle.Render(vars[i])+"\n")
 	}
 
 	if len(vars) > 5 {
 		moreStyle := lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Italic(true)
-		util.WriteString(&builder, moreStyle.Render(fmt.Sprintf("    ... and %d more\n", len(vars)-5)))
+		util.WriteString(&builder, moreStyle.Render(fmt.Sprintf("... and %d more\n", len(vars)-5)))
 	}
 
 	// Hint to view all
@@ -604,7 +598,7 @@ func renderVariablesSection(vars []string) string {
 	hintStyle := lipgloss.NewStyle().
 		Foreground(SecondaryColor).
 		Italic(true)
-	util.WriteString(&builder, hintStyle.Render("    💡 Press 'v' to view all variables")+"\n")
+	util.WriteString(&builder, hintStyle.Render("💡 Press 'v' to view all variables")+"\n")
 
 	return builder.String()
 }

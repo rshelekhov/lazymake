@@ -20,22 +20,15 @@ var (
 	WarningColor = lipgloss.AdaptiveColor{Light: "#9A6700", Dark: "#D29922"}
 
 	// Text hierarchy
-	TextPrimary = lipgloss.AdaptiveColor{Light: "#1F2328", Dark: "#E6EDF3"}
+	TextPrimary   = lipgloss.AdaptiveColor{Light: "#1F2328", Dark: "#E6EDF3"}
 	TextSecondary = lipgloss.AdaptiveColor{Light: "#656D76", Dark: "#8B949E"}
-	TextMuted = lipgloss.AdaptiveColor{Light: "#8C959F", Dark: "#6E7681"}
-
-	// Legacy alias for backward compatibility
-	MutedColor = TextMuted
-	TextColor = TextPrimary
+	TextMuted     = lipgloss.AdaptiveColor{Light: "#8C959F", Dark: "#6E7681"}
 
 	// Borders and backgrounds
-	BorderColor = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#30363D"}
-	BorderAccent = lipgloss.AdaptiveColor{Light: "#0969DA", Dark: "#58A6FF"}
+	BorderColor      = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#30363D"}
+	BorderAccent     = lipgloss.AdaptiveColor{Light: "#0969DA", Dark: "#58A6FF"}
 	BackgroundSubtle = lipgloss.AdaptiveColor{Light: "#F6F8FA", Dark: "#161B22"}
-	ShadowColor = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#010409"}
-
-	// Legacy alias for backward compatibility
-	SeparatorColor = BorderColor
+	ShadowColor      = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#010409"}
 )
 
 // Styles
@@ -51,7 +44,7 @@ var (
 				PaddingLeft(1)
 
 	NormalItemStyle = lipgloss.NewStyle().
-			Foreground(TextColor).
+			Foreground(TextPrimary).
 			PaddingLeft(1)
 
 	DescriptionStyle = lipgloss.NewStyle().
@@ -60,7 +53,7 @@ var (
 
 	// DocDescriptionStyle is used for ## documented comments (industry standard)
 	DocDescriptionStyle = lipgloss.NewStyle().
-				Foreground(SecondaryColor).
+				Foreground(TextSecondary).
 				PaddingLeft(3)
 
 	ErrorStyle = lipgloss.NewStyle().
@@ -88,10 +81,10 @@ var (
 
 	// StatusBarStyle is used for the status bars in different views
 	StatusBarStyle = lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Background(BackgroundSubtle).
-		BorderTop(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(BorderColor).
-		Padding(1, 2)
+			Foreground(TextPrimary).
+			Background(BackgroundSubtle).
+			BorderTop(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(BorderColor).
+			Padding(1, 2)
 )

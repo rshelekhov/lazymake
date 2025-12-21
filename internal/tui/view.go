@@ -84,14 +84,14 @@ func (m Model) renderHelpView() string {
 
 	// Description
 	desc := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextMuted).
 		Render("Available targets:\n")
 	helpContent += desc + "\n"
 
 	// List all targets with descriptions
 	if len(m.Targets) == 0 {
 		helpContent += lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Render("  No targets found\n")
 	} else {
 		// Find the longest target name for alignment
@@ -137,8 +137,8 @@ func (m Model) renderHelpView() string {
 	// Legend - use plain formatting to avoid lipgloss layout issues
 	helpContent += "\n"
 	helpContent += "Legend:\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(SecondaryColor).Render("Cyan") + " = ## documented target (recommended)\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(MutedColor).Render("Gray") + " = # regular comment\n"
+	helpContent += "  " + lipgloss.NewStyle().Foreground(TextSecondary).Render("Gray") + " = ## documented target (recommended)\n"
+	helpContent += "  " + lipgloss.NewStyle().Foreground(TextMuted).Render("Gray Dark") + " = # regular comment\n"
 
 	// Wrap in a container with padding (no width constraint to avoid layout issues)
 	containerStyle := lipgloss.NewStyle().
@@ -209,7 +209,7 @@ func (m Model) renderGraphContent(width int) string {
 		depthStr = fmt.Sprintf("%d level(s)", m.GraphDepth+1)
 	}
 	depthInfo := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextMuted).
 		Render(fmt.Sprintf("Depth: %s", depthStr))
 	util.WriteString(&builder, depthInfo+"\n\n")
 
@@ -259,7 +259,7 @@ func (m Model) renderGraphLegend(width int) string {
 			Render("[N]") +
 			"  " +
 			lipgloss.NewStyle().
-				Foreground(TextColor).
+				Foreground(TextPrimary).
 				Render("Execution Order")
 		items = append(items, item)
 	}
@@ -271,7 +271,7 @@ func (m Model) renderGraphLegend(width int) string {
 			Render(" ★ ") +
 			"  " +
 			lipgloss.NewStyle().
-				Foreground(TextColor).
+				Foreground(TextPrimary).
 				Render("Critical Path")
 		items = append(items, item)
 	}
@@ -283,7 +283,7 @@ func (m Model) renderGraphLegend(width int) string {
 			Render(" ∥ ") +
 			"  " +
 			lipgloss.NewStyle().
-				Foreground(TextColor).
+				Foreground(TextPrimary).
 				Render("Parallel Execution")
 		items = append(items, item)
 	}
@@ -444,7 +444,7 @@ func (m Model) renderExecutingView() string {
 		Foreground(PrimaryColor).
 		Bold(true).
 		Render(m.Spinner.View() + " Executing: make " + m.ExecutingTarget)
-	builder.WriteString("\n" + title + "\n\n")
+	util.WriteString(&builder, "\n"+title+"\n\n")
 
 	// Progress bar (if we have avg duration to estimate)
 	if stats != nil && stats.AvgDuration > 0 {
@@ -465,14 +465,15 @@ func (m Model) renderExecutingView() string {
 				formatDuration(elapsed),
 				formatDuration(stats.AvgDuration)))
 
-		builder.WriteString("  " + progressBar + "\n")
-		builder.WriteString(timeDisplay + "\n\n")
+		util.WriteString(&builder, "  "+progressBar+"\n")
+		util.WriteString(&builder, "  "+progressBar+"\n")
+		util.WriteString(&builder, timeDisplay+"\n\n")
 	} else {
 		// Simple elapsed time
 		timeStyle := lipgloss.NewStyle().
 			Foreground(TextSecondary).
 			Render("  Elapsed: " + formatDuration(elapsed))
-		builder.WriteString(timeStyle + "\n\n")
+		util.WriteString(&builder, timeStyle+"\n\n")
 	}
 
 	// Wait message
@@ -480,7 +481,7 @@ func (m Model) renderExecutingView() string {
 		Foreground(TextMuted).
 		Italic(true).
 		Render("  Please wait...")
-	builder.WriteString(waitMsg + "\n")
+	util.WriteString(&builder, waitMsg+"\n")
 
 	// Modern container with accent border and subtle background
 	containerStyle := lipgloss.NewStyle().

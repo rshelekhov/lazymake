@@ -30,9 +30,13 @@ func (m Model) renderVariablesView() string {
 		Foreground(TextSecondary).
 		Padding(0, 2)
 
-	totalBadge := Badge(fmt.Sprintf("%d", totalVars), TextPrimary, BackgroundSubtle)
+	totalBadge := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Render(fmt.Sprintf("%d", totalVars))
 	usedBadge := Badge(fmt.Sprintf("%d used", usedVars), lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}, SuccessColor)
-	unusedBadge := Badge(fmt.Sprintf("%d unused", unusedVars), TextSecondary, BackgroundSubtle)
+	unusedBadge := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Render(fmt.Sprintf("%d unused", unusedVars))
 
 	stats := totalBadge + "  " + usedBadge + "  " + unusedBadge
 	util.WriteString(&builder, statsStyle.Render(stats)+"\n\n")
@@ -149,10 +153,12 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"})
 	}
 
-	// Type badge using Badge component
+	// Type badge
 	typeBadge := ""
 	if v.Type.Symbol() != "" {
-		typeBadge = Badge(v.Type.Symbol(), TextSecondary, BackgroundSubtle) + " "
+		typeBadge = lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Render(v.Type.Symbol()) + " "
 	}
 
 	typeLabel := lipgloss.NewStyle().
