@@ -324,7 +324,7 @@ func renderEmptyPreview(width, height int) string {
 	return borderStyle.Render(placedContent)
 }
 
-// renderStatusBar renders the bottom status bar
+// renderStatusBar renders the bottom status bar with colored nuggets (lipgloss-style)
 func (m Model) renderStatusBar() string {
 	// Count stats
 	totalTargets := 0
@@ -343,43 +343,90 @@ func (m Model) renderStatusBar() string {
 		}
 	}
 
-	// Left side: workspace path + stats
+	// Base status bar style - with background for entire bar
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Background(BackgroundSubtle)
+
+	// Colored nugget style (only for first item)
+	coloredNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Background(PrimaryColor).
+		Padding(0, 1).
+		MarginRight(1)
+
+	// Plain nugget style (inherits status bar background, just text)
+	plainNuggetStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Padding(0, 1)
+
+	// Yellow text style for regressed items
+	yellowNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("220")).
+		Padding(0, 1)
+
+	// Workspace path nugget (only colored one)
 	workspacePath := m.getWorkspaceDisplayPath()
-	leftStats := []string{workspacePath, fmt.Sprintf("%d targets", totalTargets)}
+	pathNugget := coloredNuggetStyle.Render(workspacePath)
 
+	var sections []string
+	sections = append(sections, pathNugget)
+
+	// Target count (plain text on status bar background)
+	targetInfo := plainNuggetStyle.Render(fmt.Sprintf("%d targets", totalTargets))
+	sections = append(sections, targetInfo)
+
+	// Dangerous count - only if there are dangerous targets
 	if dangerousCount > 0 {
-		leftStats = append(leftStats, fmt.Sprintf("%d dangerous", dangerousCount))
+		dangerInfo := plainNuggetStyle.Render(fmt.Sprintf("%d dangerous", dangerousCount))
+		sections = append(sections, dangerInfo)
 	}
 
+	// Regressed count with yellow text - only if there are regressed targets
 	if regressedCount > 0 {
-		leftStats = append(leftStats, fmt.Sprintf("%d regressed 📈", regressedCount))
+		regressedInfo := yellowNuggetStyle.Render(fmt.Sprintf("%d regressed", regressedCount))
+		sections = append(sections, regressedInfo)
 	}
 
-	leftContent := strings.Join(leftStats, " • ")
+	// Calculate width used by nuggets
+	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+	leftWidth := lipgloss.Width(leftBar)
 
-	// Right side: shortcuts - dynamically build from key bindings
-	var rightContent string
-
-	// If dangerous target selected, show warning with specific keys
+	// Right side: shortcuts
+	var helpText string
 	if item := m.List.SelectedItem(); item != nil {
 		if target, ok := item.(Target); ok && target.IsDangerous {
 			if target.DangerLevel == safety.SeverityCritical {
-				rightContent = "⚠️  Dangerous command • enter: confirm & run • q: quit"
+				helpText = "⚠️  Dangerous • enter: confirm • esc: cancel • q: quit"
 			} else {
-				// Non-critical dangerous target, show normal shortcuts
-				rightContent = formatKeyBindings(m.KeyBindings)
+				helpText = formatKeyBindings(m.KeyBindings)
 			}
 		} else {
-			// Normal target, show all shortcuts
-			rightContent = formatKeyBindings(m.KeyBindings)
+			helpText = formatKeyBindings(m.KeyBindings)
 		}
 	} else {
-		// No target selected, show all shortcuts
-		rightContent = formatKeyBindings(m.KeyBindings)
+		helpText = formatKeyBindings(m.KeyBindings)
 	}
 
-	// Use the reusable status bar component
-	return renderStatusBar(m.Width, leftContent, rightContent)
+	// Middle section fills remaining space
+	middleWidth := max(m.Width-leftWidth-lipgloss.Width(helpText)-6, 1)
+	middle := lipgloss.NewStyle().
+		Width(middleWidth).
+		Align(lipgloss.Left).
+		Render("")
+
+	// Right section with help text
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+
+	// Combine all sections
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
+
+	return statusBarStyle.
+		Width(m.Width).
+		Render(bar)
 }
 
 // formatKeyBindings formats key bindings as "key: description • key: description • ..."

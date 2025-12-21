@@ -6,44 +6,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderStatusBar creates a reusable status bar with left and right content
-// This provides consistent layout and styling across all views
-func renderStatusBar(width int, leftContent, rightContent string) string {
-	contentWidth := width - 4 // Account for padding
-	leftWidth := len(leftContent) + 2
-
-	// Ensure valid widths
-	rightWidth := max(contentWidth-leftWidth, 0)
-
-	// Apply styles with proper alignment
-	// Left side is bold for better hierarchy
-	left := lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Bold(true).
-		Width(leftWidth).
-		Render(leftContent)
-
-	// Right side is muted for secondary info
-	right := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Width(rightWidth).
-		Align(lipgloss.Right).
-		Render(rightContent)
-
-	content := left + right
-
-	// Use lipgloss.Place to force content into exact width
-	placedContent := lipgloss.Place(
-		contentWidth,
-		1, // Single line height
-		lipgloss.Left,
-		lipgloss.Center,
-		content,
-	)
-
-	return StatusBarStyle.Render(placedContent)
-}
-
 // ModernBorder creates a refined border for main containers
 func ModernBorder(width int) lipgloss.Style {
 	return lipgloss.NewStyle().

@@ -146,10 +146,22 @@ func (m Model) renderHelpView() string {
 
 	content := containerStyle.Render(helpContent)
 
-	// Status bar with keyboard shortcuts
-	statusBar := renderStatusBar(m.Width, "", "?: toggle help • g: graph • esc: return • q: quit")
+	// Status bar with lipgloss-style nuggets
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Background(BackgroundSubtle)
 
-	return content + "\n" + statusBar
+	helpText := "?: toggle help • g: graph • esc: return • q: quit"
+	rightStyle := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Align(lipgloss.Right)
+
+	bar := statusBarStyle.
+		Width(m.Width).
+		Render(rightStyle.Render(helpText))
+
+	return content + "\n" + bar
 }
 
 // renderGraphView displays the dependency graph for the selected target
@@ -294,20 +306,48 @@ func (m Model) renderGraphLegend(width int) string {
 
 // renderGraphStatusBar renders the keyboard controls in status bar format
 func (m Model) renderGraphStatusBar(width int) string {
-	// Left side: graph stats
-	leftContent := ""
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Background(BackgroundSubtle)
+
+	// Colored nugget style (only for first item)
+	coloredNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Background(PrimaryColor).
+		Padding(0, 1).
+		MarginRight(1)
+
+	var sections []string
+
+	// Graph stats nugget (only colored one)
 	if m.GraphTarget != "" {
-		leftContent = fmt.Sprintf("Target: %s", m.GraphTarget)
+		targetNugget := coloredNuggetStyle.Render(fmt.Sprintf("target: %s", m.GraphTarget))
+		sections = append(sections, targetNugget)
 	} else if m.Graph != nil {
 		nodeCount := len(m.Graph.Nodes)
-		leftContent = fmt.Sprintf("%d nodes", nodeCount)
+		nodeNugget := coloredNuggetStyle.Render(fmt.Sprintf("%d nodes", nodeCount))
+		sections = append(sections, nodeNugget)
 	}
 
-	// Right side: keyboard shortcuts
-	rightContent := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
+	leftBar := ""
+	leftWidth := 0
+	if len(sections) > 0 {
+		leftBar = lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+		leftWidth = lipgloss.Width(leftBar)
+	}
 
-	// Use the reusable status bar component
-	return renderStatusBar(width, leftContent, rightContent)
+	// Help text on the right
+	helpText := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
+	middleWidth := max(width-leftWidth-lipgloss.Width(helpText)-6, 1)
+	middle := lipgloss.NewStyle().Width(middleWidth).Render("")
+
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
+	return statusBarStyle.Width(width).Render(bar)
 }
 
 // renderOutputView displays output of the executed target
@@ -358,8 +398,20 @@ func (m Model) renderOutputView() string {
 		// Width(innerWidth)
 		Width(contentWidth)
 
-	// Status bar with shortcuts
-	statusBar := renderStatusBar(m.Width, "", "esc: return • q: quit")
+	// Status bar with lipgloss-style nuggets
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Background(BackgroundSubtle)
+
+	helpText := "esc: return • q: quit"
+	rightStyle := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Align(lipgloss.Right)
+
+	statusBar := statusBarStyle.
+		Width(m.Width).
+		Render(rightStyle.Render(helpText))
 
 	return "\n" + viewportStyle.Render(builder.String()) + "\n" + statusBar
 }

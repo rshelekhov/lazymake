@@ -47,18 +47,50 @@ func (m Model) renderWorkspaceList() string {
 		}
 	}
 
-	// Stats with badges
-	var leftContent string
-	if discoveredCount > 0 {
-		recentBadge := Badge(fmt.Sprintf("%d recent", recentCount), TextSecondary, BackgroundSubtle)
-		discoveredBadge := Badge(fmt.Sprintf("%d discovered", discoveredCount), TextSecondary, BackgroundSubtle)
-		leftContent = recentBadge + "  " + discoveredBadge
-	} else {
-		leftContent = Badge(fmt.Sprintf("%d workspaces", recentCount), TextSecondary, BackgroundSubtle)
-	}
-	rightContent := "enter: switch • f: favorite • esc/w: cancel • q: quit"
+	// Create status bar with background for entire bar
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Background(BackgroundSubtle)
 
-	statusBar := renderStatusBar(m.Width, leftContent, rightContent)
+	// Colored nugget style (only for first item)
+	coloredNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Background(PrimaryColor).
+		Padding(0, 1).
+		MarginRight(1)
+
+	// Plain nugget style (inherits status bar background, just text)
+	plainNuggetStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Padding(0, 1)
+
+	// Recent workspaces nugget (only colored one)
+	recentNugget := coloredNuggetStyle.Render(fmt.Sprintf("%d recent", recentCount))
+
+	var sections []string
+	sections = append(sections, recentNugget)
+
+	// Discovered workspaces (plain text on status bar background)
+	if discoveredCount > 0 {
+		discoveredInfo := plainNuggetStyle.Render(fmt.Sprintf("%d discovered", discoveredCount))
+		sections = append(sections, discoveredInfo)
+	}
+
+	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+	leftWidth := lipgloss.Width(leftBar)
+
+	// Help text on the right
+	helpText := "enter: switch • f: favorite • esc/w: cancel • q: quit"
+	middleWidth := max(m.Width-leftWidth-lipgloss.Width(helpText)-6, 1)
+	middle := lipgloss.NewStyle().Width(middleWidth).Render("")
+
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
+	statusBar := statusBarStyle.Width(m.Width).Render(bar)
 
 	return content + "\n" + statusBar
 }

@@ -77,8 +77,57 @@ func (m Model) renderVariablesView() string {
 		}
 	}
 
-	// Status bar with keyboard shortcuts
-	statusBar := renderStatusBar(m.Width, fmt.Sprintf("%d variables", totalVars), "v/esc: return • ↑↓/jk: navigate • q: quit")
+	// Status bar with background for entire bar
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Background(BackgroundSubtle)
+
+	// Colored nugget style (only for first item)
+	coloredNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Background(PrimaryColor).
+		Padding(0, 1).
+		MarginRight(1)
+
+	// Plain nugget style (inherits status bar background, just text)
+	plainNuggetStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Padding(0, 1)
+
+	// Total variables nugget (only colored one)
+	totalNugget := coloredNuggetStyle.Render(fmt.Sprintf("%d variables", totalVars))
+
+	var sections []string
+	sections = append(sections, totalNugget)
+
+	// Used variables (plain text on status bar background)
+	if usedVars > 0 {
+		usedInfo := plainNuggetStyle.Render(fmt.Sprintf("%d used", usedVars))
+		sections = append(sections, usedInfo)
+	}
+
+	// Unused variables (plain text on status bar background)
+	if unusedVars > 0 {
+		unusedInfo := plainNuggetStyle.Render(fmt.Sprintf("%d unused", unusedVars))
+		sections = append(sections, unusedInfo)
+	}
+
+	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+	leftWidth := lipgloss.Width(leftBar)
+
+	// Help text on the right
+	helpText := "v/esc: return • ↑↓/jk: navigate • q: quit"
+	middleWidth := max(m.Width-leftWidth-lipgloss.Width(helpText)-6, 1)
+	middle := lipgloss.NewStyle().Width(middleWidth).Render("")
+
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
+	statusBar := statusBarStyle.Width(m.Width).Render(bar)
+
 	util.WriteString(&builder, "\n"+statusBar)
 
 	return builder.String()

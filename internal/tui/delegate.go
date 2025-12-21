@@ -3,11 +3,13 @@ package tui
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
@@ -89,8 +91,8 @@ func NewItemDelegate() ItemDelegate {
 	return ItemDelegate{DefaultDelegate: d}
 }
 
-func (d ItemDelegate) Height() int  { return d.DefaultDelegate.Height() }
-func (d ItemDelegate) Spacing() int { return d.DefaultDelegate.Spacing() }
+func (d ItemDelegate) Height() int  { return 2 } // Base height, may expand for wrapped text
+func (d ItemDelegate) Spacing() int { return 1 }
 func (d ItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return d.DefaultDelegate.Update(msg, m)
 }
@@ -120,12 +122,14 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	// Handle regular target - customize title and description
+	// Handle regular target - custom rendering with text wrapping
 	target, ok := listItem.(Target)
 	if !ok {
-		d.DefaultDelegate.Render(w, m, index, listItem)
 		return
 	}
+
+	// Determine if this item is selected
+	isSelected := index == m.Index()
 
 	// Build title with icon prefix based on target status
 	var icon string
@@ -147,11 +151,13 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	}
 
 	// Build title with icon
-	title := target.Name
+	var titleParts []string
 	if icon != "" {
 		iconStyled := lipgloss.NewStyle().Foreground(iconColor).Render(icon)
-		title = iconStyled + " " + target.Name
+		titleParts = append(titleParts, iconStyled)
 	}
+	titleParts = append(titleParts, target.Name)
+	title := strings.Join(titleParts, " ")
 
 	// Build description with badge if needed
 	desc := target.Description
@@ -164,19 +170,54 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		}
 	}
 
-	// Use different description color for ## comments
-	if target.CommentType == makefile.CommentDouble {
-		// Temporarily modify the delegate styles for this item
-		if index == m.Index() {
-			d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(SecondaryColor)
-		} else {
-			d.Styles.NormalDesc = d.Styles.NormalDesc.Foreground(SecondaryColor)
+	// Select appropriate styles based on selection state
+	var titleStyle, descStyle lipgloss.Style
+	if isSelected {
+		titleStyle = d.Styles.SelectedTitle
+		descStyle = d.Styles.SelectedDesc.UnsetWidth() // Remove fixed width to prevent padding
+
+		// Use different description color for ## comments
+		if target.CommentType == makefile.CommentDouble {
+			descStyle = descStyle.Foreground(SecondaryColor)
+		}
+	} else {
+		titleStyle = d.Styles.NormalTitle
+		descStyle = d.Styles.NormalDesc.UnsetWidth() // Remove fixed width to prevent padding
+
+		// Use different description color for ## comments
+		if target.CommentType == makefile.CommentDouble {
+			descStyle = descStyle.Foreground(SecondaryColor)
 		}
 	}
 
-	// Create wrapper item and render using default delegate
-	item := targetItem{title: title, desc: desc}
-	d.DefaultDelegate.Render(w, m, index, item)
+	// Render title
+	var output strings.Builder
+	output.WriteString(titleStyle.Render(title))
+	output.WriteString("\n")
+
+	// Render description with wrapping
+	if desc != "" {
+		// Calculate available width for wrapping
+		// Account for list padding and any indentation
+		availableWidth := m.Width() - 4 // Leave some margin
+		if availableWidth < 20 {
+			availableWidth = 20 // Minimum width
+		}
+
+		// Wrap the description text
+		wrappedDesc := wordwrap.String(desc, availableWidth)
+		descLines := strings.Split(wrappedDesc, "\n")
+
+		// Render each line with the description style
+		for i, line := range descLines {
+			if i > 0 {
+				output.WriteString("\n")
+			}
+			output.WriteString(descStyle.Render(line))
+		}
+	}
+
+	fmt.Fprint(w, output.String())
 }
 
 // Modern icon constants - more consistent than emojis across terminals
