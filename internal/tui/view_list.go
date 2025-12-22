@@ -112,16 +112,13 @@ func (m Model) renderTargetList(width, height int) string {
 	return containerStyle.Render(placedContent)
 }
 
-// renderRecipePreview renders the right column with recipe and safety info
-func (m Model) renderRecipePreview(target *Target, width, height int) string {
-	if target == nil {
-		return renderEmptyPreview(width, height)
-	}
-
+// buildRecipeContent generates the full text content for the recipe preview
+// This is separate from rendering so we can set viewport content in the update cycle
+func (m Model) buildRecipeContent(target *Target, width int) string {
 	var builder strings.Builder
 
 	// Target name header with bottom border
-	contentWidth := width - 12 // Account for container padding and border
+	contentWidth := width - 8 // Match the viewport content width
 	header := lipgloss.NewStyle().
 		Foreground(PrimaryColor).
 		Bold(true).
@@ -192,20 +189,40 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		util.WriteString(&builder, perfSection)
 	}
 
-	// Padding(2,3) = 4 vertical + 6 horizontal
-	// Border = 2 vertical + 2 horizontal
-	// Total overhead: 6 vertical, 8 horizontal
-	containerContentWidth := width - 10
-	containerContentHeight := height - 8
+	return builder.String()
+}
 
-	// Use lipgloss.Place to force content into exact dimensions
-	placedContent := lipgloss.Place(
-		containerContentWidth,
-		containerContentHeight,
-		lipgloss.Left,
-		lipgloss.Top,
-		builder.String(),
-	)
+// renderRecipePreview renders the right column with recipe and safety info
+// The viewport content is set in the Update function, this just renders it
+func (m Model) renderRecipePreview(target *Target, width, height int) string {
+	if target == nil {
+		return renderEmptyPreview(width, height)
+	}
+
+	// Render viewport (content is set in Update function)
+	viewportContent := m.RecipeViewport.View()
+
+	// Add scroll percentage indicator at the bottom if content is scrollable
+	if m.RecipeViewport.TotalLineCount() > m.RecipeViewport.VisibleLineCount() {
+		scrollPercent := int(m.RecipeViewport.ScrollPercent() * 100)
+
+		// Calculate content width for proper alignment
+		contentWidth := width - 8 // Match viewport content width
+
+		// Create scroll indicator aligned to the right
+		scrollIndicator := lipgloss.NewStyle().
+			Foreground(TextMuted).
+			Width(contentWidth).
+			Align(lipgloss.Right).
+			Render(fmt.Sprintf("%d%%", scrollPercent))
+
+		// Append indicator below viewport content
+		viewportContent = lipgloss.JoinVertical(
+			lipgloss.Left,
+			viewportContent,
+			scrollIndicator,
+		)
+	}
 
 	// Apply modern border with increased padding
 	containerStyle := lipgloss.NewStyle().
@@ -214,7 +231,7 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		Padding(2, 3).
 		Margin(0, 0)
 
-	return containerStyle.Render(placedContent)
+	return containerStyle.Render(viewportContent)
 }
 
 // renderSafetyWarnings renders safety match information

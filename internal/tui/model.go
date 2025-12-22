@@ -37,10 +37,11 @@ const (
 
 type Model struct {
 	// UI Components
-	List     list.Model
-	Viewport viewport.Model
-	Progress progress.Model
-	Spinner  spinner.Model
+	List           list.Model
+	Viewport       viewport.Model // Used for output view
+	RecipeViewport viewport.Model // Used for recipe preview scrolling
+	Progress       progress.Model
+	Spinner        spinner.Model
 
 	// State
 	State           AppState

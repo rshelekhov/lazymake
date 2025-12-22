@@ -126,11 +126,27 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			// Navigate down, skipping over separators and headers
 			m = navigateToNextTarget(m, true)
+
+			// Update recipe viewport content for new selection
+			m = updateRecipeViewportContent(m)
 			return m, nil
 
 		case "up", "k":
 			// Navigate up, skipping over separators and headers
 			m = navigateToNextTarget(m, false)
+
+			// Update recipe viewport content for new selection
+			m = updateRecipeViewportContent(m)
+			return m, nil
+
+		case "ctrl+d":
+			// Scroll recipe preview down (vim-style half-page)
+			m.RecipeViewport.HalfViewDown()
+			return m, nil
+
+		case "ctrl+u":
+			// Scroll recipe preview up (vim-style half-page)
+			m.RecipeViewport.HalfViewUp()
 			return m, nil
 		}
 
@@ -147,6 +163,36 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		listHeight := msg.Height - 3 - 2
 
 		m.List.SetSize(listWidth, listHeight)
+
+		// Calculate right column dimensions for recipe viewport
+		// Use 35% for left (matching renderListView), rest for right
+		leftWidthPercent := 0.35
+		minLeftWidth := 35
+		calcLeftWidth := int(float64(msg.Width) * leftWidthPercent)
+		if calcLeftWidth < minLeftWidth && msg.Width >= minLeftWidth*2 {
+			calcLeftWidth = minLeftWidth
+		} else if calcLeftWidth < minLeftWidth {
+			calcLeftWidth = int(float64(msg.Width) * leftWidthPercent)
+		}
+		if calcLeftWidth < 10 {
+			calcLeftWidth = 10
+		}
+
+		// Estimate right width (actual will be measured during render, but this is close enough)
+		rightWidth := max(msg.Width-calcLeftWidth-1, 10)
+		availableHeight := msg.Height - 3 // Status bar height
+
+		// Initialize or resize recipe viewport
+		m.initRecipeViewport(rightWidth, availableHeight)
+
+		// Update viewport content for currently selected target
+		if selectedItem := m.List.SelectedItem(); selectedItem != nil {
+			if target, ok := selectedItem.(Target); ok {
+				content := m.buildRecipeContent(&target, rightWidth)
+				m.RecipeViewport.SetContent(content)
+				m.RecipeViewport.GotoTop()
+			}
+		}
 	}
 
 	var cmd tea.Cmd
@@ -175,6 +221,36 @@ func navigateToNextTarget(m Model, down bool) Model {
 				m.List.Select(i)
 				return m
 			}
+		}
+	}
+
+	return m
+}
+
+// updateRecipeViewportContent updates the recipe viewport content for the currently selected target
+func updateRecipeViewportContent(m Model) Model {
+	// Calculate right column width (matching renderListView logic)
+	leftWidthPercent := 0.35
+	minLeftWidth := 35
+	calcLeftWidth := int(float64(m.Width) * leftWidthPercent)
+	if calcLeftWidth < minLeftWidth && m.Width >= minLeftWidth*2 {
+		calcLeftWidth = minLeftWidth
+	} else if calcLeftWidth < minLeftWidth {
+		calcLeftWidth = int(float64(m.Width) * leftWidthPercent)
+	}
+	if calcLeftWidth < 10 {
+		calcLeftWidth = 10
+	}
+
+	// Estimate right width
+	rightWidth := max(m.Width-calcLeftWidth-1, 10)
+
+	// Update viewport content for currently selected target
+	if selectedItem := m.List.SelectedItem(); selectedItem != nil {
+		if target, ok := selectedItem.(Target); ok {
+			content := m.buildRecipeContent(&target, rightWidth)
+			m.RecipeViewport.SetContent(content)
+			m.RecipeViewport.GotoTop() // Auto-scroll to top on new selection
 		}
 	}
 
@@ -358,6 +434,19 @@ func (m *Model) resizeViewport() {
 	vw, vh := computeViewportSize(m.Width, m.Height)
 	m.Viewport.Width = vw
 	m.Viewport.Height = vh
+}
+
+// initRecipeViewport initializes the recipe preview viewport with given dimensions
+func (m *Model) initRecipeViewport(width, height int) {
+	// Calculate content dimensions using CORRECT values (matching left column)
+	contentWidth := width - 8   // 6 (padding) + 2 (border) = 8
+	contentHeight := height - 6 // 4 (padding) + 2 (border) = 6
+
+	m.RecipeViewport = viewport.New(contentWidth, contentHeight)
+	m.RecipeViewport.Style = lipgloss.NewStyle()
+
+	// Start at top (will auto-scroll on selection change)
+	m.RecipeViewport.YPosition = 0
 }
 
 func computeViewportSize(winWidth, winHeight int) (int, int) {
