@@ -72,7 +72,7 @@ var (
 				Foreground(TextSecondary).
 				Bold(true).
 				PaddingTop(1).
-				PaddingLeft(1)
+				PaddingLeft(2)
 
 	// SeparatorStyle is used for the line between sections
 	SeparatorStyle = lipgloss.NewStyle().
