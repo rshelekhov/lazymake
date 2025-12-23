@@ -202,26 +202,50 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 	// Render viewport (content is set in Update function)
 	viewportContent := m.RecipeViewport.View()
 
-	// Add scroll percentage indicator at the bottom if content is scrollable
+	// Calculate exact dimensions matching left column
+	contentWidth := width - 8   // Match left column: 6 (padding) + 2 (border)
+	contentHeight := height - 6 // Match left column: 4 (padding) + 2 (border)
+
+	// Force viewport content to exact dimensions (same as left column)
+	// This ensures both columns have identical heights
+	viewportContent = lipgloss.Place(
+		contentWidth,
+		contentHeight,
+		lipgloss.Left,
+		lipgloss.Top,
+		viewportContent,
+	)
+
+	// Overlay scroll percentage indicator at bottom-right if content is scrollable
 	if m.RecipeViewport.TotalLineCount() > m.RecipeViewport.VisibleLineCount() {
 		scrollPercent := int(m.RecipeViewport.ScrollPercent() * 100)
 
-		// Calculate content width for proper alignment
-		contentWidth := width - 8 // Match viewport content width
-
-		// Create scroll indicator aligned to the right
+		// Create compact scroll indicator
 		scrollIndicator := lipgloss.NewStyle().
 			Foreground(TextMuted).
-			Width(contentWidth).
-			Align(lipgloss.Right).
+			Background(lipgloss.AdaptiveColor{Light: "#F6F8FA", Dark: "#161B22"}).
+			Padding(0, 1).
 			Render(fmt.Sprintf("%d%%", scrollPercent))
 
-		// Append indicator below viewport content
-		viewportContent = lipgloss.JoinVertical(
-			lipgloss.Left,
-			viewportContent,
+		// Place indicator overlay at bottom-right
+		indicatorOverlay := lipgloss.Place(
+			contentWidth,
+			contentHeight,
+			lipgloss.Right,
+			lipgloss.Bottom,
 			scrollIndicator,
 		)
+
+		// Combine content and indicator using JoinHorizontal at each line
+		// This overlays the indicator on the last line
+		contentLines := strings.Split(viewportContent, "\n")
+		indicatorLines := strings.Split(indicatorOverlay, "\n")
+
+		// Replace the last line with the indicator overlay
+		if len(contentLines) == len(indicatorLines) && len(contentLines) > 0 {
+			contentLines[len(contentLines)-1] = indicatorLines[len(indicatorLines)-1]
+			viewportContent = strings.Join(contentLines, "\n")
+		}
 	}
 
 	// Apply modern border with increased padding
@@ -373,7 +397,7 @@ func (m Model) renderStatusBar() string {
 
 	// Yellow text style for regressed items
 	yellowNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("220")).
+		Foreground(WarningColor).
 		Padding(0, 1)
 
 	// Workspace path nugget (only colored one)
