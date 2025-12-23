@@ -443,25 +443,27 @@ func (m Model) renderStatusBar() string {
 		helpText = formatKeyBindings(m.KeyBindings)
 	}
 
-	// Middle section fills remaining space
-	middleWidth := max(m.Width-leftWidth-lipgloss.Width(helpText)-6, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
 	// Right section with help text
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Padding(0, 1).
 		Render(helpText)
+	rightWidth := lipgloss.Width(right)
+
+	// Middle section fills remaining space
+	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
+	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
+	middle := lipgloss.NewStyle().
+		Width(middleWidth).
+		Align(lipgloss.Left).
+		Render("")
 
 	// Combine all sections
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
 
 	return statusBarStyle.
 		Width(m.Width).
-		Padding(1, 0).
+		Padding(1, 1).
 		Render(bar)
 }
 
