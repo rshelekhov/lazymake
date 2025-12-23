@@ -183,31 +183,31 @@ func TestDefaultColorScheme(t *testing.T) {
 	scheme := defaultColorScheme()
 
 	// Verify all colors are set
-	if scheme.Keyword == "" {
+	if scheme.Keyword == nil {
 		t.Error("Keyword color should be set")
 	}
-	if scheme.String == "" {
+	if scheme.String == nil {
 		t.Error("String color should be set")
 	}
-	if scheme.Comment == "" {
+	if scheme.Comment == nil {
 		t.Error("Comment color should be set")
 	}
-	if scheme.Function == "" {
+	if scheme.Function == nil {
 		t.Error("Function color should be set")
 	}
-	if scheme.Number == "" {
+	if scheme.Number == nil {
 		t.Error("Number color should be set")
 	}
-	if scheme.Operator == "" {
+	if scheme.Operator == nil {
 		t.Error("Operator color should be set")
 	}
-	if scheme.Variable == "" {
+	if scheme.Variable == nil {
 		t.Error("Variable color should be set")
 	}
-	if scheme.Type == "" {
+	if scheme.Type == nil {
 		t.Error("Type color should be set")
 	}
-	if scheme.Default == "" {
+	if scheme.Default == nil {
 		t.Error("Default color should be set")
 	}
 }

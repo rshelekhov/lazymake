@@ -18,15 +18,15 @@ type Highlighter struct {
 
 // ColorScheme defines the colors for syntax highlighting
 type ColorScheme struct {
-	Keyword  lipgloss.Color // Keywords (if, for, def, func)
-	String   lipgloss.Color // String literals
-	Comment  lipgloss.Color // Comments
-	Function lipgloss.Color // Function names
-	Number   lipgloss.Color // Numeric literals
-	Operator lipgloss.Color // Operators (+, -, =, |)
-	Variable lipgloss.Color // Variables
-	Type     lipgloss.Color // Types
-	Default  lipgloss.Color // Default text
+	Keyword  lipgloss.TerminalColor // Keywords (if, for, def, func)
+	String   lipgloss.TerminalColor // String literals
+	Comment  lipgloss.TerminalColor // Comments
+	Function lipgloss.TerminalColor // Function names
+	Number   lipgloss.TerminalColor // Numeric literals
+	Operator lipgloss.TerminalColor // Operators (+, -, =, |)
+	Variable lipgloss.TerminalColor // Variables
+	Type     lipgloss.TerminalColor // Types
+	Default  lipgloss.TerminalColor // Default text
 }
 
 // NewHighlighter creates a new syntax highlighter with default settings
@@ -44,18 +44,18 @@ func NewHighlighter() *Highlighter {
 	}
 }
 
-// defaultColorScheme returns a monokai-inspired color scheme
+// defaultColorScheme returns a GitHub VS Code theme color scheme with adaptive light/dark support
 func defaultColorScheme() *ColorScheme {
 	return &ColorScheme{
-		Keyword:  lipgloss.Color("#FF79C6"), // Pink
-		String:   lipgloss.Color("#E6DB74"), // Yellow
-		Comment:  lipgloss.Color("#75715E"), // Gray
-		Function: lipgloss.Color("#A6E22E"), // Green
-		Number:   lipgloss.Color("#AE81FF"), // Purple
-		Operator: lipgloss.Color("#F92672"), // Red/Pink
-		Variable: lipgloss.Color("#FD971F"), // Orange
-		Type:     lipgloss.Color("#66D9EF"), // Cyan
-		Default:  lipgloss.Color("#F8F8F2"), // White
+		Keyword:  lipgloss.AdaptiveColor{Light: "#0000FF", Dark: "#569CD6"}, // Keywords (if, for, func)
+		String:   lipgloss.AdaptiveColor{Light: "#A31515", Dark: "#CE9178"}, // String literals
+		Comment:  lipgloss.AdaptiveColor{Light: "#008000", Dark: "#6A9955"}, // Comments
+		Function: lipgloss.AdaptiveColor{Light: "#795E26", Dark: "#C8C6BF"}, // Function names
+		Number:   lipgloss.AdaptiveColor{Light: "#098658", Dark: "#B5CEA8"}, // Numeric literals
+		Operator: lipgloss.AdaptiveColor{Light: "#000000", Dark: "#D4D4D4"}, // Operators (+, -, =)
+		Variable: lipgloss.AdaptiveColor{Light: "#001080", Dark: "#9CDCFE"}, // Variables
+		Type:     lipgloss.AdaptiveColor{Light: "#267F99", Dark: "#4EC9B0"}, // Types, classes
+		Default:  lipgloss.AdaptiveColor{Light: "#000000", Dark: "#D4D4D4"}, // Default text
 	}
 }
 
@@ -120,9 +120,9 @@ func (h *Highlighter) tokenToLipgloss(tokenType chroma.TokenType) lipgloss.Style
 }
 
 // getTokenColor returns the appropriate color for a token type
-func (h *Highlighter) getTokenColor(tokenType chroma.TokenType) lipgloss.Color {
+func (h *Highlighter) getTokenColor(tokenType chroma.TokenType) lipgloss.TerminalColor {
 	// Check exact token types first
-	if color := h.getExactTokenColor(tokenType); color != "" {
+	if color := h.getExactTokenColor(tokenType); color != nil {
 		return color
 	}
 
@@ -150,7 +150,7 @@ func (h *Highlighter) getTokenColor(tokenType chroma.TokenType) lipgloss.Color {
 }
 
 // getExactTokenColor returns color for exact token type matches
-func (h *Highlighter) getExactTokenColor(tokenType chroma.TokenType) lipgloss.Color {
+func (h *Highlighter) getExactTokenColor(tokenType chroma.TokenType) lipgloss.TerminalColor {
 	switch tokenType {
 	case chroma.Keyword:
 		return h.colorScheme.Keyword
@@ -169,7 +169,7 @@ func (h *Highlighter) getExactTokenColor(tokenType chroma.TokenType) lipgloss.Co
 	case chroma.NameClass, chroma.KeywordType:
 		return h.colorScheme.Type
 	default:
-		return ""
+		return nil
 	}
 }
 
