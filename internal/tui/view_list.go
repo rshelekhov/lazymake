@@ -223,7 +223,6 @@ func (m Model) renderRecipePreview(target *Target, width, height int) string {
 		// Create compact scroll indicator
 		scrollIndicator := lipgloss.NewStyle().
 			Foreground(TextMuted).
-			Background(lipgloss.AdaptiveColor{Light: "#F6F8FA", Dark: "#161B22"}).
 			Padding(0, 1).
 			Render(fmt.Sprintf("%d%%", scrollPercent))
 
