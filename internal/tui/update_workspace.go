@@ -51,12 +51,7 @@ func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-
-		// Calculate workspace list size (similar to main list)
-		listWidth := msg.Width - 4
-		listHeight := msg.Height - 6 // Account for title and status bar
-
-		m.WorkspaceList.SetSize(listWidth, listHeight)
+		// Note: list size is set in render function, not here
 	}
 
 	// Delegate to workspace list for navigation
@@ -182,18 +177,14 @@ func (m *Model) initWorkspacePicker() {
 	}
 
 	// Create list with workspace delegate
-	delegate := WorkspaceItemDelegate{}
+	delegate := NewWorkspaceItemDelegate()
 	l := list.New(items, delegate, 0, 0)
-	l.Title = "" // Don't show title - we render it manually in the view
+	l.Title = "Switch Workspace"
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
-
-	// Set list size based on current dimensions
-	listWidth := m.Width - 4
-	listHeight := m.Height - 6
-	l.SetSize(listWidth, listHeight)
+	// Note: list size is set in render function, not here
 
 	m.WorkspaceList = l
 }
