@@ -399,6 +399,36 @@ func (m Model) SwitchWorkspace(newMakefilePath string, cfg *config.Config) Model
 	newModel.Height = m.Height
 	newModel.WorkspaceManager = m.WorkspaceManager
 
+	// Initialize recipe viewport if dimensions are available
+	if newModel.Width > 0 && newModel.Height > 0 {
+		// Calculate dimensions for recipe viewport (matching update logic)
+		leftWidthPercent := 0.35
+		minLeftWidth := 35
+		leftWidth := int(float64(newModel.Width) * leftWidthPercent)
+		if leftWidth < minLeftWidth && newModel.Width >= minLeftWidth*2 {
+			leftWidth = minLeftWidth
+		} else if leftWidth < minLeftWidth {
+			leftWidth = int(float64(newModel.Width) * leftWidthPercent)
+		}
+		if leftWidth < 10 {
+			leftWidth = 10
+		}
+
+		rightWidth := max(newModel.Width-leftWidth-1, 10)
+		availableHeight := newModel.Height - 3 // Status bar height
+
+		newModel.initRecipeViewport(rightWidth, availableHeight)
+
+		// Set content for selected target (if any)
+		if selectedItem := newModel.List.SelectedItem(); selectedItem != nil {
+			if target, ok := selectedItem.(Target); ok {
+				content := newModel.buildRecipeContent(&target, rightWidth)
+				newModel.RecipeViewport.SetContent(content)
+				newModel.RecipeViewport.GotoTop()
+			}
+		}
+	}
+
 	// Record workspace access
 	if m.WorkspaceManager != nil {
 		m.WorkspaceManager.RecordAccess(newMakefilePath)
