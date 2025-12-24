@@ -361,22 +361,26 @@ func renderEmptyPreview(width, height int) string {
 
 // renderStatusBar renders the bottom status bar with colored nuggets (lipgloss-style)
 func (m Model) renderStatusBar() string {
-	// Count stats
+	// Count stats - use maps to track unique targets by name
 	totalTargets := 0
-	dangerousCount := 0
-	regressedCount := 0
+	dangerousTargets := make(map[string]bool)
+	regressedTargets := make(map[string]bool)
 
 	for _, item := range m.List.Items() {
 		if target, ok := item.(Target); ok {
 			totalTargets++
 			if target.IsDangerous {
-				dangerousCount++
+				dangerousTargets[target.Name] = true
 			}
 			if target.PerfStats != nil && target.PerfStats.IsRegressed {
-				regressedCount++
+				regressedTargets[target.Name] = true
 			}
 		}
 	}
+
+	// Get unique counts
+	dangerousCount := len(dangerousTargets)
+	regressedCount := len(regressedTargets)
 
 	// Base status bar style - with background for entire bar
 	statusBarStyle := lipgloss.NewStyle().
