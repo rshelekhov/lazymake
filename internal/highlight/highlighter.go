@@ -145,6 +145,15 @@ func (h *Highlighter) getTokenColor(tokenType chroma.TokenType) lipgloss.Termina
 	if tokenType.InCategory(chroma.Name) {
 		return h.colorScheme.Function
 	}
+	if tokenType.InCategory(chroma.Punctuation) {
+		return h.colorScheme.Default
+	}
+	if tokenType.InCategory(chroma.Text) {
+		return h.colorScheme.Default
+	}
+	if tokenType.InCategory(chroma.Literal) {
+		return h.colorScheme.Default
+	}
 
 	return h.colorScheme.Default
 }
