@@ -15,46 +15,58 @@ func (m Model) renderVariablesView() string {
 		return "Loading variable inspector..."
 	}
 
+	// Calculate available space
+	// Status bar takes 3 lines (border 2 + content 1)
+	statusBarHeight := 3
+	availableHeight := m.Height - statusBarHeight
+
+	// Build main content
+	content := m.buildVariablesContent(availableHeight)
+
+	// Wrap content in bordered container
+	contentWidth := m.Width - 2 // Account for border (2)
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(BorderColor).
+		Padding(2, 3).
+		Width(contentWidth)
+
+	borderedContent := containerStyle.Render(content)
+
+	// Render status bar
+	statusBar := m.renderVariablesStatusBar()
+
+	// Combine content and status bar
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		borderedContent,
+		statusBar,
+	)
+}
+
+// buildVariablesContent builds the main content for the variables view
+func (m Model) buildVariablesContent(availableHeight int) string {
 	var builder strings.Builder
 
 	// Title
 	title := TitleStyle.Render("Variable Inspector")
 	util.WriteString(&builder, title+"\n\n")
 
-	// Stats line with badges
 	totalVars := len(m.Variables)
-	usedVars := countUsedVariables(m.Variables)
-	unusedVars := totalVars - usedVars
-
-	statsStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Padding(0, 2)
-
-	totalBadge := lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Render(fmt.Sprintf("%d", totalVars))
-	usedBadge := Badge(fmt.Sprintf("%d used", usedVars), lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}, SuccessColor)
-	unusedBadge := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Render(fmt.Sprintf("%d unused", unusedVars))
-
-	stats := totalBadge + "  " + usedBadge + "  " + unusedBadge
-	util.WriteString(&builder, statsStyle.Render(stats)+"\n\n")
 
 	if totalVars == 0 {
 		// No variables found
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(TextMuted).
-			Italic(true).
-			Padding(0, 2)
+			Italic(true)
 		util.WriteString(&builder, emptyStyle.Render("No variables found in Makefile")+"\n\n")
 	} else {
 		// Render each variable
 		// Calculate how many variables can fit on screen
 		// Each variable block takes approximately 5-6 lines
-		// Leave space for title (2), stats (2), status bar (3) = 7 lines
-		availableHeight := m.Height - 7
-		varsPerScreen := max(1, availableHeight/6)
+		// Leave space for title (2), stats (2), border/padding (6) = 10 lines
+		contentHeight := availableHeight - 10
+		varsPerScreen := max(1, contentHeight/6)
 
 		// Calculate scroll offset to keep selected variable visible
 		startIdx := 0
@@ -70,21 +82,20 @@ func (m Model) renderVariablesView() string {
 			varBlock := renderVariableBlock(variable, selected)
 			util.WriteString(&builder, varBlock)
 		}
-
-		// Show scroll indicator if needed
-		if totalVars > varsPerScreen {
-			scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", startIdx+1, endIdx, totalVars)
-			scrollStyle := lipgloss.NewStyle().
-				Foreground(TextMuted).
-				Italic(true)
-			util.WriteString(&builder, "\n"+scrollStyle.Render(scrollInfo)+"\n")
-		}
 	}
 
-	// Status bar with background for entire bar
+	return builder.String()
+}
+
+// renderVariablesStatusBar renders the status bar for the variables view
+func (m Model) renderVariablesStatusBar() string {
+	totalVars := len(m.Variables)
+	usedVars := countUsedVariables(m.Variables)
+	unusedVars := totalVars - usedVars
+
+	// Base status bar style
 	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Background(BackgroundSubtle)
+		Foreground(TextPrimary)
 
 	// Colored nugget style (only for first item)
 	coloredNuggetStyle := lipgloss.NewStyle().
@@ -121,36 +132,63 @@ func (m Model) renderVariablesView() string {
 
 	// Help text on the right
 	helpText := "v/esc: return • ↑↓/jk: navigate • q: quit"
-	middleWidth := max(m.Width-leftWidth-lipgloss.Width(helpText)-6, 1)
-	middle := lipgloss.NewStyle().Width(middleWidth).Render("")
 
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Padding(0, 1).
 		Render(helpText)
+	rightWidth := lipgloss.Width(right)
 
+	// Middle section fills remaining space
+	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
+	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
+	middle := lipgloss.NewStyle().
+		Width(middleWidth).
+		Align(lipgloss.Left).
+		Render("")
+
+	// Combine all sections
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-	statusBar := statusBarStyle.Width(m.Width).Render(bar)
 
-	util.WriteString(&builder, "\n"+statusBar)
-
-	return builder.String()
+	return statusBarStyle.
+		Width(m.Width).
+		Padding(1, 1).
+		Render(bar)
 }
 
 // renderVariableBlock renders a single variable's information
 func renderVariableBlock(v variables.Variable, selected bool) string {
 	var builder strings.Builder
 
-	// Variable name with type badge
-	nameStyle := lipgloss.NewStyle().
-		Foreground(PrimaryColor).
-		Bold(true)
+	// Select appropriate styles based on selection state
+	var titleStyle, contentStyle lipgloss.Style
 
-	// Different style for selected variable
 	if selected {
-		nameStyle = nameStyle.
-			Background(PrimaryColor).
-			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"})
+		// Selected item with vertical border (matching target list)
+		titleStyle = lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderLeft(true).
+			BorderForeground(PrimaryColor).
+			PaddingLeft(1)
+
+		contentStyle = lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderLeft(true).
+			BorderForeground(PrimaryColor).
+			PaddingLeft(1)
+	} else {
+		// Normal item without border
+		titleStyle = lipgloss.NewStyle().
+			Foreground(TextPrimary).
+			Bold(true).
+			PaddingLeft(2)
+
+		contentStyle = lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			PaddingLeft(2)
 	}
 
 	// Type badge
@@ -165,31 +203,35 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		Foreground(TextMuted).
 		Render(v.Type.String())
 
-	varHeader := fmt.Sprintf("  %s  %s%s",
-		nameStyle.Render(v.Name),
-		typeBadge,
-		typeLabel,
-	)
-	util.WriteString(&builder, varHeader+"\n")
+	// Build title parts separately to preserve individual colors
+	// Use TextPrimary (white) for variable name, like target names in main view
+	var nameColor lipgloss.AdaptiveColor
+	if selected {
+		nameColor = PrimaryColor
+	} else {
+		nameColor = TextPrimary
+	}
+	nameStyled := lipgloss.NewStyle().Foreground(nameColor).Bold(true).Render(v.Name)
+	varHeader := nameStyled + "  " + typeBadge + typeLabel
 
-	// Indented content style
-	contentStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Padding(0, 4)
+	// Apply title style (border will be added if selected)
+	util.WriteString(&builder, titleStyle.Render(varHeader)+"\n")
+
+	// Detail lines with matching border
+	var details []string
 
 	// Raw value
 	if v.RawValue != "" {
 		rawLine := fmt.Sprintf("Raw:      %s", truncateValue(v.RawValue, 80))
-		util.WriteString(&builder, contentStyle.Render(rawLine)+"\n")
+		details = append(details, contentStyle.Render(rawLine))
 	}
 
 	// Expanded value (only if different from raw)
 	if v.ExpandedValue != "" && v.ExpandedValue != v.RawValue {
 		expandedLine := fmt.Sprintf("Expanded: %s", truncateValue(v.ExpandedValue, 80))
-		expandedStyle := lipgloss.NewStyle().
-			Foreground(SuccessColor).
-			Padding(0, 4)
-		util.WriteString(&builder, expandedStyle.Render(expandedLine)+"\n")
+		// Create style with success color but same border as content
+		expandedStyle := contentStyle.Foreground(SuccessColor)
+		details = append(details, expandedStyle.Render(expandedLine))
 	}
 
 	// Usage information
@@ -209,16 +251,16 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		}
 		usageLine += fmt.Sprintf(" (%d target%s)", usageCount, pluralize(usageCount))
 
-		usageStyle := lipgloss.NewStyle().
-			Foreground(SecondaryColor).
-			Padding(0, 4)
-		util.WriteString(&builder, usageStyle.Render(usageLine)+"\n")
+		// Keep the same gray color as other details (TextSecondary from contentStyle)
+		details = append(details, contentStyle.Render(usageLine))
 	} else {
-		unusedStyle := lipgloss.NewStyle().
-			Foreground(TextMuted).
-			Italic(true).
-			Padding(0, 4)
-		util.WriteString(&builder, unusedStyle.Render("Not used by any target")+"\n")
+		unusedStyle := contentStyle.Foreground(TextMuted).Italic(true)
+		details = append(details, unusedStyle.Render("Not used by any target"))
+	}
+
+	// Render all detail lines
+	for _, detail := range details {
+		util.WriteString(&builder, detail+"\n")
 	}
 
 	util.WriteString(&builder, "\n")
