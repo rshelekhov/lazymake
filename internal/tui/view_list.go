@@ -613,15 +613,15 @@ func renderVariablesSection(vars []string) string {
 
 	// Separator
 	separator := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Render(strings.Repeat("━", 50))
+		Foreground(BorderColor).
+		Render(strings.Repeat("─", 50))
 	util.WriteString(&builder, separator+"\n\n")
 
 	// Header
 	header := lipgloss.NewStyle().
 		Foreground(SecondaryColor).
 		Bold(true).
-		Render("📦 Variables Used")
+		Render("Variables Used")
 	util.WriteString(&builder, header+"\n\n")
 
 	// List variables (max 5, show "and N more")
@@ -642,9 +642,9 @@ func renderVariablesSection(vars []string) string {
 	// Hint to view all
 	util.WriteString(&builder, "\n")
 	hintStyle := lipgloss.NewStyle().
-		Foreground(SecondaryColor).
+		Foreground(TextMuted).
 		Italic(true)
-	util.WriteString(&builder, hintStyle.Render("💡 Press 'v' to view all variables")+"\n")
+	util.WriteString(&builder, hintStyle.Render(IconInfo+" Press 'v' to view all variables")+"\n")
 
 	return builder.String()
 }
