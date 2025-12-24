@@ -40,7 +40,6 @@ func Badge(text string, fgColor, bgColor lipgloss.AdaptiveColor) string {
 		Foreground(fgColor).
 		Background(bgColor).
 		Padding(0, 1).
-		Bold(true).
 		Render(text)
 }
 
