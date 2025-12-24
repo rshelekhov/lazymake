@@ -150,15 +150,6 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		iconColor = SecondaryColor
 	}
 
-	// Build title with icon
-	var titleParts []string
-	if icon != "" {
-		iconStyled := lipgloss.NewStyle().Foreground(iconColor).Render(icon)
-		titleParts = append(titleParts, iconStyled)
-	}
-	titleParts = append(titleParts, target.Name)
-	title := strings.Join(titleParts, " ")
-
 	// Build description with badge if needed
 	desc := target.Description
 	if shouldShowDurationBadge(target) {
@@ -172,9 +163,12 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	// Select appropriate styles based on selection state
 	var titleStyle, descStyle lipgloss.Style
+	var titleColor lipgloss.AdaptiveColor
+
 	if isSelected {
 		titleStyle = d.Styles.SelectedTitle
-		descStyle = d.Styles.SelectedDesc.UnsetWidth() // Remove fixed width to prevent padding
+		titleColor = PrimaryColor
+		descStyle = d.Styles.SelectedDesc.UnsetWidth()
 
 		// Use different description color for ## comments
 		if target.CommentType == makefile.CommentDouble {
@@ -182,7 +176,8 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		}
 	} else {
 		titleStyle = d.Styles.NormalTitle
-		descStyle = d.Styles.NormalDesc.UnsetWidth() // Remove fixed width to prevent padding
+		titleColor = TextPrimary
+		descStyle = d.Styles.NormalDesc.UnsetWidth()
 
 		// Use different description color for ## comments
 		if target.CommentType == makefile.CommentDouble {
@@ -190,7 +185,18 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		}
 	}
 
-	// Render title
+	// Build title with pre-colored parts (so titleStyle border works correctly)
+	var titleParts []string
+	if icon != "" {
+		iconStyled := lipgloss.NewStyle().Foreground(iconColor).Render(icon)
+		titleParts = append(titleParts, iconStyled)
+	}
+	// Pre-color the target name
+	nameStyled := lipgloss.NewStyle().Foreground(titleColor).Render(target.Name)
+	titleParts = append(titleParts, nameStyled)
+	title := strings.Join(titleParts, " ")
+
+	// Apply titleStyle - border/padding will be applied, Foreground won't affect pre-colored text
 	var output strings.Builder
 	output.WriteString(titleStyle.Render(title))
 	output.WriteString("\n")
@@ -208,7 +214,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		wrappedDesc := wordwrap.String(desc, availableWidth)
 		descLines := strings.Split(wrappedDesc, "\n")
 
-		// Render each line with the description style
+		// Render each line with the description style (includes border)
 		for i, line := range descLines {
 			if i > 0 {
 				output.WriteString("\n")
