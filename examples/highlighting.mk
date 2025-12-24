@@ -118,3 +118,134 @@ clean:
 	rm -rf dist/
 	go clean -cache
 	find . -name "*.test" -delete
+
+# =============================================================================
+# Full-Stack Web Application Build Pipeline (for demo screenshots)
+# Demonstrates: dependency graph, variables, syntax highlighting, parallel execution
+# =============================================================================
+
+# Build configuration variables
+VERSION := 1.2.3
+BUILD_DIR := ./dist
+FRONTEND_DIR := ./web/frontend
+BACKEND_DIR := ./cmd/server
+DOCKER_REGISTRY := registry.example.com
+export NODE_ENV := production
+export CGO_ENABLED := 0
+
+## Install all project dependencies
+install-deps:
+	@echo "Installing dependencies..."
+	npm install --prefix $(FRONTEND_DIR)
+	go mod download
+	go mod verify
+
+## Build React frontend application
+# language: javascript
+build-frontend: install-deps
+	@echo "Building frontend v$(VERSION)..."
+	cd $(FRONTEND_DIR) && npm run build
+	mkdir -p $(BUILD_DIR)/static
+	cp -r $(FRONTEND_DIR)/build/* $(BUILD_DIR)/static/
+
+## Build Go backend server
+build-backend: install-deps
+	@echo "Building backend v$(VERSION)..."
+	go build -ldflags="-s -w -X main.Version=$(VERSION)" \
+		-o $(BUILD_DIR)/server $(BACKEND_DIR)
+	chmod +x $(BUILD_DIR)/server
+
+## Run frontend tests with coverage
+test-frontend: build-frontend
+	cd $(FRONTEND_DIR) && npm run test -- --coverage --watchAll=false
+	cd $(FRONTEND_DIR) && npm run lint
+
+## Run backend tests and benchmarks
+test-backend: build-backend
+	go test -v -race -coverprofile=coverage.out ./...
+	go test -bench=. -benchmem ./internal/...
+	go vet ./...
+
+## Generate and optimize Docker image
+# language: docker
+build-docker: test-frontend test-backend
+	cat > $(BUILD_DIR)/Dockerfile << 'EOF'
+	FROM alpine:3.18
+	RUN apk add --no-cache ca-certificates tzdata
+	WORKDIR /app
+	COPY server /app/
+	COPY static /app/static/
+	EXPOSE 8080
+	USER nobody
+	CMD ["/app/server"]
+	EOF
+	docker build -t $(DOCKER_REGISTRY)/myapp:$(VERSION) $(BUILD_DIR)
+	docker tag $(DOCKER_REGISTRY)/myapp:$(VERSION) $(DOCKER_REGISTRY)/myapp:latest
+
+## Run integration tests
+# language: python
+test-integration: build-docker
+	#!/usr/bin/env python3
+	import requests
+	import time
+	import subprocess
+
+	# Start container
+	container = subprocess.Popen(
+		["docker", "run", "-p", "8080:8080", "--rm",
+		 f"$(DOCKER_REGISTRY)/myapp:$(VERSION)"],
+		stdout=subprocess.PIPE
+	)
+
+	time.sleep(3)  # Wait for startup
+
+	# Run integration tests
+	response = requests.get("http://localhost:8080/health")
+	assert response.status_code == 200
+	assert response.json()["version"] == "$(VERSION)"
+
+	container.terminate()
+	print("✓ Integration tests passed")
+
+## Deploy to Kubernetes cluster
+# language: yaml
+deploy-staging: test-integration
+	@echo "Deploying version $(VERSION) to staging..."
+	kubectl set image deployment/myapp \
+		myapp=$(DOCKER_REGISTRY)/myapp:$(VERSION) \
+		--namespace=staging
+	kubectl rollout status deployment/myapp --namespace=staging
+	kubectl get pods --namespace=staging -l app=myapp
+
+## Full production deployment with health checks
+deploy-production: test-integration
+	@echo "Deploying version $(VERSION) to production..."
+	helm upgrade --install myapp ./charts/myapp \
+		--set image.tag=$(VERSION) \
+		--set image.repository=$(DOCKER_REGISTRY)/myapp \
+		--set replicas=3 \
+		--namespace=production \
+		--wait --timeout=5m
+	kubectl get pods --namespace=production -l app=myapp
+	@echo "✓ Deployment complete: v$(VERSION)"
+
+## Database migration
+# language: sql
+migrate-db: deploy-staging
+	@echo "Running database migrations..."
+	psql $(DATABASE_URL) << 'EOF'
+	-- Create users table
+	CREATE TABLE IF NOT EXISTS users (
+	    id SERIAL PRIMARY KEY,
+	    email VARCHAR(255) UNIQUE NOT NULL,
+	    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Add indexes
+	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+	CREATE INDEX IF NOT EXISTS idx_users_created ON users(created_at);
+	EOF
+
+## Complete CI/CD pipeline (meta target)
+.PHONY: ci-pipeline
+ci-pipeline: build-frontend build-backend test-frontend test-backend build-docker test-integration deploy-staging
