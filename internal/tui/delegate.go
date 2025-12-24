@@ -66,7 +66,7 @@ func NewItemDelegate() ItemDelegate {
 		BorderForeground(PrimaryColor)
 
 	d.Styles.SelectedDesc = d.Styles.SelectedDesc.
-		Foreground(SecondaryColor).
+		Foreground(TextMuted).
 		BorderForeground(PrimaryColor)
 
 	// Normal items
@@ -74,7 +74,7 @@ func NewItemDelegate() ItemDelegate {
 		Foreground(TextPrimary)
 
 	d.Styles.NormalDesc = d.Styles.NormalDesc.
-		Foreground(TextSecondary)
+		Foreground(TextMuted)
 
 	// Dimmed (when filtering)
 	d.Styles.DimmedTitle = d.Styles.DimmedTitle.
