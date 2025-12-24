@@ -312,7 +312,7 @@ func (m Model) renderGraphStatusBar(width int) string {
 
 	// Colored nugget style (only for first item)
 	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
 		Background(PrimaryColor).
 		Padding(0, 1).
 		MarginRight(1)
