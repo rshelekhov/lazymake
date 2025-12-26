@@ -142,6 +142,9 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	case target.IsDangerous && target.DangerLevel == safety.SeverityWarning:
 		icon = IconDangerWarning
 		iconColor = WarningColor
+	case target.IsDangerous && target.DangerLevel == safety.SeverityInfo:
+		icon = "○" // Blue circle for info
+		iconColor = SecondaryColor
 	case target.PerfStats != nil && target.PerfStats.IsRegressed:
 		icon = IconRegression
 		iconColor = WarningColor
@@ -228,8 +231,8 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 // Modern icon constants - more consistent than emojis across terminals
 const (
-	IconDangerCritical = "●" // Filled circle
-	IconDangerWarning  = "○" // Empty circle
+	IconDangerCritical = "○" // Empty circle (red outline)
+	IconDangerWarning  = "○" // Empty circle (yellow outline)
 	IconRegression     = "↑" // Up arrow (performance up = bad)
 	IconRecent         = "◆" // Diamond
 	IconFavorite       = "★" // Star

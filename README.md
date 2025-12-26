@@ -166,9 +166,9 @@ Recording instructions:
 1. Terminal size: 100x30
 2. Use examples/dangerous.mk for demo
 3. Sequence:
-   - Show list with 🚨 and ⚠️ indicators (3s)
-   - Select a 🚨 critical target (2s)
-   - Show recipe preview with danger warning (3s)
+   - Show list with colored circle indicators (red, yellow, blue) (3s)
+   - Select a red circle (critical) target (2s)
+   - Show recipe preview with danger warning in bordered box (3s)
    - Press Enter to trigger confirmation dialog (2s)
    - Show full warning dialog (4s)
    - Press ESC to cancel (1s)
@@ -177,12 +177,13 @@ Recording instructions:
 
 ![Safety Features](docs/assets/safety-features.gif)
 
-Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels in the target list.
+Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels with colored circles in the target list.
 
 **Key features:**
+- Three severity levels - Critical (red ○), Warning (yellow ○), Info (blue ○)
 - Critical commands require confirmation - prevents irreversible mistakes
-- Warning indicators for risky operations
-- Context-aware detection - adjusts severity based on target name
+- Context-aware detection - adjusts severity based on target name and environment
+- Detailed warnings in bordered boxes - matched commands, descriptions, and suggestions
 - Customizable rules - add project-specific patterns
 
 [Full documentation](docs/features/safety-features.md)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/rshelekhov/lazymake/internal/safety"
 	"github.com/rshelekhov/lazymake/internal/util"
 )
@@ -266,6 +267,12 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			util.WriteString(&builder, "\n")
 		}
 
+		// Separator before each warning
+		separator := lipgloss.NewStyle().
+			Foreground(BorderColor).
+			Render(strings.Repeat("─", 50))
+		util.WriteString(&builder, separator+"\n\n")
+
 		// Severity indicator and rule ID with modern icons
 		var severityStr string
 		var severityIcon string
@@ -273,16 +280,16 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 
 		switch match.Severity {
 		case safety.SeverityCritical:
-			severityIcon = IconDangerCritical
-			severityStr = "CRITICAL"
+			severityIcon = "○" // Empty circle (red)
+			severityStr = "Critical"
 			severityColor = ErrorColor
 		case safety.SeverityWarning:
-			severityIcon = IconDangerWarning
-			severityStr = "WARNING"
+			severityIcon = "○" // Empty circle (yellow)
+			severityStr = "Warning"
 			severityColor = WarningColor
 		case safety.SeverityInfo:
-			severityIcon = IconInfo
-			severityStr = "INFO"
+			severityIcon = "○" // Empty circle (blue)
+			severityStr = "Info"
 			severityColor = SecondaryColor
 		}
 
@@ -291,36 +298,59 @@ func renderSafetyWarnings(matches []safety.MatchResult) string {
 			Bold(true).
 			Render(severityIcon)
 
-		severityBadge := StatusPill(strings.ToLower(severityStr))
+		// Use text without background (no badge) for all severity levels
+		severityBadge := lipgloss.NewStyle().
+			Foreground(severityColor).
+			Bold(true).
+			Render(severityStr)
 
-		severityHeader := icon + " " + severityBadge + " " +
-			lipgloss.NewStyle().
-				Foreground(TextSecondary).
-				Render(match.Rule.ID)
-		util.WriteString(&builder, severityHeader+"\n")
+		// Build box content with word wrapping
+		// Max width for text (accounting for border and padding)
+		maxWidth := 70
+		var boxContent strings.Builder
+
+		// Header (inside box now)
+		header := icon + " " + severityBadge + " " + lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Render(match.Rule.ID)
+		util.WriteString(&boxContent, header+"\n")
 
 		// Matched line
 		if match.MatchedLine != "" {
-			matchedStyle := lipgloss.NewStyle().
-				Foreground(TextMuted).
-				Render("Matched: " + match.MatchedLine)
-			util.WriteString(&builder, matchedStyle+"\n")
+			util.WriteString(&boxContent, "\n")
+			matchedLine := fmt.Sprintf("Matched: %s", match.MatchedLine)
+			wrappedMatched := wordwrap.String(matchedLine, maxWidth)
+			util.WriteString(&boxContent, wrappedMatched+"\n")
 		}
 
 		// Description
 		if match.Rule.Description != "" {
-			descStyle := lipgloss.NewStyle().
-				Foreground(TextSecondary)
-			util.WriteString(&builder, descStyle.Render(match.Rule.Description)+"\n")
+			util.WriteString(&boxContent, "\n")
+			wrappedDesc := wordwrap.String(match.Rule.Description, maxWidth)
+			util.WriteString(&boxContent, wrappedDesc)
 		}
 
-		// Suggestion
+		// Suggestion (inside the box now)
 		if match.Rule.Suggestion != "" {
-			suggestionStyle := lipgloss.NewStyle().
-				Foreground(SecondaryColor).
-				Italic(true)
-			util.WriteString(&builder, suggestionStyle.Render(IconInfo+" "+match.Rule.Suggestion)+"\n")
+			util.WriteString(&boxContent, "\n\n")
+			suggestionLine := IconInfo + " " + match.Rule.Suggestion
+			wrappedSuggestion := wordwrap.String(suggestionLine, maxWidth)
+			suggestionText := lipgloss.NewStyle().
+				Foreground(TextMuted).
+				Italic(true).
+				Render(wrappedSuggestion)
+			util.WriteString(&boxContent, suggestionText)
 		}
+
+		// Render box with border
+		safetyBox := lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(BorderColor).
+			Padding(1, 2).
+			Render(boxContent.String())
+
+		util.WriteString(&builder, safetyBox+"\n")
 	}
 
 	return builder.String()
@@ -364,13 +394,18 @@ func (m Model) renderStatusBar() string {
 	// Count stats - use maps to track unique targets by name
 	totalTargets := 0
 	dangerousTargets := make(map[string]bool)
+	criticalTargets := make(map[string]bool)
 	regressedTargets := make(map[string]bool)
 
 	for _, item := range m.List.Items() {
 		if target, ok := item.(Target); ok {
 			totalTargets++
 			if target.IsDangerous {
-				dangerousTargets[target.Name] = true
+				if target.DangerLevel == safety.SeverityCritical {
+					criticalTargets[target.Name] = true
+				} else {
+					dangerousTargets[target.Name] = true
+				}
 			}
 			if target.PerfStats != nil && target.PerfStats.IsRegressed {
 				regressedTargets[target.Name] = true
@@ -380,6 +415,7 @@ func (m Model) renderStatusBar() string {
 
 	// Get unique counts
 	dangerousCount := len(dangerousTargets)
+	criticalCount := len(criticalTargets)
 	regressedCount := len(regressedTargets)
 
 	// Base status bar style - with background for entire bar
@@ -416,8 +452,16 @@ func (m Model) renderStatusBar() string {
 
 	// Dangerous count - only if there are dangerous targets
 	if dangerousCount > 0 {
-		dangerInfo := plainNuggetStyle.Render(fmt.Sprintf("%d dangerous", dangerousCount))
+		dangerIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
+		dangerInfo := plainNuggetStyle.Render(fmt.Sprintf("%s %d dangerous", dangerIcon, dangerousCount))
 		sections = append(sections, dangerInfo)
+	}
+
+	// Critical count - only if there are critical targets
+	if criticalCount > 0 {
+		criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
+		criticalInfo := plainNuggetStyle.Render(fmt.Sprintf("%s %d critical", criticalIcon, criticalCount))
+		sections = append(sections, criticalInfo)
 	}
 
 	// Regressed count with yellow text - only if there are regressed targets
@@ -435,9 +479,11 @@ func (m Model) renderStatusBar() string {
 	if item := m.List.SelectedItem(); item != nil {
 		if target, ok := item.(Target); ok && target.IsDangerous {
 			if target.DangerLevel == safety.SeverityCritical {
-				helpText = "⚠️  Dangerous • enter: confirm • esc: cancel • q: quit"
+				criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
+				helpText = criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
 			} else {
-				helpText = formatKeyBindings(m.KeyBindings)
+				dangerIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
+				helpText = dangerIcon + " Dangerous • enter: confirm • esc: cancel • q: quit"
 			}
 		} else {
 			helpText = formatKeyBindings(m.KeyBindings)
