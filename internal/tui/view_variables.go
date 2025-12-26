@@ -61,25 +61,12 @@ func (m Model) buildVariablesContent(availableHeight int) string {
 			Italic(true)
 		util.WriteString(&builder, emptyStyle.Render("No variables found in Makefile")+"\n\n")
 	} else {
-		// Render each variable
-		// Calculate how many variables can fit on screen
-		// Each variable block takes approximately 5-6 lines
-		// Leave space for title (2), stats (2), border/padding (6) = 10 lines
-		contentHeight := availableHeight - 10
-		varsPerScreen := max(1, contentHeight/6)
-
-		// Calculate scroll offset to keep selected variable visible
-		startIdx := 0
-		if m.VariableListIndex >= varsPerScreen {
-			startIdx = m.VariableListIndex - varsPerScreen + 1
-		}
-
-		endIdx := min(startIdx+varsPerScreen, totalVars)
-
-		for i := startIdx; i < endIdx; i++ {
-			variable := m.Variables[i]
-			selected := i == m.VariableListIndex
-			varBlock := renderVariableBlock(variable, selected)
+		// Render all variables (no selection/navigation)
+		for i, variable := range m.Variables {
+			if i > 0 {
+				util.WriteString(&builder, "\n") // Separator between variables
+			}
+			varBlock := renderVariableBlock(variable)
 			util.WriteString(&builder, varBlock)
 		}
 	}
@@ -131,7 +118,7 @@ func (m Model) renderVariablesStatusBar() string {
 	leftWidth := lipgloss.Width(leftBar)
 
 	// Help text on the right
-	helpText := "v/esc: return • ↑↓/jk: navigate • q: quit"
+	helpText := "v/esc: return • q: quit"
 
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
@@ -157,39 +144,16 @@ func (m Model) renderVariablesStatusBar() string {
 }
 
 // renderVariableBlock renders a single variable's information
-func renderVariableBlock(v variables.Variable, selected bool) string {
+func renderVariableBlock(v variables.Variable) string {
 	var builder strings.Builder
 
-	// Select appropriate styles based on selection state
-	var titleStyle, contentStyle lipgloss.Style
+	// Simple styles without selection (no border, no padding)
+	titleStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Bold(true)
 
-	if selected {
-		// Selected item with vertical border (matching target list)
-		titleStyle = lipgloss.NewStyle().
-			Foreground(PrimaryColor).
-			Bold(true).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderLeft(true).
-			BorderForeground(PrimaryColor).
-			PaddingLeft(1)
-
-		contentStyle = lipgloss.NewStyle().
-			Foreground(TextSecondary).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderLeft(true).
-			BorderForeground(PrimaryColor).
-			PaddingLeft(1)
-	} else {
-		// Normal item without border
-		titleStyle = lipgloss.NewStyle().
-			Foreground(TextPrimary).
-			Bold(true).
-			PaddingLeft(2)
-
-		contentStyle = lipgloss.NewStyle().
-			Foreground(TextSecondary).
-			PaddingLeft(2)
-	}
+	contentStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary)
 
 	// Type badge
 	typeBadge := ""
@@ -203,21 +167,17 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		Foreground(TextMuted).
 		Render(v.Type.String())
 
-	// Build title parts separately to preserve individual colors
-	// Use TextPrimary (white) for variable name, like target names in main view
-	var nameColor lipgloss.AdaptiveColor
-	if selected {
-		nameColor = PrimaryColor
-	} else {
-		nameColor = TextPrimary
-	}
-	nameStyled := lipgloss.NewStyle().Foreground(nameColor).Bold(true).Render(v.Name)
-	varHeader := nameStyled + "  " + typeBadge + typeLabel
+	// Variable name in white (like target names)
+	nameStyled := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Bold(true).
+		Render(v.Name)
+	varHeader := nameStyled + " " + typeBadge + typeLabel
 
-	// Apply title style (border will be added if selected)
+	// Render title
 	util.WriteString(&builder, titleStyle.Render(varHeader)+"\n")
 
-	// Detail lines with matching border
+	// Detail lines
 	var details []string
 
 	// Raw value
@@ -229,7 +189,7 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 	// Expanded value (only if different from raw)
 	if v.ExpandedValue != "" && v.ExpandedValue != v.RawValue {
 		expandedLine := fmt.Sprintf("Expanded: %s", truncateValue(v.ExpandedValue, 80))
-		// Create style with success color but same border as content
+		// Use success color for expanded value
 		expandedStyle := contentStyle.Foreground(SuccessColor)
 		details = append(details, expandedStyle.Render(expandedLine))
 	}
@@ -251,7 +211,6 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 		}
 		usageLine += fmt.Sprintf(" (%d target%s)", usageCount, pluralize(usageCount))
 
-		// Keep the same gray color as other details (TextSecondary from contentStyle)
 		details = append(details, contentStyle.Render(usageLine))
 	} else {
 		unusedStyle := contentStyle.Foreground(TextMuted).Italic(true)
@@ -262,8 +221,6 @@ func renderVariableBlock(v variables.Variable, selected bool) string {
 	for _, detail := range details {
 		util.WriteString(&builder, detail+"\n")
 	}
-
-	util.WriteString(&builder, "\n")
 
 	return builder.String()
 }

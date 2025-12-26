@@ -39,8 +39,6 @@ Complete reference of all keyboard shortcuts in lazymake, organized by view.
 |-----|--------|
 | `v` | Return to list view |
 | `Esc` | Return to list view |
-| `↑` / `↓` | Navigate up/down through variables |
-| `j` / `k` | Vim-style navigation (up/down) |
 | `q` | Quit lazymake |
 | `Ctrl+C` | Quit lazymake |
 

@@ -325,7 +325,7 @@ lazymake -f path/to/Makefile
 
 | Key | Action | View |
 |-----|--------|------|
-| `↑/↓` or `j/k` | Navigate | All |
+| `↑/↓` or `j/k` | Navigate | Main list, Output, Workspace picker |
 | `Enter` | Execute target | Main list |
 | `g` | View dependency graph | Main list |
 | `v` | View variable inspector | Main list |

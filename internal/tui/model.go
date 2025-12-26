@@ -59,8 +59,7 @@ type Model struct {
 	ShowParallel bool   // Show parallel markers
 
 	// Variable inspector state
-	Variables         []variables.Variable
-	VariableListIndex int
+	Variables []variables.Variable
 
 	// History state
 	History       *history.History
@@ -305,12 +304,11 @@ func NewModel(cfg *config.Config) Model {
 		Targets:           tuiTargets,
 		Graph:             depGraph,
 		GraphDepth:        -1,
-		ShowOrder:         true,
-		ShowCritical:      true,
-		ShowParallel:      true,
-		Variables:         vars,
-		VariableListIndex: 0,
-		History:           hist,
+		ShowOrder:    true,
+		ShowCritical: true,
+		ShowParallel: true,
+		Variables:    vars,
+		History:      hist,
 		MakefilePath:      absPath,
 		RecentTargets:     recentTargets,
 		Exporter:          exporter,

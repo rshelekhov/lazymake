@@ -73,7 +73,6 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "v":
 			// Toggle variable inspector view
 			m.State = StateVariables
-			m.VariableListIndex = 0
 			return m, nil
 
 		case "w":
@@ -558,18 +557,6 @@ func (m Model) updateVariables(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Return to list view
 			m.State = StateList
 			return m, nil
-
-		case "up", "k":
-			// Navigate up in variable list
-			if m.VariableListIndex > 0 {
-				m.VariableListIndex--
-			}
-
-		case "down", "j":
-			// Navigate down in variable list
-			if m.VariableListIndex < len(m.Variables)-1 {
-				m.VariableListIndex++
-			}
 		}
 
 	case tea.WindowSizeMsg:
