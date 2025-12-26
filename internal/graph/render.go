@@ -11,12 +11,12 @@ import (
 type TreeRenderer struct {
 	ShowOrder    bool // Show execution order numbers [1] [2] [3]
 	ShowCritical bool // Show critical path marker ★
-	ShowParallel bool // Show parallel marker ∥
+	ShowParallel bool // Show parallel marker ||
 
 	// Optional formatting functions for colored output
 	FormatOrder    func(string) string // Format execution order [N]
 	FormatCritical func(string) string // Format critical path marker ★
-	FormatParallel func(string) string // Format parallel marker ∥
+	FormatParallel func(string) string // Format parallel marker ||
 }
 
 // RenderTree returns a string representation of the graph as an ASCII tree
@@ -30,9 +30,9 @@ type TreeRenderer struct {
 // Example output:
 //
 //	all [3] ★
-//	├── build [2] ∥
+//	├── build [2] ||
 //	│   └── deps [1]
-//	└── test [2] ∥
+//	└── test [2] ||
 //	    └── deps [1] (see above)
 func (g *Graph) RenderTree(renderer TreeRenderer) string {
 	var builder strings.Builder
@@ -128,9 +128,9 @@ func renderNode(
 //	"build"                    (just the name)
 //	"build [2]"                (with order)
 //	"build [2] ★"              (order + critical)
-//	"build [2] ★ ∥"            (order + critical + parallel)
+//	"build [2] ★ ||"           (order + critical + parallel)
 //	"build — Build the app"    (with description)
-//	"build [2] ★ ∥ — Build"    (everything!)
+//	"build [2] ★ || — Build"   (everything!)
 func buildNodeString(node *Node, renderer TreeRenderer) string {
 	var parts []string
 
@@ -155,9 +155,9 @@ func buildNodeString(node *Node, renderer TreeRenderer) string {
 		parts = append(parts, criticalStr)
 	}
 
-	// Add parallel marker ∥
+	// Add parallel marker ||
 	if renderer.ShowParallel && node.CanParallel {
-		parallelStr := "∥"
+		parallelStr := "||"
 		if renderer.FormatParallel != nil {
 			parallelStr = renderer.FormatParallel(parallelStr)
 		}
@@ -176,7 +176,7 @@ func buildNodeString(node *Node, renderer TreeRenderer) string {
 
 // RenderLegend returns a legend explaining the symbols used in the tree
 //
-// Example: "Legend: [N] = execution order, ★ = critical path, ∥ = can run in parallel"
+// Example: "Legend: [N] = execution order, ★ = critical path, || = can run in parallel"
 func RenderLegend(showOrder, showCritical, showParallel bool) string {
 	var parts []string
 
@@ -187,7 +187,7 @@ func RenderLegend(showOrder, showCritical, showParallel bool) string {
 		parts = append(parts, "★ = critical path")
 	}
 	if showParallel {
-		parts = append(parts, "∥ = can run in parallel")
+		parts = append(parts, "|| = can run in parallel")
 	}
 
 	if len(parts) == 0 {

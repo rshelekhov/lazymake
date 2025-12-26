@@ -269,7 +269,7 @@ func (m Model) renderGraphContent(width int) string {
 			item := lipgloss.NewStyle().
 				Foreground(SuccessColor). // Green
 				Bold(true).
-				Render(" ∥ ") +
+				Render("|| ") +
 				"  " +
 				lipgloss.NewStyle().
 					Foreground(TextPrimary).
@@ -287,69 +287,6 @@ func (m Model) renderGraphContent(width int) string {
 		Width(width - 2) // Account for border (2)
 
 	return containerStyle.Render(builder.String())
-}
-
-// renderGraphLegend renders an enhanced legend with color-coded symbols
-func (m Model) renderGraphLegend(width int) string {
-	if !m.ShowOrder && !m.ShowCritical && !m.ShowParallel {
-		return "" // Skip if no annotations enabled
-	}
-
-	var builder strings.Builder
-
-	// Build legend items with colors
-	var items []string
-
-	if m.ShowOrder {
-		item := lipgloss.NewStyle().
-			Foreground(SecondaryColor).
-			Bold(true).
-			Render("[N]") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextPrimary).
-				Render("Execution Order")
-		items = append(items, item)
-	}
-
-	if m.ShowCritical {
-		item := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFD700")). // Gold
-			Bold(true).
-			Render(" ★ ") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextPrimary).
-				Render("Critical Path")
-		items = append(items, item)
-	}
-
-	if m.ShowParallel {
-		item := lipgloss.NewStyle().
-			Foreground(SuccessColor). // Green
-			Bold(true).
-			Render(" ∥ ") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextPrimary).
-				Render("Parallel Execution")
-		items = append(items, item)
-	}
-
-	// Join items
-	for _, item := range items {
-		util.WriteString(&builder, item+"\n")
-	}
-
-	// Apply border
-	// Set width to full terminal width minus border
-	legendStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(width - 2) // Account for border (2)
-
-	return legendStyle.Render(builder.String())
 }
 
 // renderGraphStatusBar renders the keyboard controls in status bar format

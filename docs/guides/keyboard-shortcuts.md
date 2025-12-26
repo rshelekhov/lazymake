@@ -29,7 +29,7 @@ Complete reference of all keyboard shortcuts in lazymake, organized by view.
 | `_` | Show fewer dependency levels (alternate) |
 | `o` | Toggle execution order numbers `[N]` |
 | `c` | Toggle critical path markers `★` |
-| `p` | Toggle parallel opportunity markers `∥` |
+| `p` | Toggle parallel opportunity markers `||` |
 | `q` | Quit lazymake |
 | `Ctrl+C` | Quit lazymake |
 

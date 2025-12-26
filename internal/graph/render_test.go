@@ -114,8 +114,8 @@ func TestRenderTreeWithAnnotations(t *testing.T) {
 		t.Error("Should contain critical path marker")
 	}
 
-	// Should contain parallel marker ∥ (build and test can run in parallel)
-	if !strings.Contains(output, "∥") {
+	// Should contain parallel marker || (build and test can run in parallel)
+	if !strings.Contains(output, "||") {
 		t.Error("Should contain parallel marker")
 	}
 }
