@@ -478,12 +478,16 @@ func (m Model) renderStatusBar() string {
 	var helpText string
 	if item := m.List.SelectedItem(); item != nil {
 		if target, ok := item.(Target); ok && target.IsDangerous {
-			if target.DangerLevel == safety.SeverityCritical {
+			switch target.DangerLevel {
+			case safety.SeverityCritical:
 				criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
 				helpText = criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
-			} else {
-				dangerIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
-				helpText = dangerIcon + " Dangerous • enter: confirm • esc: cancel • q: quit"
+			case safety.SeverityWarning:
+				warningIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
+				helpText = warningIcon + " Warning • enter: run • esc: cancel • q: quit"
+			case safety.SeverityInfo:
+				infoIcon := lipgloss.NewStyle().Foreground(SecondaryColor).Render("○")
+				helpText = infoIcon + " Info • enter: run • esc: cancel • q: quit"
 			}
 		} else {
 			helpText = formatKeyBindings(m.KeyBindings)
