@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/rshelekhov/lazymake/internal/safety"
 	"github.com/rshelekhov/lazymake/internal/util"
 )
@@ -18,18 +20,11 @@ func (m Model) renderConfirmView() string {
 
 	var builder strings.Builder
 
-	// Title with modern icon
-	icon := lipgloss.NewStyle().
-		Foreground(ErrorColor).
-		Bold(true).
-		Render(IconDangerCritical)
-
-	titleBadge := StatusPill("error")
-
+	// Title without padding (like "RECENT" or "ALL TARGETS" but without left padding)
 	title := lipgloss.NewStyle().
+		Foreground(TextSecondary).
 		Bold(true).
-		Foreground(TextPrimary).
-		Render(icon + " DANGEROUS COMMAND " + titleBadge)
+		Render("DANGEROUS COMMAND")
 	util.WriteString(&builder, title+"\n\n")
 
 	// Target name
@@ -71,36 +66,60 @@ func (m Model) renderConfirmView() string {
 				Bold(true).
 				Render(severityIcon)
 
-			badge := StatusPill(severityStr)
+			// Use text without background (no badge) for severity level
+			severityBadge := lipgloss.NewStyle().
+				Foreground(severityColor).
+				Bold(true).
+				Render(severityStr)
 
-			ruleHeader := icon + " " + badge + " " +
+			// Build box content with word wrapping
+			// Max width for text (accounting for dialog border/padding + box border/padding)
+			maxWidth := 60
+			var boxContent strings.Builder
+
+			// Header (inside box now)
+			header := icon + " " + severityBadge + " " +
 				lipgloss.NewStyle().
 					Foreground(TextSecondary).
 					Render(match.Rule.ID)
-			util.WriteString(&builder, ruleHeader+"\n")
+			util.WriteString(&boxContent, header+"\n")
 
 			// Matched command
 			if match.MatchedLine != "" {
-				matchedStyle := lipgloss.NewStyle().
-					Foreground(TextMuted).
-					Render("Command: " + match.MatchedLine)
-				util.WriteString(&builder, matchedStyle+"\n")
+				util.WriteString(&boxContent, "\n")
+				matchedLine := fmt.Sprintf("Command: %s", match.MatchedLine)
+				wrappedMatched := wordwrap.String(matchedLine, maxWidth)
+				util.WriteString(&boxContent, wrappedMatched+"\n")
 			}
 
 			// Description
 			if match.Rule.Description != "" {
-				descStyle := lipgloss.NewStyle().
-					Foreground(TextSecondary)
-				util.WriteString(&builder, "\n"+descStyle.Render(match.Rule.Description)+"\n")
+				util.WriteString(&boxContent, "\n")
+				wrappedDesc := wordwrap.String(match.Rule.Description, maxWidth)
+				util.WriteString(&boxContent, wrappedDesc)
 			}
 
-			// Suggestion
+			// Suggestion (inside the box now)
 			if match.Rule.Suggestion != "" {
-				suggestionStyle := lipgloss.NewStyle().
-					Foreground(SecondaryColor).
-					Italic(true)
-				util.WriteString(&builder, "\n"+suggestionStyle.Render(IconInfo+" "+match.Rule.Suggestion)+"\n")
+				util.WriteString(&boxContent, "\n\n")
+				suggestionLine := IconInfo + " " + match.Rule.Suggestion
+				wrappedSuggestion := wordwrap.String(suggestionLine, maxWidth)
+				suggestionText := lipgloss.NewStyle().
+					Foreground(TextMuted).
+					Italic(true).
+					Render(wrappedSuggestion)
+				util.WriteString(&boxContent, suggestionText)
 			}
+
+			// Render box with border
+			safetyBox := lipgloss.NewStyle().
+				Foreground(TextSecondary).
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(BorderColor).
+				Padding(1, 2).
+				Render(boxContent.String())
+
+			util.WriteString(&builder, safetyBox+"\n")
 		}
 	}
 
@@ -109,7 +128,7 @@ func (m Model) renderConfirmView() string {
 	// Actions
 	actionsStyle := lipgloss.NewStyle().
 		Foreground(TextSecondary).
-		Align(lipgloss.Center)
+		Align(lipgloss.Left)
 
 	enterAction := lipgloss.NewStyle().
 		Foreground(ErrorColor).
@@ -130,15 +149,14 @@ func (m Model) renderConfirmView() string {
 	contentWidth := min(80, m.Width-10)
 	contentHeight := 0 // Auto-height
 
-	// Wrap in prominent border with subtle background
+	// Wrap in prominent border without background
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(ErrorColor).
-		Background(BackgroundSubtle).
-		Padding(3, 4).
+		Padding(2, 4).
 		Width(contentWidth).
 		Height(contentHeight).
-		Align(lipgloss.Center)
+		Align(lipgloss.Left)
 
 	dialog := dialogStyle.Render(builder.String())
 
