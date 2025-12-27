@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -149,11 +150,23 @@ func (m *Model) initWorkspacePicker() {
 
 	// Add recent workspaces first
 	recentPaths := make(map[string]bool)
+	cwdBase := filepath.Base(cwd)
+
 	for _, ws := range recent {
 		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
+		relDir := filepath.Dir(relPath)
+
+		// Add root directory name for current directory paths
+		if relDir == "." {
+			relDir = "./" + cwdBase
+		} else if len(relDir) > 2 && relDir[:2] == "./" {
+			relDir = "./" + cwdBase + "/" + relDir[2:]
+		}
+
 		items = append(items, WorkspaceItem{
 			Workspace: ws,
-			RelPath:   relPath,
+			RelPath:   filepath.Base(relPath), // Just filename
+			RelDir:    relDir,                  // Full relative path with root
 		})
 		recentPaths[ws.Path] = true
 	}
@@ -169,9 +182,19 @@ func (m *Model) initWorkspacePicker() {
 				IsFavorite:   false,
 			}
 			relPath := m.WorkspaceManager.GetRelativePath(result.Path, cwd)
+			relDir := filepath.Dir(relPath)
+
+			// Add root directory name for current directory paths
+			if relDir == "." {
+				relDir = "./" + cwdBase
+			} else if len(relDir) > 2 && relDir[:2] == "./" {
+				relDir = "./" + cwdBase + "/" + relDir[2:]
+			}
+
 			items = append(items, WorkspaceItem{
 				Workspace: ws,
-				RelPath:   relPath,
+				RelPath:   filepath.Base(relPath), // Just filename
+				RelDir:    relDir,                  // Full relative path with root
 			})
 		}
 	}
@@ -201,13 +224,24 @@ func (m *Model) refreshWorkspaceList() {
 	// Convert to list items
 	items := make([]list.Item, len(recent))
 	cwd, _ := os.Getwd()
+	cwdBase := filepath.Base(cwd)
+
 	for i, ws := range recent {
 		// Compute relative path for display
 		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
+		relDir := filepath.Dir(relPath)
+
+		// Add root directory name for current directory paths
+		if relDir == "." {
+			relDir = "./" + cwdBase
+		} else if len(relDir) > 2 && relDir[:2] == "./" {
+			relDir = "./" + cwdBase + "/" + relDir[2:]
+		}
 
 		items[i] = WorkspaceItem{
 			Workspace: ws,
-			RelPath:   relPath,
+			RelPath:   filepath.Base(relPath), // Just filename
+			RelDir:    relDir,                  // Full relative path with root
 		}
 	}
 

@@ -9,17 +9,17 @@ Access recent and discovered Makefiles with a single keypress:
 ```
 ┌─ Switch Workspace ────────────────────────────────────────┐
 │                                                           │
-│    ./Makefile                                             │
-│    Last used: 2 minutes ago • 15 times                    │
+│    Makefile                                               │
+│    ./myapp • Last used: 2 minutes ago                     │
 │                                                           │
-│    ../other-project/Makefile                              │
-│    Last used: 1 hour ago • 8 times                        │
+│    Makefile                                               │
+│    ../other-project • Last used: 1 hour ago               │
 │                                                           │
-│    examples/dangerous.mk                                  │
-│    Discovered in project                                  │
+│    dangerous.mk                                           │
+│    ./myapp/examples • Discovered                          │
 │                                                           │
-│    tools/Makefile                                         │
-│    Discovered in project                                  │
+│    Makefile                                               │
+│    ./myapp/tools • Discovered                             │
 │                                                           │
 └───────────────────────────────────────────────────────────┘
   2 recent • 2 discovered
@@ -28,10 +28,10 @@ Access recent and discovered Makefiles with a single keypress:
 
 **Features:**
 - **Automatic discovery**: Scans your project tree (up to 3 levels deep) to find all Makefiles
-- **Recent workspaces**: Shows last 10 accessed Makefiles with access tracking
+- **Recent workspaces**: Shows last 10 accessed Makefiles with directory path and last used time
 - **Discovered workspaces**: Displays found Makefiles you haven't used yet
 - **Favorites first**: Star frequently used projects with `f` - they appear at the top
-- **Access tracking**: Displays "time ago" (e.g., "2 hours ago") and access count for recent workspaces
+- **Clear organization**: Filename in title, full relative path with root directory in description
 - **Smart exclusions**: Skips `.git`, `node_modules`, `vendor`, build directories, and other common non-code paths
 - **Fast scanning**: 5-second timeout ensures responsiveness even in large projects
 
@@ -75,7 +75,7 @@ This means:
 
 lazymake automatically tracks workspace usage:
 - **On first use**: Creates workspace entry when you run a target
-- **On subsequent uses**: Updates access count and last accessed time
+- **On subsequent uses**: Updates last accessed time
 - **On cleanup**: Removes entries for deleted Makefiles automatically
 - **Persistent**: Data survives across sessions in `~/.cache/lazymake/workspaces.json`
 

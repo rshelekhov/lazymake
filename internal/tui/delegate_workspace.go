@@ -14,7 +14,8 @@ import (
 // WorkspaceItem implements list.Item for workspace picker
 type WorkspaceItem struct {
 	Workspace workspace.Workspace
-	RelPath   string // Relative path for display
+	RelPath   string // Relative path to Makefile for display
+	RelDir    string // Relative path to directory for description
 }
 
 // FilterValue returns the string value to filter against
@@ -92,16 +93,15 @@ func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item
 		title = titleParts[0] + " " + titleParts[1]
 	}
 
-	// Build description: metadata (last accessed time, access count)
+	// Build description: directory path + last accessed time
 	var desc string
 	if ws.Workspace.AccessCount > 0 {
-		// Recently accessed workspace - show access info
+		// Recently accessed workspace - show directory and last used time
 		timeAgo := formatTimeAgo(ws.Workspace.LastAccessed)
-		accessInfo := fmt.Sprintf("%d times", ws.Workspace.AccessCount)
-		desc = fmt.Sprintf("Last used: %s • %s", timeAgo, accessInfo)
+		desc = fmt.Sprintf("%s • Last used: %s", ws.RelDir, timeAgo)
 	} else {
-		// Discovered but never accessed - show "discovered" label
-		desc = "Discovered in project"
+		// Discovered but never accessed - show directory and "discovered" label
+		desc = fmt.Sprintf("%s • Discovered", ws.RelDir)
 	}
 
 	// Select appropriate styles based on selection state

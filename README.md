@@ -234,7 +234,7 @@ Recording instructions:
    - Press 'f' to toggle favorite (2s)
    - Show star appears/disappears (2s)
    - Press Enter to switch workspace (1s)
-4. Highlight: Stars, "time ago", access counts
+4. Highlight: Stars, "time ago", directory paths
 -->
 
 ![Workspace Management](docs/assets/workspace-management.gif)
@@ -244,7 +244,7 @@ Work with multiple projects seamlessly. Press `w` to see recent Makefiles and au
 **Key features:**
 - Automatic discovery - finds all Makefiles up to 3 levels deep
 - Favorites system - star frequently used projects
-- Access tracking - shows "last used" and access count
+- Clear paths - filename in title, full directory path with root in description
 - Per-project history - each Makefile remembers its recent targets
 
 [Full documentation](docs/features/workspace-management.md)
