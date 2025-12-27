@@ -9,7 +9,7 @@ import (
 type Severity int
 
 const (
-	SeverityInfo Severity = iota // No UI indication (logged only)
+	SeverityInfo     Severity = iota // No UI indication (logged only)
 	SeverityWarning                  // Show ⚠️ emoji
 	SeverityCritical                 // Show 🚨 emoji + confirmation dialog
 )
@@ -78,7 +78,7 @@ type MatchResult struct {
 // CheckResult represents the complete safety check for a target
 type CheckResult struct {
 	TargetName  string
-	IsDangerous bool         // Has any matched safety rules
-	DangerLevel Severity     // Highest severity level
+	IsDangerous bool          // Has any matched safety rules
+	DangerLevel Severity      // Highest severity level
 	Matches     []MatchResult // All matched rules for this target
 }
