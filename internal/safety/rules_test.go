@@ -75,6 +75,176 @@ func TestRuleMatching(t *testing.T) {
 			recipe:      []string{"kubectl delete namespace prod"},
 			shouldMatch: true,
 		},
+		// New rule tests: aws-s3-delete
+		{
+			name:        "aws-s3-delete matches recursive delete",
+			ruleID:      "aws-s3-delete",
+			recipe:      []string{"aws s3 rm s3://my-bucket/ --recursive"},
+			shouldMatch: true,
+		},
+		{
+			name:        "aws-s3-delete matches force remove bucket",
+			ruleID:      "aws-s3-delete",
+			recipe:      []string{"aws s3 rb s3://my-bucket --force"},
+			shouldMatch: true,
+		},
+		{
+			name:        "aws-s3-delete safe s3 copy does not match",
+			ruleID:      "aws-s3-delete",
+			recipe:      []string{"aws s3 cp file.txt s3://bucket/"},
+			shouldMatch: false,
+		},
+		// New rule tests: cloud-instance-terminate
+		{
+			name:        "cloud-instance-terminate matches AWS EC2",
+			ruleID:      "cloud-instance-terminate",
+			recipe:      []string{"aws ec2 terminate-instances --instance-ids i-1234567890abcdef0"},
+			shouldMatch: true,
+		},
+		{
+			name:        "cloud-instance-terminate matches GCP",
+			ruleID:      "cloud-instance-terminate",
+			recipe:      []string{"gcloud compute instances delete my-instance"},
+			shouldMatch: true,
+		},
+		{
+			name:        "cloud-instance-terminate matches Azure",
+			ruleID:      "cloud-instance-terminate",
+			recipe:      []string{"az vm delete --resource-group myGroup --name myVM"},
+			shouldMatch: true,
+		},
+		{
+			name:        "cloud-instance-terminate safe stop does not match",
+			ruleID:      "cloud-instance-terminate",
+			recipe:      []string{"aws ec2 stop-instances --instance-ids i-123"},
+			shouldMatch: false,
+		},
+		// New rule tests: curl-pipe-shell
+		{
+			name:        "curl-pipe-shell matches curl to bash",
+			ruleID:      "curl-pipe-shell",
+			recipe:      []string{"curl -sSL https://example.com/install.sh | bash"},
+			shouldMatch: true,
+		},
+		{
+			name:        "curl-pipe-shell matches wget to sh",
+			ruleID:      "curl-pipe-shell",
+			recipe:      []string{"wget -qO- https://example.com/script.sh | sh"},
+			shouldMatch: true,
+		},
+		{
+			name:        "curl-pipe-shell matches curl to sudo bash",
+			ruleID:      "curl-pipe-shell",
+			recipe:      []string{"curl https://example.com/install.sh | sudo bash"},
+			shouldMatch: true,
+		},
+		{
+			name:        "curl-pipe-shell safe curl to file does not match",
+			ruleID:      "curl-pipe-shell",
+			recipe:      []string{"curl -o script.sh https://example.com/install.sh"},
+			shouldMatch: false,
+		},
+		// New rule tests: firewall-flush
+		{
+			name:        "firewall-flush matches iptables flush",
+			ruleID:      "firewall-flush",
+			recipe:      []string{"iptables -F"},
+			shouldMatch: true,
+		},
+		{
+			name:        "firewall-flush matches ufw disable",
+			ruleID:      "firewall-flush",
+			recipe:      []string{"ufw disable"},
+			shouldMatch: true,
+		},
+		{
+			name:        "firewall-flush matches iptables --flush",
+			ruleID:      "firewall-flush",
+			recipe:      []string{"iptables --flush"},
+			shouldMatch: true,
+		},
+		{
+			name:        "firewall-flush safe iptables list does not match",
+			ruleID:      "firewall-flush",
+			recipe:      []string{"iptables -L"},
+			shouldMatch: false,
+		},
+		// New rule tests: process-kill-force
+		{
+			name:        "process-kill-force matches kill -9",
+			ruleID:      "process-kill-force",
+			recipe:      []string{"kill -9 12345"},
+			shouldMatch: true,
+		},
+		{
+			name:        "process-kill-force matches killall -9",
+			ruleID:      "process-kill-force",
+			recipe:      []string{"killall -9 nginx"},
+			shouldMatch: true,
+		},
+		{
+			name:        "process-kill-force safe kill does not match",
+			ruleID:      "process-kill-force",
+			recipe:      []string{"kill 12345"},
+			shouldMatch: false,
+		},
+		// New rule tests: helm-delete
+		{
+			name:        "helm-delete matches helm uninstall",
+			ruleID:      "helm-delete",
+			recipe:      []string{"helm uninstall my-release"},
+			shouldMatch: true,
+		},
+		{
+			name:        "helm-delete matches helm delete",
+			ruleID:      "helm-delete",
+			recipe:      []string{"helm delete my-release"},
+			shouldMatch: true,
+		},
+		{
+			name:        "helm-delete safe helm list does not match",
+			ruleID:      "helm-delete",
+			recipe:      []string{"helm list"},
+			shouldMatch: false,
+		},
+		// New rule tests: ssh-key-delete
+		{
+			name:        "ssh-key-delete matches rm .ssh",
+			ruleID:      "ssh-key-delete",
+			recipe:      []string{"rm -rf ~/.ssh"},
+			shouldMatch: true,
+		},
+		{
+			name:        "ssh-key-delete matches rm id_rsa",
+			ruleID:      "ssh-key-delete",
+			recipe:      []string{"rm ~/.ssh/id_rsa"},
+			shouldMatch: true,
+		},
+		{
+			name:        "ssh-key-delete safe ssh-keygen does not match",
+			ruleID:      "ssh-key-delete",
+			recipe:      []string{"ssh-keygen -t ed25519"},
+			shouldMatch: false,
+		},
+		// New rule tests: env-file-overwrite
+		{
+			name:        "env-file-overwrite matches redirect to .env",
+			ruleID:      "env-file-overwrite",
+			recipe:      []string{"echo 'KEY=value' > .env"},
+			shouldMatch: true,
+		},
+		{
+			name:        "env-file-overwrite matches cp to .env",
+			ruleID:      "env-file-overwrite",
+			recipe:      []string{"cp .env.example .env"},
+			shouldMatch: true,
+		},
+		{
+			name:        "env-file-overwrite safe cat .env does not match",
+			ruleID:      "env-file-overwrite",
+			recipe:      []string{"cat .env"},
+			shouldMatch: false,
+		},
 	}
 
 	for _, tt := range tests {
