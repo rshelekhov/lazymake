@@ -47,6 +47,20 @@ func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			// Switch to selected workspace
 			return m.handleWorkspaceSelection()
+
+		case "up", "k":
+			// Navigate up, skip headers
+			var cmd tea.Cmd
+			m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
+			m.skipHeadersUp()
+			return m, cmd
+
+		case "down", "j":
+			// Navigate down, skip headers
+			var cmd tea.Cmd
+			m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
+			m.skipHeadersDown()
+			return m, cmd
 		}
 
 	case tea.WindowSizeMsg:
@@ -55,11 +69,47 @@ func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Note: list size is set in render function, not here
 	}
 
-	// Delegate to workspace list for navigation
+	// Delegate to workspace list for other navigation/updates
 	var cmd tea.Cmd
 	m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
 
 	return m, cmd
+}
+
+// skipHeadersDown moves cursor down past headers
+func (m *Model) skipHeadersDown() {
+	items := m.WorkspaceList.Items()
+	index := m.WorkspaceList.Index()
+
+	// Check if current item is a header, skip to next workspace
+	for index < len(items) {
+		if _, ok := items[index].(WorkspaceHeaderItem); ok {
+			index++
+			if index < len(items) {
+				m.WorkspaceList.Select(index)
+			}
+		} else {
+			break
+		}
+	}
+}
+
+// skipHeadersUp moves cursor up past headers
+func (m *Model) skipHeadersUp() {
+	items := m.WorkspaceList.Items()
+	index := m.WorkspaceList.Index()
+
+	// Check if current item is a header, skip to previous workspace
+	for index >= 0 {
+		if _, ok := items[index].(WorkspaceHeaderItem); ok {
+			index--
+			if index >= 0 {
+				m.WorkspaceList.Select(index)
+			}
+		} else {
+			break
+		}
+	}
 }
 
 // handleWorkspaceSelection processes workspace selection and initiates switch
@@ -145,13 +195,12 @@ func (m *Model) initWorkspacePicker() {
 	// Get recent workspaces
 	recent := m.WorkspaceManager.GetRecent(10)
 
-	// Build combined list: recent first, then discovered (excluding duplicates)
-	var items []list.Item
-
-	// Add recent workspaces first
+	// Build combined list with all workspaces
+	var allWorkspaces []WorkspaceItem
 	recentPaths := make(map[string]bool)
 	cwdBase := filepath.Base(cwd)
 
+	// Add recent workspaces
 	for _, ws := range recent {
 		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
 		relDir := filepath.Dir(relPath)
@@ -163,7 +212,7 @@ func (m *Model) initWorkspacePicker() {
 			relDir = "./" + cwdBase + "/" + relDir[2:]
 		}
 
-		items = append(items, WorkspaceItem{
+		allWorkspaces = append(allWorkspaces, WorkspaceItem{
 			Workspace: ws,
 			RelPath:   filepath.Base(relPath), // Just filename
 			RelDir:    relDir,                  // Full relative path with root
@@ -191,13 +240,16 @@ func (m *Model) initWorkspacePicker() {
 				relDir = "./" + cwdBase + "/" + relDir[2:]
 			}
 
-			items = append(items, WorkspaceItem{
+			allWorkspaces = append(allWorkspaces, WorkspaceItem{
 				Workspace: ws,
 				RelPath:   filepath.Base(relPath), // Just filename
 				RelDir:    relDir,                  // Full relative path with root
 			})
 		}
 	}
+
+	// Build final list with sections
+	items := buildWorkspaceListWithSections(allWorkspaces)
 
 	// Create list with workspace delegate
 	delegate := NewWorkspaceItemDelegate()
@@ -209,7 +261,53 @@ func (m *Model) initWorkspacePicker() {
 	l.Styles.Title = TitleStyle
 	// Note: list size is set in render function, not here
 
+	// Position cursor on first actual workspace (skip headers)
+	for i, item := range items {
+		if _, ok := item.(WorkspaceItem); ok {
+			l.Select(i)
+			break
+		}
+	}
+
 	m.WorkspaceList = l
+}
+
+// buildWorkspaceListWithSections organizes workspaces into sections with headers
+func buildWorkspaceListWithSections(workspaces []WorkspaceItem) []list.Item {
+	// Separate favorites from non-favorites
+	var favorites []WorkspaceItem
+	var nonFavorites []WorkspaceItem
+
+	for _, ws := range workspaces {
+		if ws.Workspace.IsFavorite {
+			favorites = append(favorites, ws)
+		} else {
+			nonFavorites = append(nonFavorites, ws)
+		}
+	}
+
+	// Build items list with sections
+	items := make([]list.Item, 0, len(workspaces)+2)
+
+	// Add favorites section if there are any
+	if len(favorites) > 0 {
+		items = append(items, WorkspaceHeaderItem{Label: "FAVORITES", WithSeparator: false})
+		for _, ws := range favorites {
+			items = append(items, ws)
+		}
+	}
+
+	// Add all workspaces section
+	if len(nonFavorites) > 0 {
+		// Add separator before this section if there were favorites
+		withSeparator := len(favorites) > 0
+		items = append(items, WorkspaceHeaderItem{Label: "ALL WORKSPACES", WithSeparator: withSeparator})
+		for _, ws := range nonFavorites {
+			items = append(items, ws)
+		}
+	}
+
+	return items
 }
 
 // refreshWorkspaceList refreshes the workspace list items (e.g., after toggling favorite)
@@ -221,12 +319,12 @@ func (m *Model) refreshWorkspaceList() {
 	// Get recent workspaces
 	recent := m.WorkspaceManager.GetRecent(10)
 
-	// Convert to list items
-	items := make([]list.Item, len(recent))
+	// Convert to workspace items
+	var allWorkspaces []WorkspaceItem
 	cwd, _ := os.Getwd()
 	cwdBase := filepath.Base(cwd)
 
-	for i, ws := range recent {
+	for _, ws := range recent {
 		// Compute relative path for display
 		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
 		relDir := filepath.Dir(relPath)
@@ -238,12 +336,15 @@ func (m *Model) refreshWorkspaceList() {
 			relDir = "./" + cwdBase + "/" + relDir[2:]
 		}
 
-		items[i] = WorkspaceItem{
+		allWorkspaces = append(allWorkspaces, WorkspaceItem{
 			Workspace: ws,
 			RelPath:   filepath.Base(relPath), // Just filename
 			RelDir:    relDir,                  // Full relative path with root
-		}
+		})
 	}
+
+	// Build list with sections
+	items := buildWorkspaceListWithSections(allWorkspaces)
 
 	// Update list items
 	m.WorkspaceList.SetItems(items)

@@ -23,6 +23,14 @@ func (w WorkspaceItem) FilterValue() string {
 	return w.Workspace.Path
 }
 
+// WorkspaceHeaderItem represents a section header in workspace list
+type WorkspaceHeaderItem struct {
+	Label         string
+	WithSeparator bool // Draw separator line before this header
+}
+
+func (h WorkspaceHeaderItem) FilterValue() string { return "" }
+
 // WorkspaceItemDelegate is a custom delegate for rendering workspace list items
 type WorkspaceItemDelegate struct {
 	list.DefaultDelegate
@@ -71,6 +79,22 @@ func (d WorkspaceItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 }
 
 func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	// Handle header items
+	if header, ok := item.(WorkspaceHeaderItem); ok {
+		headerStyle := lipgloss.NewStyle().
+			Foreground(TextMuted).
+			Bold(true).
+			PaddingLeft(2) // Align with list items
+
+		// Add separator before header if requested
+		if header.WithSeparator {
+			fmt.Fprint(w, "\n")
+		}
+		fmt.Fprint(w, headerStyle.Render(header.Label))
+		return
+	}
+
+	// Handle workspace items
 	ws, ok := item.(WorkspaceItem)
 	if !ok {
 		return

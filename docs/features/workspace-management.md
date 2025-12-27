@@ -9,20 +9,24 @@ Access recent and discovered Makefiles with a single keypress:
 ```
 ┌─ Switch Workspace ────────────────────────────────────────┐
 │                                                           │
-│    Makefile                                               │
-│    ./myapp • Last used: 2 minutes ago                     │
+│  FAVORITES                                                │
+│  ⭐ Makefile                                              │
+│     ./myapp • Last used: 2 minutes ago                    │
 │                                                           │
-│    Makefile                                               │
-│    ../other-project • Last used: 1 hour ago               │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━    │
 │                                                           │
-│    dangerous.mk                                           │
-│    ./myapp/examples • Discovered                          │
+│  ALL WORKSPACES                                           │
+│  Makefile                                                 │
+│  ../other-project • Last used: 1 hour ago                 │
 │                                                           │
-│    Makefile                                               │
-│    ./myapp/tools • Discovered                             │
+│  dangerous.mk                                             │
+│  ./myapp/examples • Discovered                            │
+│                                                           │
+│  Makefile                                                 │
+│  ./myapp/tools • Discovered                               │
 │                                                           │
 └───────────────────────────────────────────────────────────┘
-  2 recent • 2 discovered
+  1 favorite • 3 workspaces
   enter: switch • f: favorite • esc/w: cancel
 ```
 
@@ -30,7 +34,8 @@ Access recent and discovered Makefiles with a single keypress:
 - **Automatic discovery**: Scans your project tree (up to 3 levels deep) to find all Makefiles
 - **Recent workspaces**: Shows last 10 accessed Makefiles with directory path and last used time
 - **Discovered workspaces**: Displays found Makefiles you haven't used yet
-- **Favorites first**: Star frequently used projects with `f` - they appear at the top
+- **Favorites section**: Star frequently used projects with `f` - they appear in a dedicated section at the top
+- **Visual separation**: Favorites and all workspaces are clearly separated with headers and dividers
 - **Clear organization**: Filename in title, full relative path with root directory in description
 - **Smart exclusions**: Skips `.git`, `node_modules`, `vendor`, build directories, and other common non-code paths
 - **Fast scanning**: 5-second timeout ensures responsiveness even in large projects

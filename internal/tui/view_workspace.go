@@ -72,14 +72,13 @@ func (m Model) renderWorkspaceListContainer(width, height int) string {
 func (m Model) renderWorkspaceStatusBar() string {
 	// Count stats
 	items := m.WorkspaceList.Items()
-	recentCount := 0
-	discoveredCount := 0
+	favoriteCount := 0
+	workspaceCount := 0
 	for _, item := range items {
 		if ws, ok := item.(WorkspaceItem); ok {
-			if ws.Workspace.AccessCount > 0 {
-				recentCount++
-			} else {
-				discoveredCount++
+			workspaceCount++
+			if ws.Workspace.IsFavorite {
+				favoriteCount++
 			}
 		}
 	}
@@ -100,16 +99,28 @@ func (m Model) renderWorkspaceStatusBar() string {
 		Foreground(TextSecondary).
 		Padding(0, 1)
 
-	// Recent workspaces nugget (only colored one)
-	recentNugget := coloredNuggetStyle.Render(fmt.Sprintf("%d recent", recentCount))
+	// Workspaces count nugget (only colored one)
+	var label string
+	if workspaceCount == 1 {
+		label = "1 workspace"
+	} else {
+		label = fmt.Sprintf("%d workspaces", workspaceCount)
+	}
+	workspacesNugget := coloredNuggetStyle.Render(label)
 
 	var sections []string
-	sections = append(sections, recentNugget)
+	sections = append(sections, workspacesNugget)
 
-	// Discovered workspaces (plain text on status bar background)
-	if discoveredCount > 0 {
-		discoveredInfo := plainNuggetStyle.Render(fmt.Sprintf("%d discovered", discoveredCount))
-		sections = append(sections, discoveredInfo)
+	// Favorites count (plain text on status bar background)
+	if favoriteCount > 0 {
+		var favLabel string
+		if favoriteCount == 1 {
+			favLabel = "1 favorite"
+		} else {
+			favLabel = fmt.Sprintf("%d favorites", favoriteCount)
+		}
+		favoriteInfo := plainNuggetStyle.Render(favLabel)
+		sections = append(sections, favoriteInfo)
 	}
 
 	// Calculate width used by nuggets
