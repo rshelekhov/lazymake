@@ -1,4 +1,6 @@
-# lazymake
+<img src="./assets/lazymake-logo.svg" alt="LAZYMAKE" width="600">
+
+</br>
 
 [![CI](https://img.shields.io/github/actions/workflow/status/rshelekhov/lazymake/ci.yml?branch=main&label=CI)](https://github.com/rshelekhov/lazymake/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/release/rshelekhov/lazymake.svg)](https://github.com/rshelekhov/lazymake/releases)
@@ -164,9 +166,9 @@ Recording instructions:
 1. Terminal size: 100x30
 2. Use examples/dangerous.mk for demo
 3. Sequence:
-   - Show list with 🚨 and ⚠️ indicators (3s)
-   - Select a 🚨 critical target (2s)
-   - Show recipe preview with danger warning (3s)
+   - Show list with colored circle indicators (red, yellow, blue) (3s)
+   - Select a red circle (critical) target (2s)
+   - Show recipe preview with danger warning in bordered box (3s)
    - Press Enter to trigger confirmation dialog (2s)
    - Show full warning dialog (4s)
    - Press ESC to cancel (1s)
@@ -175,12 +177,13 @@ Recording instructions:
 
 ![Safety Features](docs/assets/safety-features.gif)
 
-Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels in the target list.
+Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels with colored circles in the target list.
 
 **Key features:**
+- Three severity levels - Critical (red ○), Warning (yellow ○), Info (blue ○)
 - Critical commands require confirmation - prevents irreversible mistakes
-- Warning indicators for risky operations
-- Context-aware detection - adjusts severity based on target name
+- Context-aware detection - adjusts severity based on target name and environment
+- Detailed warnings in bordered boxes - matched commands, descriptions, and suggestions
 - Customizable rules - add project-specific patterns
 
 [Full documentation](docs/features/safety-features.md)
@@ -231,7 +234,7 @@ Recording instructions:
    - Press 'f' to toggle favorite (2s)
    - Show star appears/disappears (2s)
    - Press Enter to switch workspace (1s)
-4. Highlight: Stars, "time ago", access counts
+4. Highlight: Stars, "time ago", directory paths
 -->
 
 ![Workspace Management](docs/assets/workspace-management.gif)
@@ -241,7 +244,7 @@ Work with multiple projects seamlessly. Press `w` to see recent Makefiles and au
 **Key features:**
 - Automatic discovery - finds all Makefiles up to 3 levels deep
 - Favorites system - star frequently used projects
-- Access tracking - shows "last used" and access count
+- Clear paths - filename in title, full directory path with root in description
 - Per-project history - each Makefile remembers its recent targets
 
 [Full documentation](docs/features/workspace-management.md)
@@ -322,7 +325,7 @@ lazymake -f path/to/Makefile
 
 | Key | Action | View |
 |-----|--------|------|
-| `↑/↓` or `j/k` | Navigate | All |
+| `↑/↓` or `j/k` | Navigate | Main list, Output, Workspace picker |
 | `Enter` | Execute target | Main list |
 | `g` | View dependency graph | Main list |
 | `v` | View variable inspector | Main list |

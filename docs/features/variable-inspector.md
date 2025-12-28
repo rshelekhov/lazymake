@@ -43,7 +43,7 @@ Browse all variables in your Makefile with detailed information:
 │   Not used by any target                                  │
 │                                                           │
 └───────────────────────────────────────────────────────────┘
-  v/esc: return • ↑↓/j/k: navigate • q: quit
+  v/esc: return • q: quit
 ```
 
 ### 2. Context Panel (Automatic)
@@ -122,9 +122,7 @@ clean: ## Clean build artifacts
 ## Navigation
 
 - **`v`**: Open variable inspector from list view
-- **`↑/↓` or `j/k`**: Navigate between variables
 - **`v` or `esc`**: Return to list view
-- **Auto-scroll**: Inspector automatically scrolls to keep selected variable visible
 
 ---
 

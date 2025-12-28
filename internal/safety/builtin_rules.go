@@ -147,6 +147,20 @@ var BuiltinRules = []Rule{
 		Description: "Sets overly permissive file permissions (777 = world-writable). Security risk.",
 		Suggestion:  "Use more restrictive permissions. Typically 755 for executables, 644 for files.",
 	},
+
+	{
+		ID:       "deployment-commands",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`kubectl\s+apply`,
+			`terraform\s+apply`,
+			`tofu\s+apply`,  // OpenTofu
+			`helm\s+install`,
+			`helm\s+upgrade`,
+		},
+		Description: "Deploys or applies infrastructure changes. May affect running systems.",
+		Suggestion:  "Review changes with plan/diff first. Verify target environment. Consider using staging before production.",
+	},
 }
 
 // GetBuiltinRuleByID returns a built-in rule by its ID, or nil if not found

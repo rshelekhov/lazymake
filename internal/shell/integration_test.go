@@ -502,6 +502,7 @@ func TestAutoDetection(t *testing.T) {
 
 	if integ == nil {
 		t.Fatal("Expected non-nil integration with auto detection")
+		return
 	}
 
 	// Verify writer is bash writer

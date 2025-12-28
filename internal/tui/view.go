@@ -84,14 +84,14 @@ func (m Model) renderHelpView() string {
 
 	// Description
 	desc := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextMuted).
 		Render("Available targets:\n")
 	helpContent += desc + "\n"
 
 	// List all targets with descriptions
 	if len(m.Targets) == 0 {
 		helpContent += lipgloss.NewStyle().
-			Foreground(MutedColor).
+			Foreground(TextMuted).
 			Render("  No targets found\n")
 	} else {
 		// Find the longest target name for alignment
@@ -137,8 +137,8 @@ func (m Model) renderHelpView() string {
 	// Legend - use plain formatting to avoid lipgloss layout issues
 	helpContent += "\n"
 	helpContent += "Legend:\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(SecondaryColor).Render("Cyan") + " = ## documented target (recommended)\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(MutedColor).Render("Gray") + " = # regular comment\n"
+	helpContent += "  " + lipgloss.NewStyle().Foreground(TextSecondary).Render("Gray") + " = ## documented target (recommended)\n"
+	helpContent += "  " + lipgloss.NewStyle().Foreground(TextMuted).Render("Gray Dark") + " = # regular comment\n"
 
 	// Wrap in a container with padding (no width constraint to avoid layout issues)
 	containerStyle := lipgloss.NewStyle().
@@ -146,10 +146,22 @@ func (m Model) renderHelpView() string {
 
 	content := containerStyle.Render(helpContent)
 
-	// Status bar with keyboard shortcuts
-	statusBar := renderStatusBar(m.Width, "", "?: toggle help • g: graph • esc: return • q: quit")
+	// Status bar with lipgloss-style nuggets
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Background(BackgroundSubtle)
 
-	return content + "\n" + statusBar
+	helpText := "?: toggle help • g: graph • esc: return • q: quit"
+	rightStyle := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Align(lipgloss.Right)
+
+	bar := statusBarStyle.
+		Width(m.Width).
+		Render(rightStyle.Render(helpText))
+
+	return content + "\n" + bar
 }
 
 // renderGraphView displays the dependency graph for the selected target
@@ -161,17 +173,9 @@ func (m Model) renderGraphView() string {
 
 	graphContent := m.renderGraphContent(m.Width)
 
-	legend := m.renderGraphLegend(m.Width)
-
 	statusBar := m.renderGraphStatusBar(m.Width)
 
-	sections := []string{graphContent}
-	if legend != "" {
-		sections = append(sections, legend)
-	}
-	sections = append(sections, statusBar)
-
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	return lipgloss.JoinVertical(lipgloss.Left, graphContent, statusBar)
 }
 
 // renderGraphContent renders the main graph content with border
@@ -197,7 +201,7 @@ func (m Model) renderGraphContent(width int) string {
 		depthStr = fmt.Sprintf("%d level(s)", m.GraphDepth+1)
 	}
 	depthInfo := lipgloss.NewStyle().
-		Foreground(MutedColor).
+		Foreground(TextMuted).
 		Render(fmt.Sprintf("Depth: %s", depthStr))
 	util.WriteString(&builder, depthInfo+"\n\n")
 
@@ -213,101 +217,127 @@ func (m Model) renderGraphContent(width int) string {
 		ShowOrder:    m.ShowOrder,
 		ShowCritical: m.ShowCritical,
 		ShowParallel: m.ShowParallel,
+		// Add color formatting functions
+		FormatOrder: func(s string) string {
+			return lipgloss.NewStyle().Foreground(SecondaryColor).Bold(true).Render(s)
+		},
+		FormatCritical: func(s string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true).Render(s)
+		},
+		FormatParallel: func(s string) string {
+			return lipgloss.NewStyle().Foreground(SuccessColor).Bold(true).Render(s)
+		},
 	}
 
 	treeStr := graphToRender.RenderTree(renderer)
 	util.WriteString(&builder, treeStr)
 
+	// Add legend if any annotations are enabled
+	if m.ShowOrder || m.ShowCritical || m.ShowParallel {
+		// Separator line
+		separator := lipgloss.NewStyle().
+			Foreground(BorderColor).
+			Render(strings.Repeat("─", width-8)) // Account for border and padding
+		util.WriteString(&builder, "\n"+separator+"\n\n")
+
+		// Build legend items
+		if m.ShowOrder {
+			item := lipgloss.NewStyle().
+				Foreground(SecondaryColor).
+				Bold(true).
+				Render("[N]") +
+				"  " +
+				lipgloss.NewStyle().
+					Foreground(TextPrimary).
+					Render("Execution Order")
+			util.WriteString(&builder, item+"\n")
+		}
+
+		if m.ShowCritical {
+			item := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFD700")). // Gold
+				Bold(true).
+				Render(" ★ ") +
+				"  " +
+				lipgloss.NewStyle().
+					Foreground(TextPrimary).
+					Render("Critical Path")
+			util.WriteString(&builder, item+"\n")
+		}
+
+		if m.ShowParallel {
+			item := lipgloss.NewStyle().
+				Foreground(SuccessColor). // Green
+				Bold(true).
+				Render("|| ") +
+				"  " +
+				lipgloss.NewStyle().
+					Foreground(TextPrimary).
+					Render("Parallel Execution")
+			util.WriteString(&builder, item)
+		}
+	}
+
 	// Apply border (matching main view pattern)
 	// Set width to full terminal width minus border
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
+		BorderForeground(BorderColor).
 		Padding(1, 2).
 		Width(width - 2) // Account for border (2)
 
 	return containerStyle.Render(builder.String())
 }
 
-// renderGraphLegend renders an enhanced legend with color-coded symbols
-func (m Model) renderGraphLegend(width int) string {
-	if !m.ShowOrder && !m.ShowCritical && !m.ShowParallel {
-		return "" // Skip if no annotations enabled
-	}
-
-	var builder strings.Builder
-
-	// Build legend items with colors
-	var items []string
-
-	if m.ShowOrder {
-		item := lipgloss.NewStyle().
-			Foreground(SecondaryColor).
-			Bold(true).
-			Render("[N]") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextColor).
-				Render("Execution Order")
-		items = append(items, item)
-	}
-
-	if m.ShowCritical {
-		item := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFD700")). // Gold
-			Bold(true).
-			Render(" ★ ") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextColor).
-				Render("Critical Path")
-		items = append(items, item)
-	}
-
-	if m.ShowParallel {
-		item := lipgloss.NewStyle().
-			Foreground(SuccessColor). // Green
-			Bold(true).
-			Render(" ∥ ") +
-			"  " +
-			lipgloss.NewStyle().
-				Foreground(TextColor).
-				Render("Parallel Execution")
-		items = append(items, item)
-	}
-
-	// Join items
-	for _, item := range items {
-		util.WriteString(&builder, item+"\n")
-	}
-
-	// Apply border
-	// Set width to full terminal width minus border
-	legendStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(width - 2) // Account for border (2)
-
-	return legendStyle.Render(builder.String())
-}
-
 // renderGraphStatusBar renders the keyboard controls in status bar format
 func (m Model) renderGraphStatusBar(width int) string {
-	// Left side: graph stats
-	leftContent := ""
-	if m.GraphTarget != "" {
-		leftContent = fmt.Sprintf("Target: %s", m.GraphTarget)
-	} else if m.Graph != nil {
-		nodeCount := len(m.Graph.Nodes)
-		leftContent = fmt.Sprintf("%d nodes", nodeCount)
-	}
+	// Base status bar style - with background for entire bar
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextPrimary)
 
-	// Right side: keyboard shortcuts
-	rightContent := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
+	// Colored nugget style (only for first item)
+	coloredNuggetStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+		Background(PrimaryColor).
+		Padding(0, 1).
+		MarginRight(1)
 
-	// Use the reusable status bar component
-	return renderStatusBar(width, leftContent, rightContent)
+	// Workspace path nugget (only colored one)
+	workspacePath := m.getWorkspaceDisplayPath()
+	pathNugget := coloredNuggetStyle.Render(workspacePath)
+
+	var sections []string
+	sections = append(sections, pathNugget)
+
+	// Calculate width used by nuggets
+	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+	leftWidth := lipgloss.Width(leftBar)
+
+	// Right side: shortcuts
+	helpText := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
+
+	// Right section with help text
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+	rightWidth := lipgloss.Width(right)
+
+	// Middle section fills remaining space
+	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
+	middleWidth := max(width-2-leftWidth-rightWidth, 1)
+	middle := lipgloss.NewStyle().
+		Width(middleWidth).
+		Align(lipgloss.Left).
+		Render("")
+
+	// Combine all sections
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
+
+	return statusBarStyle.
+		Width(width).
+		Padding(1, 1).
+		Render(bar)
 }
 
 // renderOutputView displays output of the executed target
@@ -358,8 +388,20 @@ func (m Model) renderOutputView() string {
 		// Width(innerWidth)
 		Width(contentWidth)
 
-	// Status bar with shortcuts
-	statusBar := renderStatusBar(m.Width, "", "esc: return • q: quit")
+	// Status bar with lipgloss-style nuggets
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Background(BackgroundSubtle)
+
+	helpText := "esc: return • q: quit"
+	rightStyle := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Align(lipgloss.Right)
+
+	statusBar := statusBarStyle.
+		Width(m.Width).
+		Render(rightStyle.Render(helpText))
 
 	return "\n" + viewportStyle.Render(builder.String()) + "\n" + statusBar
 }
@@ -385,29 +427,59 @@ func (m Model) renderExecutingView() string {
 		}
 	}
 
-	var statusLine string
+	var builder strings.Builder
+
+	// Title with spinner
+	title := lipgloss.NewStyle().
+		Foreground(PrimaryColor).
+		Bold(true).
+		Render(m.Spinner.View() + " Executing: make " + m.ExecutingTarget)
+	util.WriteString(&builder, "\n"+title+"\n\n")
+
+	// Progress bar (if we have avg duration to estimate)
 	if stats != nil && stats.AvgDuration > 0 {
-		avgStr := formatDuration(stats.AvgDuration)
-		statusLine = fmt.Sprintf("  Elapsed: %s / ~%s avg",
-			formatDuration(elapsed),
-			avgStr)
+		// Calculate progress percentage
+		progress := float64(elapsed) / float64(stats.AvgDuration)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+
+		// Render progress bar
+		progressBar := m.Progress.ViewAs(progress)
+
+		// Time display
+		timeStyle := lipgloss.NewStyle().
+			Foreground(TextSecondary)
+		timeDisplay := timeStyle.Render(
+			fmt.Sprintf("  %s / ~%s avg",
+				formatDuration(elapsed),
+				formatDuration(stats.AvgDuration)))
+
+		util.WriteString(&builder, "  "+progressBar+"\n")
+		util.WriteString(&builder, "  "+progressBar+"\n")
+		util.WriteString(&builder, timeDisplay+"\n\n")
 	} else {
-		// Simple timer (no performance history)
-		statusLine = fmt.Sprintf("  Elapsed: %s", formatDuration(elapsed))
+		// Simple elapsed time
+		timeStyle := lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Render("  Elapsed: " + formatDuration(elapsed))
+		util.WriteString(&builder, timeStyle+"\n\n")
 	}
 
-	header := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(PrimaryColor).
-		Render("\n  ⏳ Executing: make " + m.ExecutingTarget)
+	// Wait message
+	waitMsg := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Italic(true).
+		Render("  Please wait...")
+	util.WriteString(&builder, waitMsg+"\n")
 
+	// Modern container with accent border and subtle background
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
-		Padding(1, 2).
-		Width(width - 2)
+		BorderForeground(BorderAccent).
+		Background(BackgroundSubtle).
+		Padding(2, 3).
+		Width(width - 4)
 
-	content := header + "\n\n" + statusLine + "\n\n  Please wait...\n"
-
-	return containerStyle.Render(content)
+	return containerStyle.Render(builder.String())
 }

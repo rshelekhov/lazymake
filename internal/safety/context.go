@@ -13,7 +13,8 @@ func adjustSeverity(target makefile.Target, rule Rule, matchedLine string) Sever
 	severity := rule.Severity
 
 	// Clean targets are expected to be destructive
-	if isCleanTarget(target.Name) {
+	// BUT: don't downgrade if target affects databases or production systems
+	if isCleanTarget(target.Name) && !affectsCriticalSystems(target.Name, matchedLine) {
 		// Downgrade severity for clean targets
 		switch severity {
 		case SeverityCritical:
@@ -41,10 +42,8 @@ func adjustSeverity(target makefile.Target, rule Rule, matchedLine string) Sever
 		}
 	}
 
-	// Production keywords elevate severity
-	if containsProductionKeywords(matchedLine) && severity == SeverityWarning {
-		severity = SeverityCritical
-	}
+	// Note: Removed auto-escalation from Warning to Critical based on production keywords
+	// Rules should be defined with appropriate base severity instead
 
 	return severity
 }
@@ -103,6 +102,26 @@ func containsProductionKeywords(command string) bool {
 		// Match whole words to avoid false positives like "produce"
 		pattern := regexp.MustCompile(`\b` + keyword + `\b`)
 		if pattern.MatchString(cmdLower) {
+			return true
+		}
+	}
+	return false
+}
+
+// affectsCriticalSystems checks if target affects databases or production systems
+// Used to prevent downgrading severity for "clean-like" targets that touch critical data
+func affectsCriticalSystems(targetName, command string) bool {
+	criticalKeywords := []string{
+		"db", "database",
+		"prod", "production",
+		"schema", "migration",
+		"backup", "restore",
+	}
+
+	combined := strings.ToLower(targetName + " " + command)
+
+	for _, keyword := range criticalKeywords {
+		if strings.Contains(combined, keyword) {
 			return true
 		}
 	}

@@ -6,9 +6,9 @@ lazymake visualizes your Makefile's dependency structure to help you understand 
 
 ```
 all [3] ★
-├── build [2] ★ ∥
+├── build [2] ★ ||
 │   └── deps [1] ★
-└── test [2] ★ ∥
+└── test [2] ★ ||
     └── deps [1] (see above)
 ```
 
@@ -25,7 +25,7 @@ all [3] ★
   - Optimizing these targets has the biggest impact on build time
   - Only shown for targets that are part of dependency chains
 
-- **`∥` Parallel Opportunities**: Targets that can run concurrently
+- **`||` Parallel Opportunities**: Targets that can run concurrently
   - Make can execute these simultaneously with `-j` flag
   - Example: `make -j4` runs up to 4 targets in parallel
   - Only shown for targets with actual dependencies to coordinate
@@ -51,7 +51,7 @@ lazymake intelligently identifies meaningful patterns:
 - **`-` or `_`**: Show fewer dependency levels
 - **`o`**: Toggle execution order numbers `[N]`
 - **`c`**: Toggle critical path markers `★`
-- **`p`**: Toggle parallel opportunity markers `∥`
+- **`p`**: Toggle parallel opportunity markers `||`
 - **`g` or `esc`**: Return to list view
 
 ---
