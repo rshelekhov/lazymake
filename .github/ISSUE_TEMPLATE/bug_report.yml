@@ -1,0 +1,100 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in lazymake
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us investigate.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is
+      placeholder: When I press 'g' to view the dependency graph, the app crashes...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run `lazymake` in a project with...
+        2. Press 'g' to view graph
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: The dependency graph should display...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened (include error messages if any)
+      placeholder: |
+        Error message:
+        panic: runtime error...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: lazymake Version
+      description: Output of `lazymake --version`
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: Your OS and version
+      placeholder: macOS 14.0, Ubuntu 22.04, Windows 11, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: makefile
+    attributes:
+      label: Makefile Sample (if relevant)
+      description: If the bug is related to a specific Makefile pattern, please share a minimal example
+      placeholder: |
+        ```makefile
+        .PHONY: build
+        build: deps
+        	go build -o app
+        ```
+      render: makefile
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration (if relevant)
+      description: Your .lazymake.yaml config if relevant
+      placeholder: |
+        ```yaml
+        safety:
+          enabled: true
+        ```
+      render: yaml
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem (screenshots, terminal output, etc.)
+      placeholder: Add any other context here...
