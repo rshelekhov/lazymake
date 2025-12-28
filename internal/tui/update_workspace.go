@@ -210,6 +210,9 @@ func (m *Model) initWorkspacePicker() {
 			relDir = "./" + cwdBase
 		} else if len(relDir) > 2 && relDir[:2] == "./" {
 			relDir = "./" + cwdBase + "/" + relDir[2:]
+		} else if relDir != ".." && !filepath.IsAbs(relDir) {
+			// Subdirectory without ./ prefix (e.g., "examples")
+			relDir = "./" + cwdBase + "/" + relDir
 		}
 
 		allWorkspaces = append(allWorkspaces, WorkspaceItem{
@@ -238,6 +241,9 @@ func (m *Model) initWorkspacePicker() {
 				relDir = "./" + cwdBase
 			} else if len(relDir) > 2 && relDir[:2] == "./" {
 				relDir = "./" + cwdBase + "/" + relDir[2:]
+			} else if relDir != ".." && !filepath.IsAbs(relDir) {
+				// Subdirectory without ./ prefix (e.g., "examples")
+				relDir = "./" + cwdBase + "/" + relDir
 			}
 
 			allWorkspaces = append(allWorkspaces, WorkspaceItem{
@@ -334,6 +340,9 @@ func (m *Model) refreshWorkspaceList() {
 			relDir = "./" + cwdBase
 		} else if len(relDir) > 2 && relDir[:2] == "./" {
 			relDir = "./" + cwdBase + "/" + relDir[2:]
+		} else if relDir != ".." && !filepath.IsAbs(relDir) {
+			// Subdirectory without ./ prefix (e.g., "examples")
+			relDir = "./" + cwdBase + "/" + relDir
 		}
 
 		allWorkspaces = append(allWorkspaces, WorkspaceItem{
