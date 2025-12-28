@@ -62,142 +62,163 @@ func (m Model) updateError(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-
-		case "?":
-			m.State = StateHelp
-			return m, nil
-
-		case "v":
-			// Toggle variable inspector view
-			m.State = StateVariables
-			return m, nil
-
-		case "w":
-			// Open workspace picker
-			m.State = StateWorkspace
-			m.initWorkspacePicker()
-			return m, nil
-
-		case "g":
-			// Show graph view for selected target
-			selected := m.List.SelectedItem()
-			if target, ok := selected.(Target); ok {
-				m.State = StateGraph
-				m.GraphTarget = target.Name
-				return m, nil
-			}
-
-		case "enter":
-			selected := m.List.SelectedItem()
-			if target, ok := selected.(Target); ok {
-				// Check if target is critical and requires confirmation
-				if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
-					// Show confirmation dialog for critical targets
-					targetCopy := target
-					m.PendingTarget = &targetCopy
-					m.State = StateConfirmDangerous
-					return m, nil
-				}
-
-				// Safe or non-critical target - execute immediately
-				// Record execution in history BEFORE starting
-				m.History.RecordExecution(m.MakefilePath, target.Name)
-				_ = m.History.Save() // Async, ignore errors (non-critical)
-
-				// Refresh recent targets for next render
-				recentEntries := m.History.GetRecent(m.MakefilePath)
-				m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
-
-				m.State = StateExecuting
-				m.ExecutingTarget = target.Name
-				m.ExecutionStartTime = time.Now()
-				m.ExecutionElapsed = 0
-				return m, tea.Batch(
-					executeTarget(target.Name),
-					tickTimer(),   // Start timer
-					m.Spinner.Tick, // Start spinner animation
-				)
-			}
-
-		case "down", "j":
-			// Navigate down, skipping over separators and headers
-			m = navigateToNextTarget(m, true)
-
-			// Update recipe viewport content for new selection
-			m = updateRecipeViewportContent(m)
-			return m, nil
-
-		case "up", "k":
-			// Navigate up, skipping over separators and headers
-			m = navigateToNextTarget(m, false)
-
-			// Update recipe viewport content for new selection
-			m = updateRecipeViewportContent(m)
-			return m, nil
-
-		case "ctrl+d":
-			// Scroll recipe preview down (vim-style half-page)
-			m.RecipeViewport.HalfViewDown()
-			return m, nil
-
-		case "ctrl+u":
-			// Scroll recipe preview up (vim-style half-page)
-			m.RecipeViewport.HalfViewUp()
-			return m, nil
-		}
-
+		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width
-		m.Height = msg.Height
-
-		// Calculate list size for left column
-		// Left column is 30% of width
-		leftWidth := max(int(float64(msg.Width)*0.30), 30)
-		// Account for border (2) on left column
-		listWidth := leftWidth - 2
-		// Account for status bar (3) and border (2) on columns
-		listHeight := msg.Height - 3 - 2
-
-		m.List.SetSize(listWidth, listHeight)
-
-		// Calculate right column dimensions for recipe viewport
-		// Use 35% for left (matching renderListView), rest for right
-		leftWidthPercent := 0.35
-		minLeftWidth := 35
-		calcLeftWidth := int(float64(msg.Width) * leftWidthPercent)
-		if calcLeftWidth < minLeftWidth && msg.Width >= minLeftWidth*2 {
-			calcLeftWidth = minLeftWidth
-		} else if calcLeftWidth < minLeftWidth {
-			calcLeftWidth = int(float64(msg.Width) * leftWidthPercent)
-		}
-		if calcLeftWidth < 10 {
-			calcLeftWidth = 10
-		}
-
-		// Estimate right width (actual will be measured during render, but this is close enough)
-		rightWidth := max(msg.Width-calcLeftWidth-1, 10)
-		availableHeight := msg.Height - 3 // Status bar height
-
-		// Initialize or resize recipe viewport
-		m.initRecipeViewport(rightWidth, availableHeight)
-
-		// Update viewport content for currently selected target
-		if selectedItem := m.List.SelectedItem(); selectedItem != nil {
-			if target, ok := selectedItem.(Target); ok {
-				content := m.buildRecipeContent(&target, rightWidth)
-				m.RecipeViewport.SetContent(content)
-				m.RecipeViewport.GotoTop()
-			}
-		}
+		return m.handleWindowResize(msg), nil
 	}
 
 	var cmd tea.Cmd
 	m.List, cmd = m.List.Update(msg)
-
 	return m, cmd
+}
+
+// handleKeyPress processes keyboard input in list view
+func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "?":
+		m.State = StateHelp
+		return m, nil
+	case "v":
+		m.State = StateVariables
+		return m, nil
+	case "w":
+		m.State = StateWorkspace
+		m.initWorkspacePicker()
+		return m, nil
+	case "g":
+		return m.handleGraphView()
+	case "enter":
+		return m.handleTargetSelection()
+	case "down", "j":
+		return m.handleNavigateDown()
+	case "up", "k":
+		return m.handleNavigateUp()
+	case "ctrl+d":
+		m.RecipeViewport.HalfPageDown()
+		return m, nil
+	case "ctrl+u":
+		m.RecipeViewport.HalfPageUp()
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.List, cmd = m.List.Update(msg)
+	return m, cmd
+}
+
+// handleGraphView switches to graph view for selected target
+func (m Model) handleGraphView() (tea.Model, tea.Cmd) {
+	if selected := m.List.SelectedItem(); selected != nil {
+		if target, ok := selected.(Target); ok {
+			m.State = StateGraph
+			m.GraphTarget = target.Name
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+// handleTargetSelection executes or confirms the selected target
+func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
+	selected := m.List.SelectedItem()
+	target, ok := selected.(Target)
+	if !ok {
+		return m, nil
+	}
+
+	// Check if target is critical and requires confirmation
+	if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
+		targetCopy := target
+		m.PendingTarget = &targetCopy
+		m.State = StateConfirmDangerous
+		return m, nil
+	}
+
+	// Safe or non-critical target - execute immediately
+	m.History.RecordExecution(m.MakefilePath, target.Name)
+	_ = m.History.Save()
+
+	// Refresh recent targets for next render
+	recentEntries := m.History.GetRecent(m.MakefilePath)
+	m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
+	m.State = StateExecuting
+	m.ExecutingTarget = target.Name
+	m.ExecutionStartTime = time.Now()
+	m.ExecutionElapsed = 0
+
+	return m, tea.Batch(
+		executeTarget(target.Name),
+		tickTimer(),
+		m.Spinner.Tick,
+	)
+}
+
+// handleNavigateDown navigates to next target and updates recipe view
+func (m Model) handleNavigateDown() (tea.Model, tea.Cmd) {
+	m = navigateToNextTarget(m, true)
+	m = updateRecipeViewportContent(m)
+	return m, nil
+}
+
+// handleNavigateUp navigates to previous target and updates recipe view
+func (m Model) handleNavigateUp() (tea.Model, tea.Cmd) {
+	m = navigateToNextTarget(m, false)
+	m = updateRecipeViewportContent(m)
+	return m, nil
+}
+
+// handleWindowResize updates dimensions and layout when window size changes
+func (m Model) handleWindowResize(msg tea.WindowSizeMsg) Model {
+	m.Width = msg.Width
+	m.Height = msg.Height
+
+	// Calculate list size for left column (30% of width)
+	leftWidth := max(int(float64(msg.Width)*0.30), 30)
+	listWidth := leftWidth - 2  // Account for border
+	listHeight := msg.Height - 5 // Account for status bar and border
+
+	m.List.SetSize(listWidth, listHeight)
+
+	// Calculate recipe viewport dimensions
+	rightWidth := m.calculateRightWidth(msg.Width)
+	availableHeight := msg.Height - 3
+
+	m.initRecipeViewport(rightWidth, availableHeight)
+	m.updateRecipeViewportForSelection(rightWidth)
+
+	return m
+}
+
+// calculateRightWidth calculates the width for the right column (recipe view)
+func (m Model) calculateRightWidth(totalWidth int) int {
+	leftWidthPercent := 0.35
+	minLeftWidth := 35
+	calcLeftWidth := int(float64(totalWidth) * leftWidthPercent)
+
+	if calcLeftWidth < minLeftWidth && totalWidth >= minLeftWidth*2 {
+		calcLeftWidth = minLeftWidth
+	} else if calcLeftWidth < minLeftWidth {
+		calcLeftWidth = int(float64(totalWidth) * leftWidthPercent)
+	}
+	if calcLeftWidth < 10 {
+		calcLeftWidth = 10
+	}
+
+	return max(totalWidth-calcLeftWidth-1, 10)
+}
+
+// updateRecipeViewportForSelection updates recipe content for selected target
+func (m Model) updateRecipeViewportForSelection(rightWidth int) {
+	if selectedItem := m.List.SelectedItem(); selectedItem != nil {
+		if target, ok := selectedItem.(Target); ok {
+			content := m.buildRecipeContent(&target, rightWidth)
+			m.RecipeViewport.SetContent(content)
+			m.RecipeViewport.GotoTop()
+		}
+	}
 }
 
 // navigateToNextTarget moves the cursor to the next/previous target, skipping separators and headers

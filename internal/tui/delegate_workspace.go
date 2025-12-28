@@ -112,7 +112,7 @@ func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item
 		titleParts = append(titleParts, favoriteIcon)
 	}
 	titleParts = append(titleParts, ws.RelPath)
-	title := fmt.Sprintf("%s", titleParts[len(titleParts)-1])
+	title := titleParts[len(titleParts)-1]
 	if len(titleParts) > 1 {
 		title = titleParts[0] + " " + titleParts[1]
 	}

@@ -168,13 +168,21 @@ func (m *Model) initWorkspacePicker() {
 		return
 	}
 
-	// Record current Makefile as accessed (ensures it appears in the list)
 	m.WorkspaceManager.RecordAccess(m.MakefilePath)
-	_ = m.WorkspaceManager.Save() // Async save, ignore errors (non-critical)
+	_ = m.WorkspaceManager.Save()
 
 	cwd, _ := os.Getwd()
+	discovered := m.discoverWorkspaces(cwd)
+	recent := m.WorkspaceManager.GetRecent(10)
 
-	// Discover Makefiles in the project (starting from cwd or Makefile directory)
+	allWorkspaces := m.buildAllWorkspacesList(recent, discovered, cwd)
+	items := buildWorkspaceListWithSections(allWorkspaces)
+
+	m.WorkspaceList = m.createWorkspaceList(items)
+}
+
+// discoverWorkspaces finds all Makefiles in the project
+func (m *Model) discoverWorkspaces(cwd string) []workspace.DiscoveryResult {
 	searchRoot := cwd
 	if searchRoot == "" {
 		searchRoot = "."
@@ -182,82 +190,69 @@ func (m *Model) initWorkspacePicker() {
 
 	discovered, err := workspace.DiscoverMakefiles(searchRoot, workspace.DefaultDiscoveryOptions())
 	if err != nil {
-		// Fall back to recent-only if discovery fails
-		discovered = []workspace.DiscoveryResult{}
+		return []workspace.DiscoveryResult{}
 	}
+	return discovered
+}
 
-	// Build a map of all discovered Makefiles by path
-	discoveredMap := make(map[string]workspace.DiscoveryResult)
-	for _, result := range discovered {
-		discoveredMap[result.Path] = result
-	}
-
-	// Get recent workspaces
-	recent := m.WorkspaceManager.GetRecent(10)
-
-	// Build combined list with all workspaces
+// buildAllWorkspacesList combines recent and discovered workspaces
+func (m *Model) buildAllWorkspacesList(recent []workspace.Workspace, discovered []workspace.DiscoveryResult, cwd string) []WorkspaceItem {
 	var allWorkspaces []WorkspaceItem
 	recentPaths := make(map[string]bool)
 	cwdBase := filepath.Base(cwd)
 
 	// Add recent workspaces
 	for _, ws := range recent {
-		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
-		relDir := filepath.Dir(relPath)
-
-		// Add root directory name for current directory paths
-		if relDir == "." {
-			relDir = "./" + cwdBase
-		} else if len(relDir) > 2 && relDir[:2] == "./" {
-			relDir = "./" + cwdBase + "/" + relDir[2:]
-		} else if relDir != ".." && !filepath.IsAbs(relDir) {
-			// Subdirectory without ./ prefix (e.g., "examples")
-			relDir = "./" + cwdBase + "/" + relDir
-		}
-
-		allWorkspaces = append(allWorkspaces, WorkspaceItem{
-			Workspace: ws,
-			RelPath:   filepath.Base(relPath), // Just filename
-			RelDir:    relDir,                  // Full relative path with root
-		})
+		item := m.createWorkspaceItem(ws, cwd, cwdBase)
+		allWorkspaces = append(allWorkspaces, item)
 		recentPaths[ws.Path] = true
 	}
 
-	// Add discovered Makefiles that aren't already in recent
+	// Add discovered Makefiles that aren't in recent
 	for _, result := range discovered {
 		if !recentPaths[result.Path] {
-			// Create a workspace entry for discovered Makefile
 			ws := workspace.Workspace{
 				Path:         result.Path,
 				LastAccessed: result.ModTime,
 				AccessCount:  0,
 				IsFavorite:   false,
 			}
-			relPath := m.WorkspaceManager.GetRelativePath(result.Path, cwd)
-			relDir := filepath.Dir(relPath)
-
-			// Add root directory name for current directory paths
-			if relDir == "." {
-				relDir = "./" + cwdBase
-			} else if len(relDir) > 2 && relDir[:2] == "./" {
-				relDir = "./" + cwdBase + "/" + relDir[2:]
-			} else if relDir != ".." && !filepath.IsAbs(relDir) {
-				// Subdirectory without ./ prefix (e.g., "examples")
-				relDir = "./" + cwdBase + "/" + relDir
-			}
-
-			allWorkspaces = append(allWorkspaces, WorkspaceItem{
-				Workspace: ws,
-				RelPath:   filepath.Base(relPath), // Just filename
-				RelDir:    relDir,                  // Full relative path with root
-			})
+			item := m.createWorkspaceItem(ws, cwd, cwdBase)
+			allWorkspaces = append(allWorkspaces, item)
 		}
 	}
 
-	// Build final list with sections
-	items := buildWorkspaceListWithSections(allWorkspaces)
+	return allWorkspaces
+}
 
-	// Create list with workspace delegate
+// createWorkspaceItem creates a WorkspaceItem with formatted paths
+func (m *Model) createWorkspaceItem(ws workspace.Workspace, cwd, cwdBase string) WorkspaceItem {
+	relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
+	relDir := m.formatRelativeDir(filepath.Dir(relPath), cwdBase)
+
+	return WorkspaceItem{
+		Workspace: ws,
+		RelPath:   filepath.Base(relPath),
+		RelDir:    relDir,
+	}
+}
+
+// formatRelativeDir formats the relative directory with root directory name
+func (m *Model) formatRelativeDir(relDir, cwdBase string) string {
+	switch {
+	case relDir == ".":
+		return "./" + cwdBase
+	case len(relDir) > 2 && relDir[:2] == "./":
+		return "./" + cwdBase + "/" + relDir[2:]
+	case relDir != ".." && !filepath.IsAbs(relDir):
+		return "./" + cwdBase + "/" + relDir
+	default:
+		return relDir
+	}
+}
+
+// createWorkspaceList creates and configures the workspace list
+func (m *Model) createWorkspaceList(items []list.Item) list.Model {
 	delegate := NewWorkspaceItemDelegate()
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Switch Workspace"
@@ -265,7 +260,6 @@ func (m *Model) initWorkspacePicker() {
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
-	// Note: list size is set in render function, not here
 
 	// Position cursor on first actual workspace (skip headers)
 	for i, item := range items {
@@ -275,7 +269,7 @@ func (m *Model) initWorkspacePicker() {
 		}
 	}
 
-	m.WorkspaceList = l
+	return l
 }
 
 // buildWorkspaceListWithSections organizes workspaces into sections with headers
@@ -336,11 +330,12 @@ func (m *Model) refreshWorkspaceList() {
 		relDir := filepath.Dir(relPath)
 
 		// Add root directory name for current directory paths
-		if relDir == "." {
+		switch {
+		case relDir == ".":
 			relDir = "./" + cwdBase
-		} else if len(relDir) > 2 && relDir[:2] == "./" {
+		case len(relDir) > 2 && relDir[:2] == "./":
 			relDir = "./" + cwdBase + "/" + relDir[2:]
-		} else if relDir != ".." && !filepath.IsAbs(relDir) {
+		case relDir != ".." && !filepath.IsAbs(relDir):
 			// Subdirectory without ./ prefix (e.g., "examples")
 			relDir = "./" + cwdBase + "/" + relDir
 		}

@@ -73,20 +73,21 @@ func DurationBadge(d time.Duration, isRegressed bool) string {
 	durationStr := formatDurationCompact(d)
 
 	var style lipgloss.Style
-	if isRegressed {
+	switch {
+	case isRegressed:
 		// Red/orange background for regressed
 		style = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
 			Background(WarningColor).
 			Padding(0, 1).
 			Bold(true)
-	} else if d < time.Second {
+	case d < time.Second:
 		// Green background for fast
 		style = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
 			Background(SuccessColor).
 			Padding(0, 1)
-	} else {
+	default:
 		// Blue background for normal
 		style = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).

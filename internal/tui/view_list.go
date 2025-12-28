@@ -391,112 +391,130 @@ func renderEmptyPreview(width, height int) string {
 
 // renderStatusBar renders the bottom status bar with colored nuggets (lipgloss-style)
 func (m Model) renderStatusBar() string {
-	// Count stats - use maps to track unique targets by name
-	totalTargets := 0
+	stats := m.countTargetStats()
+	leftBar := m.buildLeftStatusBar(stats)
+	helpText := m.getHelpText()
+
+	return m.assembleStatusBar(leftBar, helpText)
+}
+
+// targetStats holds counts of different target types
+type targetStats struct {
+	total      int
+	dangerous  int
+	critical   int
+	regressed  int
+}
+
+// countTargetStats counts unique targets by category
+func (m Model) countTargetStats() targetStats {
 	dangerousTargets := make(map[string]bool)
 	criticalTargets := make(map[string]bool)
 	regressedTargets := make(map[string]bool)
+	totalTargets := 0
 
 	for _, item := range m.List.Items() {
-		if target, ok := item.(Target); ok {
-			totalTargets++
-			if target.IsDangerous {
-				if target.DangerLevel == safety.SeverityCritical {
-					criticalTargets[target.Name] = true
-				} else {
-					dangerousTargets[target.Name] = true
-				}
+		target, ok := item.(Target)
+		if !ok {
+			continue
+		}
+		totalTargets++
+		if target.IsDangerous {
+			if target.DangerLevel == safety.SeverityCritical {
+				criticalTargets[target.Name] = true
+			} else {
+				dangerousTargets[target.Name] = true
 			}
-			if target.PerfStats != nil && target.PerfStats.IsRegressed {
-				regressedTargets[target.Name] = true
-			}
+		}
+		if target.PerfStats != nil && target.PerfStats.IsRegressed {
+			regressedTargets[target.Name] = true
 		}
 	}
 
-	// Get unique counts
-	dangerousCount := len(dangerousTargets)
-	criticalCount := len(criticalTargets)
-	regressedCount := len(regressedTargets)
+	return targetStats{
+		total:     totalTargets,
+		dangerous: len(dangerousTargets),
+		critical:  len(criticalTargets),
+		regressed: len(regressedTargets),
+	}
+}
 
-	// Base status bar style - with background for entire bar
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary)
-
-	// Colored nugget style (only for first item)
+// buildLeftStatusBar creates the left side of the status bar with stats
+func (m Model) buildLeftStatusBar(stats targetStats) string {
 	coloredNuggetStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
 		Background(PrimaryColor).
 		Padding(0, 1).
 		MarginRight(1)
 
-	// Plain nugget style (inherits status bar background, just text)
 	plainNuggetStyle := lipgloss.NewStyle().
 		Foreground(TextSecondary).
 		Padding(0, 1)
 
-	// Yellow text style for regressed items
 	yellowNuggetStyle := lipgloss.NewStyle().
 		Foreground(WarningColor).
 		Padding(0, 1)
 
-	// Workspace path nugget (only colored one)
-	workspacePath := m.getWorkspaceDisplayPath()
-	pathNugget := coloredNuggetStyle.Render(workspacePath)
-
 	var sections []string
-	sections = append(sections, pathNugget)
 
-	// Target count (plain text on status bar background)
-	targetInfo := plainNuggetStyle.Render(fmt.Sprintf("%d targets", totalTargets))
-	sections = append(sections, targetInfo)
+	// Workspace path (colored)
+	workspacePath := m.getWorkspaceDisplayPath()
+	sections = append(sections, coloredNuggetStyle.Render(workspacePath))
 
-	// Dangerous count - only if there are dangerous targets
-	if dangerousCount > 0 {
+	// Target count
+	sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%d targets", stats.total)))
+
+	// Dangerous count
+	if stats.dangerous > 0 {
 		dangerIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
-		dangerInfo := plainNuggetStyle.Render(fmt.Sprintf("%s %d dangerous", dangerIcon, dangerousCount))
-		sections = append(sections, dangerInfo)
+		sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%s %d dangerous", dangerIcon, stats.dangerous)))
 	}
 
-	// Critical count - only if there are critical targets
-	if criticalCount > 0 {
+	// Critical count
+	if stats.critical > 0 {
 		criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
-		criticalInfo := plainNuggetStyle.Render(fmt.Sprintf("%s %d critical", criticalIcon, criticalCount))
-		sections = append(sections, criticalInfo)
+		sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%s %d critical", criticalIcon, stats.critical)))
 	}
 
-	// Regressed count with yellow text - only if there are regressed targets
-	if regressedCount > 0 {
-		regressedInfo := yellowNuggetStyle.Render(fmt.Sprintf("%d regressed", regressedCount))
-		sections = append(sections, regressedInfo)
+	// Regressed count
+	if stats.regressed > 0 {
+		sections = append(sections, yellowNuggetStyle.Render(fmt.Sprintf("%d regressed", stats.regressed)))
 	}
 
-	// Calculate width used by nuggets
-	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+	return lipgloss.JoinHorizontal(lipgloss.Top, sections...)
+}
+
+// getHelpText returns appropriate help text based on selected item
+func (m Model) getHelpText() string {
+	item := m.List.SelectedItem()
+	if item == nil {
+		return formatKeyBindings(m.KeyBindings)
+	}
+
+	target, ok := item.(Target)
+	if !ok || !target.IsDangerous {
+		return formatKeyBindings(m.KeyBindings)
+	}
+
+	switch target.DangerLevel {
+	case safety.SeverityCritical:
+		criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
+		return criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
+	case safety.SeverityWarning:
+		warningIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
+		return warningIcon + " Warning • enter: run • esc: cancel • q: quit"
+	case safety.SeverityInfo:
+		infoIcon := lipgloss.NewStyle().Foreground(SecondaryColor).Render("○")
+		return infoIcon + " Info • enter: run • esc: cancel • q: quit"
+	default:
+		return formatKeyBindings(m.KeyBindings)
+	}
+}
+
+// assembleStatusBar combines all status bar components
+func (m Model) assembleStatusBar(leftBar, helpText string) string {
 	leftWidth := lipgloss.Width(leftBar)
 
-	// Right side: shortcuts
-	var helpText string
-	if item := m.List.SelectedItem(); item != nil {
-		if target, ok := item.(Target); ok && target.IsDangerous {
-			switch target.DangerLevel {
-			case safety.SeverityCritical:
-				criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
-				helpText = criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
-			case safety.SeverityWarning:
-				warningIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
-				helpText = warningIcon + " Warning • enter: run • esc: cancel • q: quit"
-			case safety.SeverityInfo:
-				infoIcon := lipgloss.NewStyle().Foreground(SecondaryColor).Render("○")
-				helpText = infoIcon + " Info • enter: run • esc: cancel • q: quit"
-			}
-		} else {
-			helpText = formatKeyBindings(m.KeyBindings)
-		}
-	} else {
-		helpText = formatKeyBindings(m.KeyBindings)
-	}
-
-	// Right section with help text
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Padding(0, 1).
@@ -504,17 +522,16 @@ func (m Model) renderStatusBar() string {
 	rightWidth := lipgloss.Width(right)
 
 	// Middle section fills remaining space
-	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
 	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
 	middle := lipgloss.NewStyle().
 		Width(middleWidth).
 		Align(lipgloss.Left).
 		Render("")
 
-	// Combine all sections
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
 
-	return statusBarStyle.
+	return lipgloss.NewStyle().
+		Foreground(TextPrimary).
 		Width(m.Width).
 		Padding(1, 1).
 		Render(bar)

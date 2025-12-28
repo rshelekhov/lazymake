@@ -97,16 +97,6 @@ func (d ItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return d.DefaultDelegate.Update(msg, m)
 }
 
-// targetItem is a wrapper to make Target compatible with DefaultDelegate
-type targetItem struct {
-	title string
-	desc  string
-}
-
-func (i targetItem) Title() string       { return i.title }
-func (i targetItem) Description() string { return i.desc }
-func (i targetItem) FilterValue() string { return i.title + " " + i.desc }
-
 func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	// Handle separator
 	if _, ok := listItem.(SeparatorTarget); ok {
@@ -128,105 +118,103 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	// Determine if this item is selected
 	isSelected := index == m.Index()
+	icon, iconColor := d.getTargetIcon(target)
+	desc := d.buildDescription(target)
+	titleStyle, descStyle, titleColor := d.getStyles(target, isSelected)
+	title := d.buildTitle(target, icon, iconColor, titleColor)
 
-	// Build title with icon prefix based on target status
-	var icon string
-	var iconColor lipgloss.AdaptiveColor
+	var output strings.Builder
+	output.WriteString(titleStyle.Render(title))
+	output.WriteString("\n")
 
+	d.renderDescription(desc, descStyle, m.Width(), &output)
+	fmt.Fprint(w, output.String())
+}
+
+// getTargetIcon returns the icon and color for a target based on its status
+func (d ItemDelegate) getTargetIcon(target Target) (string, lipgloss.AdaptiveColor) {
 	switch {
 	case target.IsDangerous && target.DangerLevel == safety.SeverityCritical:
-		icon = IconDangerCritical
-		iconColor = ErrorColor
+		return IconDangerCritical, ErrorColor
 	case target.IsDangerous && target.DangerLevel == safety.SeverityWarning:
-		icon = IconDangerWarning
-		iconColor = WarningColor
+		return IconDangerWarning, WarningColor
 	case target.IsDangerous && target.DangerLevel == safety.SeverityInfo:
-		icon = "○" // Blue circle for info
-		iconColor = SecondaryColor
+		return "○", SecondaryColor
 	case target.PerfStats != nil && target.PerfStats.IsRegressed:
-		icon = IconRegression
-		iconColor = WarningColor
+		return IconRegression, WarningColor
 	case target.IsRecent:
-		icon = IconRecent
-		iconColor = SecondaryColor
+		return IconRecent, SecondaryColor
+	default:
+		return "", lipgloss.AdaptiveColor{}
 	}
+}
 
-	// Build description with badge if needed
+// buildDescription creates the description text with performance badge if needed
+func (d ItemDelegate) buildDescription(target Target) string {
 	desc := target.Description
 	if shouldShowDurationBadge(target) {
 		badge := DurationBadge(target.PerfStats.LastDuration, target.PerfStats.IsRegressed)
 		if desc != "" {
-			desc = desc + " " + badge
-		} else {
-			desc = badge
+			return desc + " " + badge
 		}
+		return badge
 	}
+	return desc
+}
 
-	// Select appropriate styles based on selection state
-	var titleStyle, descStyle lipgloss.Style
-	var titleColor lipgloss.AdaptiveColor
-
+// getStyles returns the appropriate styles based on selection state and target
+func (d ItemDelegate) getStyles(target Target, isSelected bool) (titleStyle, descStyle lipgloss.Style, titleColor lipgloss.AdaptiveColor) {
 	if isSelected {
 		titleStyle = d.Styles.SelectedTitle
 		titleColor = PrimaryColor
 		descStyle = d.Styles.SelectedDesc.UnsetWidth()
-
-		// Use different description color for ## comments
-		if target.CommentType == makefile.CommentDouble {
-			descStyle = descStyle.Foreground(TextSecondary)
-		}
 	} else {
 		titleStyle = d.Styles.NormalTitle
 		titleColor = TextPrimary
 		descStyle = d.Styles.NormalDesc.UnsetWidth()
-
-		// Use different description color for ## comments
-		if target.CommentType == makefile.CommentDouble {
-			descStyle = descStyle.Foreground(TextSecondary)
-		}
 	}
 
-	// Build title with pre-colored parts (so titleStyle border works correctly)
+	// Use different description color for ## comments
+	if target.CommentType == makefile.CommentDouble {
+		descStyle = descStyle.Foreground(TextSecondary)
+	}
+
+	return titleStyle, descStyle, titleColor
+}
+
+// buildTitle creates the styled title with icon and target name
+func (d ItemDelegate) buildTitle(target Target, icon string, iconColor, titleColor lipgloss.AdaptiveColor) string {
 	var titleParts []string
 	if icon != "" {
 		iconStyled := lipgloss.NewStyle().Foreground(iconColor).Render(icon)
 		titleParts = append(titleParts, iconStyled)
 	}
-	// Pre-color the target name
 	nameStyled := lipgloss.NewStyle().Foreground(titleColor).Render(target.Name)
 	titleParts = append(titleParts, nameStyled)
-	title := strings.Join(titleParts, " ")
+	return strings.Join(titleParts, " ")
+}
 
-	// Apply titleStyle - border/padding will be applied, Foreground won't affect pre-colored text
-	var output strings.Builder
-	output.WriteString(titleStyle.Render(title))
-	output.WriteString("\n")
-
-	// Render description with wrapping
-	if desc != "" {
-		// Calculate available width for wrapping
-		// Account for list padding and any indentation
-		availableWidth := m.Width() - 4 // Leave some margin
-		if availableWidth < 20 {
-			availableWidth = 20 // Minimum width
-		}
-
-		// Wrap the description text
-		wrappedDesc := wordwrap.String(desc, availableWidth)
-		descLines := strings.Split(wrappedDesc, "\n")
-
-		// Render each line with the description style (includes border)
-		for i, line := range descLines {
-			if i > 0 {
-				output.WriteString("\n")
-			}
-			output.WriteString(descStyle.Render(line))
-		}
+// renderDescription renders the description with text wrapping
+func (d ItemDelegate) renderDescription(desc string, descStyle lipgloss.Style, listWidth int, output *strings.Builder) {
+	if desc == "" {
+		return
 	}
 
-	fmt.Fprint(w, output.String())
+	availableWidth := listWidth - 4 // Leave some margin
+	if availableWidth < 20 {
+		availableWidth = 20 // Minimum width
+	}
+
+	wrappedDesc := wordwrap.String(desc, availableWidth)
+	descLines := strings.Split(wrappedDesc, "\n")
+
+	for i, line := range descLines {
+		if i > 0 {
+			output.WriteString("\n")
+		}
+		output.WriteString(descStyle.Render(line))
+	}
 }
 
 // Modern icon constants - more consistent than emojis across terminals

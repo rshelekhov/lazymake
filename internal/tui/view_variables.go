@@ -15,13 +15,8 @@ func (m Model) renderVariablesView() string {
 		return "Loading variable inspector..."
 	}
 
-	// Calculate available space
-	// Status bar takes 3 lines (border 2 + content 1)
-	statusBarHeight := 3
-	availableHeight := m.Height - statusBarHeight
-
 	// Build main content
-	content := m.buildVariablesContent(availableHeight)
+	content := m.buildVariablesContent()
 
 	// Wrap content in bordered container
 	contentWidth := m.Width - 2 // Account for border (2)
@@ -45,7 +40,7 @@ func (m Model) renderVariablesView() string {
 }
 
 // buildVariablesContent builds the main content for the variables view
-func (m Model) buildVariablesContent(availableHeight int) string {
+func (m Model) buildVariablesContent() string {
 	var builder strings.Builder
 
 	// Title

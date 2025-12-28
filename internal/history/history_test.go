@@ -414,6 +414,7 @@ func TestGetPerformanceStats_Calculate(t *testing.T) {
 	stats := h.GetPerformanceStats(makefile, "test")
 	if stats == nil {
 		t.Fatal("Expected non-nil stats")
+		return
 	}
 
 	// Verify average: (1+2+3+4)/4 = 2.5s
@@ -461,6 +462,7 @@ func TestGetPerformanceStats_RegressionDetection(t *testing.T) {
 	stats := h.GetPerformanceStats(makefile, "slow-build")
 	if stats == nil {
 		t.Fatal("Expected non-nil stats")
+		return
 	}
 
 	if !stats.IsRegressed {
@@ -482,6 +484,7 @@ func TestGetPerformanceStats_NoRegression(t *testing.T) {
 	stats := h.GetPerformanceStats(makefile, "stable-test")
 	if stats == nil {
 		t.Fatal("Expected non-nil stats")
+		return
 	}
 
 	if stats.IsRegressed {
@@ -501,6 +504,7 @@ func TestGetPerformanceStats_IgnoreFailures(t *testing.T) {
 	stats := h.GetPerformanceStats(makefile, "flaky-test")
 	if stats == nil {
 		t.Fatal("Expected non-nil stats")
+		return
 	}
 
 	// Should only count successful executions: (1+2)/2 = 1.5s
