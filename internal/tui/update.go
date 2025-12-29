@@ -82,6 +82,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "v":
 		m.State = StateVariables
+		m.initVariablesViewport()
 		return m, nil
 	case "w":
 		m.State = StateWorkspace
@@ -469,6 +470,26 @@ func (m *Model) initRecipeViewport(width, height int) {
 	m.RecipeViewport.YPosition = 0
 }
 
+func (m *Model) initVariablesViewport() {
+	// Calculate available height (subtract status bar height)
+	statusBarHeight := 3 // Border + padding
+	availableHeight := m.Height - statusBarHeight
+
+	// Calculate content dimensions (account for border and padding)
+	contentWidth := m.Width - 8   // 6 (padding) + 2 (border) = 8
+	contentHeight := availableHeight - 6 // 4 (padding) + 2 (border) = 6
+
+	m.VariablesViewport = viewport.New(contentWidth, contentHeight)
+	m.VariablesViewport.Style = lipgloss.NewStyle()
+
+	// Set content
+	content := m.buildVariablesContent()
+	m.VariablesViewport.SetContent(content)
+
+	// Start at top
+	m.VariablesViewport.YPosition = 0
+}
+
 func computeViewportSize(winWidth, winHeight int) (int, int) {
 	width := getContentWidth(winWidth)
 
@@ -579,10 +600,15 @@ func (m Model) updateVariables(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.State = StateList
 			return m, nil
 		}
+		// Pass other keys to viewport for scrolling
+		var cmd tea.Cmd
+		m.VariablesViewport, cmd = m.VariablesViewport.Update(msg)
+		return m, cmd
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		m.initVariablesViewport() // Reinitialize viewport with new dimensions
 	}
 
 	return m, nil

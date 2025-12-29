@@ -383,25 +383,23 @@ func (m Model) renderOutputView() string {
 
 	viewportStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
+		BorderForeground(BorderColor).
 		Padding(1, 2).
 		// Width(innerWidth)
 		Width(contentWidth)
 
-	// Status bar with lipgloss-style nuggets
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Background(BackgroundSubtle)
-
+	// Status bar matching main view style
 	helpText := "esc: return • q: quit"
-	rightStyle := lipgloss.NewStyle().
+	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Padding(0, 1).
-		Align(lipgloss.Right)
+		Render(helpText)
 
-	statusBar := statusBarStyle.
+	statusBar := lipgloss.NewStyle().
+		Foreground(TextPrimary).
 		Width(m.Width).
-		Render(rightStyle.Render(helpText))
+		Padding(1, 1).
+		Render(right)
 
 	return "\n" + viewportStyle.Render(builder.String()) + "\n" + statusBar
 }
@@ -473,11 +471,10 @@ func (m Model) renderExecutingView() string {
 		Render("  Please wait...")
 	util.WriteString(&builder, waitMsg+"\n")
 
-	// Modern container with accent border and subtle background
+	// Modern container with border
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(BorderAccent).
-		Background(BackgroundSubtle).
+		BorderForeground(BorderColor).
 		Padding(2, 3).
 		Width(width - 4)
 

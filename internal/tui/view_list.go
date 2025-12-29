@@ -645,10 +645,22 @@ func renderRecentTargetInfo(target Target) string {
 		Render(icon + " Performance")
 	util.WriteString(&builder, header+"\n\n")
 
-	// Stats
-	statsStyle := lipgloss.NewStyle().Foreground(TextSecondary)
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("Last run: %s\n", formatDuration(stats.LastDuration))))
-	util.WriteString(&builder, statsStyle.Render(fmt.Sprintf("Average:  %s (%d runs)\n", formatDuration(stats.AvgDuration), stats.ExecutionCount)))
+	// Stats in a subtle box
+	statsContent := fmt.Sprintf(
+		"Last run: %s\nAverage:  %s (%d runs)",
+		formatDuration(stats.LastDuration),
+		formatDuration(stats.AvgDuration),
+		stats.ExecutionCount,
+	)
+
+	statsBox := lipgloss.NewStyle().
+		Foreground(TextSecondary).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(BorderColor).
+		Padding(1, 2).
+		Render(statsContent)
+
+	util.WriteString(&builder, statsBox+"\n")
 
 	return builder.String()
 }

@@ -37,11 +37,12 @@ const (
 
 type Model struct {
 	// UI Components
-	List           list.Model
-	Viewport       viewport.Model // Used for output view
-	RecipeViewport viewport.Model // Used for recipe preview scrolling
-	Progress       progress.Model
-	Spinner        spinner.Model
+	List              list.Model
+	Viewport          viewport.Model // Used for output view
+	RecipeViewport    viewport.Model // Used for recipe preview scrolling
+	VariablesViewport viewport.Model // Used for variables view scrolling
+	Progress          progress.Model
+	Spinner           spinner.Model
 
 	// State
 	State           AppState
@@ -365,7 +366,6 @@ func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
 	items := make([]list.Item, 0, len(allTargets)+len(recentTargets)+3)
 
 	if len(recentTargets) > 0 {
-		// Add recent section
 		items = append(items, HeaderTarget{Label: "RECENT"})
 		for _, t := range recentTargets {
 			items = append(items, t)
@@ -373,7 +373,6 @@ func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
 		items = append(items, SeparatorTarget{})
 	}
 
-	// Add all targets section
 	items = append(items, HeaderTarget{Label: "ALL TARGETS"})
 	for _, t := range allTargets {
 		items = append(items, t)

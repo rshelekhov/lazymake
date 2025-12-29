@@ -15,18 +15,62 @@ func (m Model) renderVariablesView() string {
 		return "Loading variable inspector..."
 	}
 
-	// Build main content
-	content := m.buildVariablesContent()
+	// Render viewport content
+	viewportContent := m.VariablesViewport.View()
+
+	// Calculate dimensions
+	statusBarHeight := 3
+	availableHeight := m.Height - statusBarHeight
+	contentWidth := m.Width - 8
+	contentHeight := availableHeight - 6
+
+	// Force viewport content to exact dimensions
+	viewportContent = lipgloss.Place(
+		contentWidth,
+		contentHeight,
+		lipgloss.Left,
+		lipgloss.Top,
+		viewportContent,
+	)
+
+	// Overlay scroll percentage indicator at bottom-right if content is scrollable
+	if m.VariablesViewport.TotalLineCount() > m.VariablesViewport.VisibleLineCount() {
+		scrollPercent := int(m.VariablesViewport.ScrollPercent() * 100)
+
+		// Create compact scroll indicator
+		scrollIndicator := lipgloss.NewStyle().
+			Foreground(TextMuted).
+			Padding(0, 1).
+			Render(fmt.Sprintf("%d%%", scrollPercent))
+
+		// Place indicator overlay at bottom-right
+		indicatorOverlay := lipgloss.Place(
+			contentWidth,
+			contentHeight,
+			lipgloss.Right,
+			lipgloss.Bottom,
+			scrollIndicator,
+		)
+
+		// Combine content and indicator
+		contentLines := strings.Split(viewportContent, "\n")
+		indicatorLines := strings.Split(indicatorOverlay, "\n")
+
+		if len(contentLines) == len(indicatorLines) && len(contentLines) > 0 {
+			contentLines[len(contentLines)-1] = indicatorLines[len(indicatorLines)-1]
+			viewportContent = strings.Join(contentLines, "\n")
+		}
+	}
 
 	// Wrap content in bordered container
-	contentWidth := m.Width - 2 // Account for border (2)
+	contentWidth = m.Width - 2 // Account for border (2)
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColor).
 		Padding(2, 3).
 		Width(contentWidth)
 
-	borderedContent := containerStyle.Render(content)
+	borderedContent := containerStyle.Render(viewportContent)
 
 	// Render status bar
 	statusBar := m.renderVariablesStatusBar()
@@ -112,8 +156,11 @@ func (m Model) renderVariablesStatusBar() string {
 	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
 	leftWidth := lipgloss.Width(leftBar)
 
-	// Help text on the right
+	// Help text on the right (add scroll hint if scrollable)
 	helpText := "v/esc: return • q: quit"
+	if m.VariablesViewport.TotalLineCount() > m.VariablesViewport.VisibleLineCount() {
+		helpText = "↑/↓: scroll • " + helpText
+	}
 
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
