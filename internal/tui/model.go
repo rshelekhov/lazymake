@@ -44,6 +44,12 @@ type Model struct {
 	Progress          progress.Model
 	Spinner           spinner.Model
 
+	// Custom filter state
+	FilterInput    string
+	IsFiltering    bool
+	AllTargets     []Target // Original unfiltered targets
+	FilteredItems  []list.Item
+
 	// State
 	State           AppState
 	ExecutingTarget string
@@ -250,12 +256,13 @@ func NewModel(cfg *config.Config) Model {
 	l.Title = "Makefile Targets"
 	l.SetShowStatusBar(false) // Disabled - we use custom status bar
 	l.SetShowHelp(false)      // Disabled - help text shown in custom status bar
-	l.SetFilteringEnabled(true)
-	l.Styles.Title = TitleStyle
+	l.SetFilteringEnabled(false) // Disabled - we use custom filtering
 
-	// Customize filter prompt to be shorter and prevent truncation
-	l.FilterInput.Prompt = "/ "
-	l.FilterInput.PromptStyle = lipgloss.NewStyle().Foreground(SecondaryColor)
+	// Custom title style without bottom padding (to match filter spacing)
+	l.Styles.Title = lipgloss.NewStyle().
+		Foreground(PrimaryColor).
+		Bold(true).
+		Padding(0, 0, 0, 0)
 
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return keyBindings
@@ -303,13 +310,16 @@ func NewModel(cfg *config.Config) Model {
 		Spinner:           spin,
 		State:             StateList,
 		Targets:           tuiTargets,
+		AllTargets:        tuiTargets,
+		FilterInput:       "",
+		IsFiltering:       false,
 		Graph:             depGraph,
 		GraphDepth:        -1,
-		ShowOrder:    true,
-		ShowCritical: true,
-		ShowParallel: true,
-		Variables:    vars,
-		History:      hist,
+		ShowOrder:         true,
+		ShowCritical:      true,
+		ShowParallel:      true,
+		Variables:         vars,
+		History:           hist,
 		MakefilePath:      absPath,
 		RecentTargets:     recentTargets,
 		Exporter:          exporter,

@@ -3,8 +3,10 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -74,9 +76,18 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyPress processes keyboard input in list view
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle custom filtering
+	if m.IsFiltering {
+		return m.handleFilteringKeys(msg)
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "/":
+		m.IsFiltering = true
+		m.FilterInput = ""
+		return m, nil
 	case "?":
 		m.State = StateHelp
 		return m, nil
@@ -92,20 +103,106 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleGraphView()
 	case "enter":
 		return m.handleTargetSelection()
-	case "down", "j":
-		return m.handleNavigateDown()
-	case "up", "k":
-		return m.handleNavigateUp()
 	case "ctrl+d":
 		m.RecipeViewport.HalfPageDown()
 		return m, nil
 	case "ctrl+u":
 		m.RecipeViewport.HalfPageUp()
 		return m, nil
+	case "down", "j":
+		m = navigateToTarget(m, true)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+	case "up", "k":
+		m = navigateToTarget(m, false)
+		m = updateRecipeViewportContent(m)
+		return m, nil
 	}
 
+	// Delegate all other keys to the list component
 	var cmd tea.Cmd
 	m.List, cmd = m.List.Update(msg)
+
+	// After list update, ensure cursor is on a Target (not header/separator)
+	m = ensureCursorOnTarget(m)
+	m = updateRecipeViewportContent(m)
+
+	return m, cmd
+}
+
+// navigateToTarget moves to next/previous Target, skipping headers and separators
+func navigateToTarget(m Model, down bool) Model {
+	items := m.List.Items()
+	currentIndex := m.List.Index()
+
+	if down {
+		// Navigate down
+		for i := currentIndex + 1; i < len(items); i++ {
+			if _, ok := items[i].(Target); ok {
+				m.List.Select(i)
+				return m
+			}
+		}
+	} else {
+		// Navigate up
+		for i := currentIndex - 1; i >= 0; i-- {
+			if _, ok := items[i].(Target); ok {
+				m.List.Select(i)
+				return m
+			}
+		}
+	}
+
+	return m
+}
+
+// handleFilteringKeys handles key input when filtering mode is active
+func (m Model) handleFilteringKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		// Exit filtering mode and reset
+		m.IsFiltering = false
+		m.FilterInput = ""
+		m = applyCustomFilter(m)
+		m = ensureCursorOnTarget(m)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+
+	case tea.KeyBackspace:
+		if len(m.FilterInput) > 0 {
+			m.FilterInput = m.FilterInput[:len(m.FilterInput)-1]
+			m = applyCustomFilter(m)
+			m = ensureCursorOnTarget(m)
+			m = updateRecipeViewportContent(m)
+		}
+		return m, nil
+
+	case tea.KeyRunes:
+		// Check if it's "/" and filter is empty - close filter
+		if string(msg.Runes) == "/" && m.FilterInput == "" {
+			m.IsFiltering = false
+			m = applyCustomFilter(m)
+			m = ensureCursorOnTarget(m)
+			m = updateRecipeViewportContent(m)
+			return m, nil
+		}
+		// Add typed character to filter
+		m.FilterInput += string(msg.Runes)
+		m = applyCustomFilter(m)
+		m = ensureCursorOnTarget(m)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+
+	case tea.KeyEnter:
+		// Keep filtering active, just select target
+		return m.handleTargetSelection()
+	}
+
+	// Allow navigation while filtering - delegate to list
+	var cmd tea.Cmd
+	m.List, cmd = m.List.Update(msg)
+	m = ensureCursorOnTarget(m)
+	m = updateRecipeViewportContent(m)
 	return m, cmd
 }
 
@@ -155,20 +252,6 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 		tickTimer(),
 		m.Spinner.Tick,
 	)
-}
-
-// handleNavigateDown navigates to next target and updates recipe view
-func (m Model) handleNavigateDown() (tea.Model, tea.Cmd) {
-	m = navigateToNextTarget(m, true)
-	m = updateRecipeViewportContent(m)
-	return m, nil
-}
-
-// handleNavigateUp navigates to previous target and updates recipe view
-func (m Model) handleNavigateUp() (tea.Model, tea.Cmd) {
-	m = navigateToNextTarget(m, false)
-	m = updateRecipeViewportContent(m)
-	return m, nil
 }
 
 // handleWindowResize updates dimensions and layout when window size changes
@@ -222,26 +305,76 @@ func (m Model) updateRecipeViewportForSelection(rightWidth int) {
 	}
 }
 
-// navigateToNextTarget moves the cursor to the next/previous target, skipping separators and headers
-func navigateToNextTarget(m Model, down bool) Model {
+// applyCustomFilter filters targets based on current FilterInput and updates the list
+func applyCustomFilter(m Model) Model {
+	if m.FilterInput == "" {
+		// No filter, show all with headers
+		items := buildItemsList(m.AllTargets, m.RecentTargets)
+		m.List.SetItems(items)
+		return m
+	}
+
+	// Fuzzy filter targets
+	var filteredTargets []Target
+	for _, target := range m.AllTargets {
+		filterValue := target.Name + " " + target.Description
+		if fuzzyMatch(m.FilterInput, filterValue) {
+			filteredTargets = append(filteredTargets, target)
+		}
+	}
+
+	// Build filtered items WITHOUT headers (clean list during search)
+	var items []list.Item
+	for _, t := range filteredTargets {
+		items = append(items, t)
+	}
+	m.List.SetItems(items)
+
+	// Move cursor to first item
+	if len(items) > 0 {
+		m.List.Select(0)
+	}
+
+	return m
+}
+
+// fuzzyMatch performs simple case-insensitive substring matching
+func fuzzyMatch(pattern, text string) bool {
+	pattern = strings.ToLower(pattern)
+	text = strings.ToLower(text)
+	return strings.Contains(text, pattern)
+}
+
+// ensureCursorOnTarget checks if cursor is on a Target, if not moves to nearest Target
+// This is used after list updates that might leave cursor on header/separator
+func ensureCursorOnTarget(m Model) Model {
+	selectedItem := m.List.SelectedItem()
+	if selectedItem == nil {
+		return m
+	}
+
+	// Check if current selection is a Target
+	if _, ok := selectedItem.(Target); ok {
+		return m // Already on a target
+	}
+
+	// Current item is Header/Separator, find nearest Target
 	items := m.List.Items()
 	currentIndex := m.List.Index()
 
-	if down {
-		// Search downward for next target
-		for i := currentIndex + 1; i < len(items); i++ {
-			if _, ok := items[i].(Target); ok {
-				m.List.Select(i)
-				return m
-			}
+	// Try forward first
+	for i := currentIndex + 1; i < len(items); i++ {
+		if _, ok := items[i].(Target); ok {
+			m.List.Select(i)
+			return m
 		}
-	} else {
-		// Search upward for previous target
-		for i := currentIndex - 1; i >= 0; i-- {
-			if _, ok := items[i].(Target); ok {
-				m.List.Select(i)
-				return m
-			}
+	}
+
+	// Try backward
+	for i := currentIndex - 1; i >= 0; i-- {
+		if _, ok := items[i].(Target); ok {
+			m.List.Select(i)
+			return m
 		}
 	}
 

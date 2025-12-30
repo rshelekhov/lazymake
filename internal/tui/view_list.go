@@ -87,20 +87,52 @@ func (m Model) renderTargetList(width, height int) string {
 	contentWidth := width - 8   // 2 (border) + 6 (padding 3*2)
 	contentHeight := height - 6 // 2 (border) + 4 (padding 2*2)
 
-	// Set list size for this render - give full width for delegate to handle wrapping
-	m.List.SetSize(contentWidth, contentHeight)
+	// Show/hide title based on filtering state
+	var filterBar string
+	listHeight := contentHeight
+
+	if m.IsFiltering {
+		// Hide title when filtering
+		m.List.SetShowTitle(false)
+
+		// Reduce list height to make room for filter input
+		listHeight = contentHeight - 2 // 1 line for filter + 1 line spacing
+
+		// Render filter input bar
+		filterPrompt := lipgloss.NewStyle().
+			Foreground(SecondaryColor).
+			Render("/ ")
+		filterText := lipgloss.NewStyle().
+			Foreground(TextPrimary).
+			Render(m.FilterInput + "█")
+
+		filterBar = filterPrompt + filterText + "\n\n"
+	} else {
+		// Show title when not filtering
+		m.List.SetShowTitle(true)
+	}
+
+	// Set list size
+	m.List.SetSize(contentWidth, listHeight)
 
 	// Get list content
 	listContent := m.List.View()
 
+	// Combine filter bar (if active) and list content
+	var finalContent string
+	if m.IsFiltering {
+		finalContent = filterBar + listContent
+	} else {
+		finalContent = listContent
+	}
+
 	// Use lipgloss.Place to force content into exact dimensions
-	// This ensures the content fills the entire space, even if list is shorter
 	placedContent := lipgloss.Place(
 		contentWidth,
 		contentHeight,
 		lipgloss.Left,
 		lipgloss.Top,
-		listContent,
+		finalContent,
 	)
 
 	// Apply modern border with increased padding and margin
