@@ -10,33 +10,7 @@
 
 A beautiful terminal user interface for browsing and executing Makefile targets.
 
-<!--
-GIF: Hero Demo (30 seconds)
-Recording instructions:
-1. Terminal size: 100x30 (standard width, comfortable height)
-2. Start: Launch `lazymake` in a project with multiple targets
-3. Sequence:
-   - Show main list view with targets (2s)
-   - Press '/' and type "build" to filter (2s)
-   - Clear search with ESC (1s)
-   - Navigate with arrow keys (2s)
-   - Press 'g' to view dependency graph (3s)
-   - Toggle annotations: 'o', 'c', 'p' (3s)
-   - Press 'g' to return (1s)
-   - Press 'v' to view variables (3s)
-   - Navigate variables (2s)
-   - Press 'v' to return (1s)
-   - Press 'w' to view workspace picker (3s)
-   - Navigate workspaces (2s)
-   - Press ESC to return (1s)
-   - Press Enter to execute selected target (3s)
-   - Show output view (3s)
-   - Press ESC to return (1s)
-4. Tools: Use VHS or asciinema + agg
-5. Export: 800px wide, optimized GIF (<5MB)
--->
-
-![Demo](docs/assets/demo.gif)
+<img src="docs/assets/demo.gif" alt="Demo" width="100%" style="max-width: 909px;">
 
 ## Why lazymake?
 
@@ -72,23 +46,7 @@ That's it! No configuration needed. lazymake works with any existing Makefile.
 
 ### Dependency Graph Visualization
 
-<!--
-GIF: Dependency Graph (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Sequence:
-   - Select a target with dependencies (2s)
-   - Press 'g' to view graph (2s)
-   - Show graph with all annotations (3s)
-   - Press '+' to increase depth (2s)
-   - Press 'o' to toggle execution order (2s)
-   - Press 'c' to toggle critical path (2s)
-   - Press 'p' to toggle parallel markers (2s)
-3. Highlight: All three annotation types visible
-4. Target: A target with meaningful dependencies (like 'all', 'build')
--->
-
-![Dependency Graph](docs/assets/dependency-graph.gif)
+![Dependency Graph](docs/assets/dependency-graph.png)
 
 See your build structure instantly. lazymake visualizes dependency chains with execution order, critical path markers, and parallel opportunities. Press `g` on any target to understand what will run and when.
 
@@ -102,21 +60,7 @@ See your build structure instantly. lazymake visualizes dependency chains with e
 
 ### Variable Inspector
 
-<!--
-GIF: Variable Inspector (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Sequence:
-   - Main list view (1s)
-   - Press 'v' to open variable inspector (2s)
-   - Navigate through variables with j/k (4s)
-   - Show different variable types (=, :=, ?=) (3s)
-   - Highlight expanded vs raw values (3s)
-   - Show "Used by" section (2s)
-3. Use Makefile with 5-8 variables for good demo
--->
-
-![Variable Inspector](docs/assets/variable-inspector.gif)
+![Variable Inspector](docs/assets/variable-inspector.png)
 
 Understand your build configuration. lazymake shows all Makefile variables with their raw and expanded values, which targets use them, and whether they're exported to the environment.
 
@@ -130,23 +74,7 @@ Understand your build configuration. lazymake shows all Makefile variables with 
 
 ### Syntax Highlighting for Multi-Language Recipes
 
-<!--
-GIF: Syntax Highlighting (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Use examples/highlighting.mk for demo
-3. Sequence:
-   - Select a Python target with shebang (2s)
-   - Show highlighted Python code with [python] badge (3s)
-   - Select a Go target (2s)
-   - Show highlighted Go commands with [go] badge (3s)
-   - Select a Rust target (2s)
-   - Show highlighted Rust commands with [rust] badge (3s)
-4. Highlight: Different colors for keywords, strings, comments
-5. Show language badges appearing below recipes
--->
-
-![Syntax Highlighting](docs/assets/syntax-highlighting.gif)
+![Syntax Highlighting](docs/assets/syntax-highlighting.png)
 
 Read code faster with automatic syntax highlighting. lazymake detects the language of your recipes (Python, Go, JavaScript, Rust, etc.) and applies appropriate syntax coloring. Works with shebangs, command detection, or manual overrides via comments.
 
@@ -160,22 +88,7 @@ Read code faster with automatic syntax highlighting. lazymake detects the langua
 
 ### Dangerous Command Detection
 
-<!--
-GIF: Safety Features (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Use examples/dangerous.mk for demo
-3. Sequence:
-   - Show list with colored circle indicators (red, yellow, blue) (3s)
-   - Select a red circle (critical) target (2s)
-   - Show recipe preview with danger warning in bordered box (3s)
-   - Press Enter to trigger confirmation dialog (2s)
-   - Show full warning dialog (4s)
-   - Press ESC to cancel (1s)
-4. Target: Use a clearly dangerous command (rm -rf, DROP DATABASE)
--->
-
-![Safety Features](docs/assets/safety-features.gif)
+![Safety Features](docs/assets/safety-features.png)
 
 Protect against accidental disasters. lazymake detects dangerous commands (rm -rf, database drops, force pushes, terraform destroy) and requires confirmation before execution. Visual indicators show danger levels with colored circles in the target list.
 
@@ -190,23 +103,7 @@ Protect against accidental disasters. lazymake detects dangerous commands (rm -r
 
 ### Recent History & Smart Search
 
-<!--
-GIF: History & Search (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Setup: Run 3-4 targets first to populate history
-3. Sequence:
-   - Show RECENT section at top (3s)
-   - Show duration badges (2s)
-   - Press '/' to search (1s)
-   - Type "test" to filter (2s)
-   - Show filtered results (2s)
-   - Clear search with ESC (1s)
-   - Show full list with recent targets (2s)
-   - Highlight ⏱ and 📈 indicators (2s)
--->
-
-![History & Search](docs/assets/history-search.gif)
+![History & Search](docs/assets/makefile-targets.png)
 
 Find targets fast. lazymake tracks your last 5 executed targets per project, showing them at the top for instant access. Real-time search filters by name and description.
 
@@ -220,24 +117,7 @@ Find targets fast. lazymake tracks your last 5 executed targets per project, sho
 
 ### Workspace Management
 
-<!--
-GIF: Workspace Management (15 seconds)
-Recording instructions:
-1. Terminal size: 100x30
-2. Setup: Project with multiple Makefiles (use examples/ or create test structure)
-3. Sequence:
-   - Main list view (1s)
-   - Press 'w' to open workspace picker (2s)
-   - Show recent workspaces with stars and timestamps (3s)
-   - Show discovered workspaces (2s)
-   - Navigate workspaces (2s)
-   - Press 'f' to toggle favorite (2s)
-   - Show star appears/disappears (2s)
-   - Press Enter to switch workspace (1s)
-4. Highlight: Stars, "time ago", directory paths
--->
-
-![Workspace Management](docs/assets/workspace-management.gif)
+![Workspace Management](docs/assets/workspace-management.png)
 
 Work with multiple projects seamlessly. Press `w` to see recent Makefiles and automatically discovered ones in your project tree. Star your favorites for quick access.
 
