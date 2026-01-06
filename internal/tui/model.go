@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -206,6 +208,13 @@ func buildItemsList(tuiTargets, recentTargets []Target) []list.Item {
 }
 
 func NewModel(cfg *config.Config) Model {
+	if cfg.MakefilePath == "" {
+		path, err := findMakefileInCwd()
+		if err != nil {
+			return Model{Err: errors.New("no Makefile specified and none found in current directory")}
+		}
+		cfg.MakefilePath = path
+	}
 	// Parse makefile and load data
 	targets, depGraph, vars, err := loadAndParseMakefile(cfg.MakefilePath)
 	if err != nil {
@@ -327,6 +336,20 @@ func NewModel(cfg *config.Config) Model {
 		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
 	}
+}
+
+// findMakefileInCwd searches for a Makefile in the current directory
+// From the GNU make manual, the order is:
+// GNUmakefile, makefile and Makefile.
+func findMakefileInCwd() (string, error) {
+	possibleNames := []string{"GNUmakefile", "makefile", "Makefile"}
+	for _, name := range possibleNames {
+		path := filepath.Join(".", name)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+	return "", errors.New("no Makefile found in current directory")
 }
 
 // extractTargetNames extracts just the names from a slice of targets
