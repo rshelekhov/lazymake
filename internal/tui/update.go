@@ -248,7 +248,7 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 	m.ExecutionElapsed = 0
 
 	return m, tea.Batch(
-		executeTarget(target.Name),
+		executeTarget(target.Name, m.MakefilePath),
 		tickTimer(),
 		m.Spinner.Tick,
 	)
@@ -684,7 +684,7 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ExecutionStartTime = time.Now()
 				m.ExecutionElapsed = 0
 				return m, tea.Batch(
-					executeTarget(target.Name),
+					executeTarget(target.Name, m.MakefilePath),
 					tickTimer(),   // Start timer
 					m.Spinner.Tick, // Start spinner animation
 				)
@@ -707,9 +707,9 @@ type executeFinishedMsg struct {
 // Custom message for timer ticks
 type timerTickMsg struct{}
 
-func executeTarget(target string) tea.Cmd {
+func executeTarget(target, makefilePath string) tea.Cmd {
 	return func() tea.Msg {
-		result := executor.Execute(target)
+		result := executor.Execute(target, makefilePath)
 		return executeFinishedMsg{result: result}
 	}
 }
