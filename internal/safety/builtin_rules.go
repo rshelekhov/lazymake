@@ -354,6 +354,18 @@ var BuiltinRules = []Rule{
 		},
 		Description: "Force kills all processes by name. Processes won't have a chance to cleanup, may cause data corruption.",
 		Suggestion:  "Use 'killall' without -9 first to allow graceful shutdown. Check processes with 'pgrep' before killing.",
+	{
+		ID:       "deployment-commands",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`kubectl\s+apply`,
+			`terraform\s+apply`,
+			`tofu\s+apply`,  // OpenTofu
+			`helm\s+install`,
+			`helm\s+upgrade`,
+		},
+		Description: "Deploys or applies infrastructure changes. May affect running systems.",
+		Suggestion:  "Review changes with plan/diff first. Verify target environment. Consider using staging before production.",
 	},
 }
 

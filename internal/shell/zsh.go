@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -75,11 +74,11 @@ func (w *ZshWriter) Append(entry string) error {
 	defer f.Close()
 
 	// Acquire exclusive lock to prevent corruption
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	if err := lockFile(f); err != nil {
 		return err
 	}
 	defer func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) // Explicitly ignore unlock error
+		_ = unlockFile(f) // Explicitly ignore unlock error
 	}()
 
 	// Write entry with newline

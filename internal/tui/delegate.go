@@ -3,11 +3,13 @@ package tui
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/safety"
@@ -48,19 +50,54 @@ type HeaderTarget struct {
 
 func (h HeaderTarget) FilterValue() string { return "" }
 
-// ItemDelegate renders list items
-type ItemDelegate struct{}
+// ItemDelegate renders list items using bubbles default delegate styling with our colors
+type ItemDelegate struct {
+	list.DefaultDelegate
+}
 
-func (d ItemDelegate) Height() int { return 3 } // Increased to handle text wrapping
+// NewItemDelegate creates a new delegate with our custom styling
+func NewItemDelegate() ItemDelegate {
+	d := list.NewDefaultDelegate()
 
+	// Apply our GitHub-inspired colors
+	// Selected item (highlighted)
+	d.Styles.SelectedTitle = d.Styles.SelectedTitle.
+		Foreground(PrimaryColor).
+		BorderForeground(PrimaryColor)
+
+	d.Styles.SelectedDesc = d.Styles.SelectedDesc.
+		Foreground(TextMuted).
+		BorderForeground(PrimaryColor)
+
+	// Normal items
+	d.Styles.NormalTitle = d.Styles.NormalTitle.
+		Foreground(TextPrimary)
+
+	d.Styles.NormalDesc = d.Styles.NormalDesc.
+		Foreground(TextMuted)
+
+	// Dimmed (when filtering)
+	d.Styles.DimmedTitle = d.Styles.DimmedTitle.
+		Foreground(TextMuted)
+
+	d.Styles.DimmedDesc = d.Styles.DimmedDesc.
+		Foreground(TextMuted)
+
+	// Filter match highlighting
+	d.Styles.FilterMatch = d.Styles.FilterMatch.
+		Foreground(WarningColor).
+		Bold(true)
+
+	return ItemDelegate{DefaultDelegate: d}
+}
+
+func (d ItemDelegate) Height() int  { return 2 } // Base height, may expand for wrapped text
 func (d ItemDelegate) Spacing() int { return 1 }
-
-func (d ItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d ItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
+	return d.DefaultDelegate.Update(msg, m)
+}
 
 func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	// Get available width for wrapping (subtract padding and margins)
-	availableWidth := m.Width() - 4 // Account for padding and list margins
-
 	// Handle separator
 	if _, ok := listItem.(SeparatorTarget); ok {
 		separator := SeparatorStyle.Render("─────────────────────────────────────")
@@ -75,80 +112,123 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	// Handle regular target
+	// Handle regular target - custom rendering with text wrapping
 	target, ok := listItem.(Target)
 	if !ok {
 		return
 	}
 
-	// Build the target name with indicators (priority: danger > regression > recent)
-	var targetName string
+	isSelected := index == m.Index()
+	icon, iconColor := d.getTargetIcon(target)
+	desc := d.buildDescription(target)
+	titleStyle, descStyle, titleColor := d.getStyles(target, isSelected)
+	title := d.buildTitle(target, icon, iconColor, titleColor)
 
-	// Danger indicators take priority
+	var output strings.Builder
+	output.WriteString(titleStyle.Render(title))
+	output.WriteString("\n")
+
+	d.renderDescription(desc, descStyle, m.Width(), &output)
+	fmt.Fprint(w, output.String())
+}
+
+// getTargetIcon returns the icon and color for a target based on its status
+func (d ItemDelegate) getTargetIcon(target Target) (string, lipgloss.AdaptiveColor) {
 	switch {
 	case target.IsDangerous && target.DangerLevel == safety.SeverityCritical:
-		targetName = "🚨 " + target.Name
+		return IconDangerCritical, ErrorColor
 	case target.IsDangerous && target.DangerLevel == safety.SeverityWarning:
-		targetName = "⚠️  " + target.Name
+		return IconDangerWarning, WarningColor
+	case target.IsDangerous && target.DangerLevel == safety.SeverityInfo:
+		return "○", SecondaryColor
 	case target.PerfStats != nil && target.PerfStats.IsRegressed:
-		targetName = "📈 " + target.Name // Regression indicator
+		return IconRegression, WarningColor
 	case target.IsRecent:
-		targetName = "⏱  " + target.Name // Recent indicator
+		return IconRecent, SecondaryColor
 	default:
-		targetName = target.Name
+		return "", lipgloss.AdaptiveColor{}
 	}
-
-	var str string
-	if index == m.Index() {
-		// Wrap text to available width using a fresh style with Width set
-		wrappedStyle := lipgloss.NewStyle().
-			Foreground(PrimaryColor).
-			Bold(true).
-			PaddingLeft(1).
-			Width(availableWidth)
-		str = wrappedStyle.Render("▶ " + targetName)
-	} else {
-		wrappedStyle := lipgloss.NewStyle().
-			Foreground(TextColor).
-			PaddingLeft(1).
-			Width(availableWidth)
-		str = wrappedStyle.Render("  " + targetName)
-	}
-
-	if target.Description != "" {
-		// Use different styles based on comment type
-		// ## comments use cyan (industry standard for documentation)
-		// # comments use gray (backward compatibility)
-		var descColor lipgloss.AdaptiveColor
-		if target.CommentType == makefile.CommentDouble {
-			descColor = SecondaryColor // Cyan for documented comments
-		} else {
-			descColor = MutedColor // Gray for regular comments
-		}
-
-		// Wrap description to available width
-		wrappedDescStyle := lipgloss.NewStyle().
-			Foreground(descColor).
-			PaddingLeft(3).
-			Width(availableWidth)
-		str += "\n" + wrappedDescStyle.Render(target.Description)
-	}
-
-	// Add duration badge on line 3 if appropriate
-	if shouldShowDurationBadge(target) {
-		durationStr := formatDuration(target.PerfStats.LastDuration)
-		color := getDurationColor(target.PerfStats)
-		badge := lipgloss.NewStyle().
-			Foreground(color).
-			Align(lipgloss.Right).
-			PaddingLeft(3).
-			Width(availableWidth).
-			Render(durationStr)
-		str += "\n" + badge
-	}
-
-	_, _ = fmt.Fprint(w, str)
 }
+
+// buildDescription creates the description text with performance badge if needed
+func (d ItemDelegate) buildDescription(target Target) string {
+	desc := target.Description
+	if shouldShowDurationBadge(target) {
+		badge := DurationBadge(target.PerfStats.LastDuration, target.PerfStats.IsRegressed)
+		if desc != "" {
+			return desc + " " + badge
+		}
+		return badge
+	}
+	return desc
+}
+
+// getStyles returns the appropriate styles based on selection state and target
+func (d ItemDelegate) getStyles(target Target, isSelected bool) (titleStyle, descStyle lipgloss.Style, titleColor lipgloss.AdaptiveColor) {
+	if isSelected {
+		titleStyle = d.Styles.SelectedTitle
+		titleColor = PrimaryColor
+		descStyle = d.Styles.SelectedDesc.UnsetWidth()
+	} else {
+		titleStyle = d.Styles.NormalTitle
+		titleColor = TextPrimary
+		descStyle = d.Styles.NormalDesc.UnsetWidth()
+	}
+
+	// Use different description color for ## comments
+	if target.CommentType == makefile.CommentDouble {
+		descStyle = descStyle.Foreground(TextSecondary)
+	}
+
+	return titleStyle, descStyle, titleColor
+}
+
+// buildTitle creates the styled title with icon and target name
+func (d ItemDelegate) buildTitle(target Target, icon string, iconColor, titleColor lipgloss.AdaptiveColor) string {
+	var titleParts []string
+	if icon != "" {
+		iconStyled := lipgloss.NewStyle().Foreground(iconColor).Render(icon)
+		titleParts = append(titleParts, iconStyled)
+	}
+	nameStyled := lipgloss.NewStyle().Foreground(titleColor).Render(target.Name)
+	titleParts = append(titleParts, nameStyled)
+	return strings.Join(titleParts, " ")
+}
+
+// renderDescription renders the description with text wrapping
+func (d ItemDelegate) renderDescription(desc string, descStyle lipgloss.Style, listWidth int, output *strings.Builder) {
+	if desc == "" {
+		return
+	}
+
+	availableWidth := listWidth - 4 // Leave some margin
+	if availableWidth < 20 {
+		availableWidth = 20 // Minimum width
+	}
+
+	wrappedDesc := wordwrap.String(desc, availableWidth)
+	descLines := strings.Split(wrappedDesc, "\n")
+
+	for i, line := range descLines {
+		if i > 0 {
+			output.WriteString("\n")
+		}
+		output.WriteString(descStyle.Render(line))
+	}
+}
+
+// Modern icon constants - more consistent than emojis across terminals
+const (
+	IconDangerCritical = "○" // Empty circle (red outline)
+	IconDangerWarning  = "○" // Empty circle (yellow outline)
+	IconRegression     = "↑" // Up arrow (performance up = bad)
+	IconRecent         = "◆" // Diamond
+	IconFavorite       = "★" // Star
+	IconSuccess        = "✓" // Check
+	IconError          = "✗" // X mark
+	IconInfo           = "ℹ" // Info
+	IconArrowRight     = "▸" // Right arrow (selected)
+)
 
 // shouldShowDurationBadge returns true if we should show duration badge for this target
 func shouldShowDurationBadge(target Target) bool {
@@ -168,17 +248,5 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%.1fs", d.Seconds())
 	default:
 		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
-	}
-}
-
-// getDurationColor returns the color for a duration badge
-func getDurationColor(stats *history.PerformanceStats) lipgloss.Color {
-	switch {
-	case stats.IsRegressed:
-		return lipgloss.Color("220") // Orange (warning)
-	case stats.AvgDuration < time.Second:
-		return lipgloss.Color("42") // Green (fast)
-	default:
-		return lipgloss.Color("86") // Cyan (normal)
 	}
 }

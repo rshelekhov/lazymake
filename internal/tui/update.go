@@ -3,8 +3,11 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -61,105 +64,79 @@ func (m Model) updateError(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-
-		case "?":
-			m.State = StateHelp
-			return m, nil
-
-		case "v":
-			// Toggle variable inspector view
-			m.State = StateVariables
-			m.VariableListIndex = 0
-			return m, nil
-
-		case "w":
-			// Open workspace picker
-			m.State = StateWorkspace
-			m.initWorkspacePicker()
-			return m, nil
-
-		case "g":
-			// Show graph view for selected target
-			selected := m.List.SelectedItem()
-			if target, ok := selected.(Target); ok {
-				m.State = StateGraph
-				m.GraphTarget = target.Name
-				return m, nil
-			}
-
-		case "enter":
-			selected := m.List.SelectedItem()
-			if target, ok := selected.(Target); ok {
-				// Check if target is critical and requires confirmation
-				if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
-					// Show confirmation dialog for critical targets
-					targetCopy := target
-					m.PendingTarget = &targetCopy
-					m.State = StateConfirmDangerous
-					return m, nil
-				}
-
-				// Safe or non-critical target - execute immediately
-				// Record execution in history BEFORE starting
-				m.History.RecordExecution(m.MakefilePath, target.Name)
-				_ = m.History.Save() // Async, ignore errors (non-critical)
-
-				// Refresh recent targets for next render
-				recentEntries := m.History.GetRecent(m.MakefilePath)
-				m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
-
-				m.State = StateExecuting
-				m.ExecutingTarget = target.Name
-				m.ExecutionStartTime = time.Now()
-				m.ExecutionElapsed = 0
-				return m, tea.Batch(
-					executeTarget(target.Name),
-					tickTimer(), // Start timer
-				)
-			}
-
-		case "down", "j":
-			// Navigate down, skipping over separators and headers
-			m = navigateToNextTarget(m, true)
-			return m, nil
-
-		case "up", "k":
-			// Navigate up, skipping over separators and headers
-			m = navigateToNextTarget(m, false)
-			return m, nil
-		}
-
+		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width
-		m.Height = msg.Height
-
-		// Calculate list size for left column
-		// Left column is 30% of width
-		leftWidth := max(int(float64(msg.Width)*0.30), 30)
-		// Account for border (2) on left column
-		listWidth := leftWidth - 2
-		// Account for status bar (3) and border (2) on columns
-		listHeight := msg.Height - 3 - 2
-
-		m.List.SetSize(listWidth, listHeight)
+		return m.handleWindowResize(msg), nil
 	}
 
 	var cmd tea.Cmd
 	m.List, cmd = m.List.Update(msg)
+	return m, cmd
+}
+
+// handleKeyPress processes keyboard input in list view
+func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle custom filtering
+	if m.IsFiltering {
+		return m.handleFilteringKeys(msg)
+	}
+
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "/":
+		m.IsFiltering = true
+		m.FilterInput = ""
+		return m, nil
+	case "?":
+		m.State = StateHelp
+		return m, nil
+	case "v":
+		m.State = StateVariables
+		m.initVariablesViewport()
+		return m, nil
+	case "w":
+		m.State = StateWorkspace
+		m.initWorkspacePicker()
+		return m, nil
+	case "g":
+		return m.handleGraphView()
+	case "enter":
+		return m.handleTargetSelection()
+	case "ctrl+d":
+		m.RecipeViewport.HalfPageDown()
+		return m, nil
+	case "ctrl+u":
+		m.RecipeViewport.HalfPageUp()
+		return m, nil
+	case "down", "j":
+		m = navigateToTarget(m, true)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+	case "up", "k":
+		m = navigateToTarget(m, false)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+	}
+
+	// Delegate all other keys to the list component
+	var cmd tea.Cmd
+	m.List, cmd = m.List.Update(msg)
+
+	// After list update, ensure cursor is on a Target (not header/separator)
+	m = ensureCursorOnTarget(m)
+	m = updateRecipeViewportContent(m)
 
 	return m, cmd
 }
 
-// navigateToNextTarget moves the cursor to the next/previous target, skipping separators and headers
-func navigateToNextTarget(m Model, down bool) Model {
+// navigateToTarget moves to next/previous Target, skipping headers and separators
+func navigateToTarget(m Model, down bool) Model {
 	items := m.List.Items()
 	currentIndex := m.List.Index()
 
 	if down {
-		// Search downward for next target
+		// Navigate down
 		for i := currentIndex + 1; i < len(items); i++ {
 			if _, ok := items[i].(Target); ok {
 				m.List.Select(i)
@@ -167,12 +144,267 @@ func navigateToNextTarget(m Model, down bool) Model {
 			}
 		}
 	} else {
-		// Search upward for previous target
+		// Navigate up
 		for i := currentIndex - 1; i >= 0; i-- {
 			if _, ok := items[i].(Target); ok {
 				m.List.Select(i)
 				return m
 			}
+		}
+	}
+
+	return m
+}
+
+// handleFilteringKeys handles key input when filtering mode is active
+func (m Model) handleFilteringKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		// Exit filtering mode and reset
+		m.IsFiltering = false
+		m.FilterInput = ""
+		m = applyCustomFilter(m)
+		m = ensureCursorOnTarget(m)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+
+	case tea.KeyBackspace:
+		if len(m.FilterInput) > 0 {
+			m.FilterInput = m.FilterInput[:len(m.FilterInput)-1]
+			m = applyCustomFilter(m)
+			m = ensureCursorOnTarget(m)
+			m = updateRecipeViewportContent(m)
+		}
+		return m, nil
+
+	case tea.KeyRunes:
+		// Check if it's "/" and filter is empty - close filter
+		if string(msg.Runes) == "/" && m.FilterInput == "" {
+			m.IsFiltering = false
+			m = applyCustomFilter(m)
+			m = ensureCursorOnTarget(m)
+			m = updateRecipeViewportContent(m)
+			return m, nil
+		}
+		// Add typed character to filter
+		m.FilterInput += string(msg.Runes)
+		m = applyCustomFilter(m)
+		m = ensureCursorOnTarget(m)
+		m = updateRecipeViewportContent(m)
+		return m, nil
+
+	case tea.KeyEnter:
+		// Keep filtering active, just select target
+		return m.handleTargetSelection()
+	}
+
+	// Allow navigation while filtering - delegate to list
+	var cmd tea.Cmd
+	m.List, cmd = m.List.Update(msg)
+	m = ensureCursorOnTarget(m)
+	m = updateRecipeViewportContent(m)
+	return m, cmd
+}
+
+// handleGraphView switches to graph view for selected target
+func (m Model) handleGraphView() (tea.Model, tea.Cmd) {
+	if selected := m.List.SelectedItem(); selected != nil {
+		if target, ok := selected.(Target); ok {
+			m.State = StateGraph
+			m.GraphTarget = target.Name
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+// handleTargetSelection executes or confirms the selected target
+func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
+	selected := m.List.SelectedItem()
+	target, ok := selected.(Target)
+	if !ok {
+		return m, nil
+	}
+
+	// Check if target is critical and requires confirmation
+	if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
+		targetCopy := target
+		m.PendingTarget = &targetCopy
+		m.State = StateConfirmDangerous
+		return m, nil
+	}
+
+	// Safe or non-critical target - execute immediately
+	m.History.RecordExecution(m.MakefilePath, target.Name)
+	_ = m.History.Save()
+
+	// Refresh recent targets for next render
+	recentEntries := m.History.GetRecent(m.MakefilePath)
+	m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
+	m.State = StateExecuting
+	m.ExecutingTarget = target.Name
+	m.ExecutionStartTime = time.Now()
+	m.ExecutionElapsed = 0
+
+	return m, tea.Batch(
+		executeTarget(target.Name, m.MakefilePath),
+		tickTimer(),
+		m.Spinner.Tick,
+	)
+}
+
+// handleWindowResize updates dimensions and layout when window size changes
+func (m Model) handleWindowResize(msg tea.WindowSizeMsg) Model {
+	m.Width = msg.Width
+	m.Height = msg.Height
+
+	// Calculate list size for left column (30% of width)
+	leftWidth := max(int(float64(msg.Width)*0.30), 30)
+	listWidth := leftWidth - 2  // Account for border
+	listHeight := msg.Height - 5 // Account for status bar and border
+
+	m.List.SetSize(listWidth, listHeight)
+
+	// Calculate recipe viewport dimensions
+	rightWidth := m.calculateRightWidth(msg.Width)
+	availableHeight := msg.Height - 3
+
+	m.initRecipeViewport(rightWidth, availableHeight)
+	m.updateRecipeViewportForSelection(rightWidth)
+
+	return m
+}
+
+// calculateRightWidth calculates the width for the right column (recipe view)
+func (m Model) calculateRightWidth(totalWidth int) int {
+	leftWidthPercent := 0.35
+	minLeftWidth := 35
+	calcLeftWidth := int(float64(totalWidth) * leftWidthPercent)
+
+	if calcLeftWidth < minLeftWidth && totalWidth >= minLeftWidth*2 {
+		calcLeftWidth = minLeftWidth
+	} else if calcLeftWidth < minLeftWidth {
+		calcLeftWidth = int(float64(totalWidth) * leftWidthPercent)
+	}
+	if calcLeftWidth < 10 {
+		calcLeftWidth = 10
+	}
+
+	return max(totalWidth-calcLeftWidth-1, 10)
+}
+
+// updateRecipeViewportForSelection updates recipe content for selected target
+func (m Model) updateRecipeViewportForSelection(rightWidth int) {
+	if selectedItem := m.List.SelectedItem(); selectedItem != nil {
+		if target, ok := selectedItem.(Target); ok {
+			content := m.buildRecipeContent(&target, rightWidth)
+			m.RecipeViewport.SetContent(content)
+			m.RecipeViewport.GotoTop()
+		}
+	}
+}
+
+// applyCustomFilter filters targets based on current FilterInput and updates the list
+func applyCustomFilter(m Model) Model {
+	if m.FilterInput == "" {
+		// No filter, show all with headers
+		items := buildItemsList(m.AllTargets, m.RecentTargets)
+		m.List.SetItems(items)
+		return m
+	}
+
+	// Fuzzy filter targets
+	var filteredTargets []Target
+	for _, target := range m.AllTargets {
+		filterValue := target.Name + " " + target.Description
+		if fuzzyMatch(m.FilterInput, filterValue) {
+			filteredTargets = append(filteredTargets, target)
+		}
+	}
+
+	// Build filtered items WITHOUT headers (clean list during search)
+	var items []list.Item
+	for _, t := range filteredTargets {
+		items = append(items, t)
+	}
+	m.List.SetItems(items)
+
+	// Move cursor to first item
+	if len(items) > 0 {
+		m.List.Select(0)
+	}
+
+	return m
+}
+
+// fuzzyMatch performs simple case-insensitive substring matching
+func fuzzyMatch(pattern, text string) bool {
+	pattern = strings.ToLower(pattern)
+	text = strings.ToLower(text)
+	return strings.Contains(text, pattern)
+}
+
+// ensureCursorOnTarget checks if cursor is on a Target, if not moves to nearest Target
+// This is used after list updates that might leave cursor on header/separator
+func ensureCursorOnTarget(m Model) Model {
+	selectedItem := m.List.SelectedItem()
+	if selectedItem == nil {
+		return m
+	}
+
+	// Check if current selection is a Target
+	if _, ok := selectedItem.(Target); ok {
+		return m // Already on a target
+	}
+
+	// Current item is Header/Separator, find nearest Target
+	items := m.List.Items()
+	currentIndex := m.List.Index()
+
+	// Try forward first
+	for i := currentIndex + 1; i < len(items); i++ {
+		if _, ok := items[i].(Target); ok {
+			m.List.Select(i)
+			return m
+		}
+	}
+
+	// Try backward
+	for i := currentIndex - 1; i >= 0; i-- {
+		if _, ok := items[i].(Target); ok {
+			m.List.Select(i)
+			return m
+		}
+	}
+
+	return m
+}
+
+// updateRecipeViewportContent updates the recipe viewport content for the currently selected target
+func updateRecipeViewportContent(m Model) Model {
+	// Calculate right column width (matching renderListView logic)
+	leftWidthPercent := 0.35
+	minLeftWidth := 35
+	calcLeftWidth := int(float64(m.Width) * leftWidthPercent)
+	if calcLeftWidth < minLeftWidth && m.Width >= minLeftWidth*2 {
+		calcLeftWidth = minLeftWidth
+	} else if calcLeftWidth < minLeftWidth {
+		calcLeftWidth = int(float64(m.Width) * leftWidthPercent)
+	}
+	if calcLeftWidth < 10 {
+		calcLeftWidth = 10
+	}
+
+	// Estimate right width
+	rightWidth := max(m.Width-calcLeftWidth-1, 10)
+
+	// Update viewport content for currently selected target
+	if selectedItem := m.List.SelectedItem(); selectedItem != nil {
+		if target, ok := selectedItem.(Target); ok {
+			content := m.buildRecipeContent(&target, rightWidth)
+			m.RecipeViewport.SetContent(content)
+			m.RecipeViewport.GotoTop() // Auto-scroll to top on new selection
 		}
 	}
 
@@ -270,14 +502,26 @@ func (m Model) updateGraph(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case timerTickMsg:
 		// Update elapsed time
 		if m.State == StateExecuting {
 			m.ExecutionElapsed = time.Since(m.ExecutionStartTime)
-			return m, tickTimer() // Continue ticking
+			// Update spinner
+			m.Spinner, cmd = m.Spinner.Update(msg)
+			return m, tea.Batch(tickTimer(), cmd) // Continue ticking and spinning
 		}
 		return m, nil // Stop if not executing
+
+	case spinner.TickMsg:
+		// Handle spinner animation ticks
+		if m.State == StateExecuting {
+			m.Spinner, cmd = m.Spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 
 	case executeFinishedMsg:
 		// Timer stops automatically (state changes from StateExecuting)
@@ -346,6 +590,39 @@ func (m *Model) resizeViewport() {
 	m.Viewport.Height = vh
 }
 
+// initRecipeViewport initializes the recipe preview viewport with given dimensions
+func (m *Model) initRecipeViewport(width, height int) {
+	// Calculate content dimensions using CORRECT values (matching left column)
+	contentWidth := width - 8   // 6 (padding) + 2 (border) = 8
+	contentHeight := height - 6 // 4 (padding) + 2 (border) = 6
+
+	m.RecipeViewport = viewport.New(contentWidth, contentHeight)
+	m.RecipeViewport.Style = lipgloss.NewStyle()
+
+	// Start at top (will auto-scroll on selection change)
+	m.RecipeViewport.YPosition = 0
+}
+
+func (m *Model) initVariablesViewport() {
+	// Calculate available height (subtract status bar height)
+	statusBarHeight := 3 // Border + padding
+	availableHeight := m.Height - statusBarHeight
+
+	// Calculate content dimensions (account for border and padding)
+	contentWidth := m.Width - 8   // 6 (padding) + 2 (border) = 8
+	contentHeight := availableHeight - 6 // 4 (padding) + 2 (border) = 6
+
+	m.VariablesViewport = viewport.New(contentWidth, contentHeight)
+	m.VariablesViewport.Style = lipgloss.NewStyle()
+
+	// Set content
+	content := m.buildVariablesContent()
+	m.VariablesViewport.SetContent(content)
+
+	// Start at top
+	m.VariablesViewport.YPosition = 0
+}
+
 func computeViewportSize(winWidth, winHeight int) (int, int) {
 	width := getContentWidth(winWidth)
 
@@ -407,8 +684,9 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ExecutionStartTime = time.Now()
 				m.ExecutionElapsed = 0
 				return m, tea.Batch(
-					executeTarget(target.Name),
-					tickTimer(), // Start timer
+					executeTarget(target.Name, m.MakefilePath),
+					tickTimer(),   // Start timer
+					m.Spinner.Tick, // Start spinner animation
 				)
 			}
 		}
@@ -429,9 +707,9 @@ type executeFinishedMsg struct {
 // Custom message for timer ticks
 type timerTickMsg struct{}
 
-func executeTarget(target string) tea.Cmd {
+func executeTarget(target, makefilePath string) tea.Cmd {
 	return func() tea.Msg {
-		result := executor.Execute(target)
+		result := executor.Execute(target, makefilePath)
 		return executeFinishedMsg{result: result}
 	}
 }
@@ -454,23 +732,16 @@ func (m Model) updateVariables(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Return to list view
 			m.State = StateList
 			return m, nil
-
-		case "up", "k":
-			// Navigate up in variable list
-			if m.VariableListIndex > 0 {
-				m.VariableListIndex--
-			}
-
-		case "down", "j":
-			// Navigate down in variable list
-			if m.VariableListIndex < len(m.Variables)-1 {
-				m.VariableListIndex++
-			}
 		}
+		// Pass other keys to viewport for scrolling
+		var cmd tea.Cmd
+		m.VariablesViewport, cmd = m.VariablesViewport.Update(msg)
+		return m, cmd
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		m.initVariablesViewport() // Reinitialize viewport with new dimensions
 	}
 
 	return m, nil

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,24 +47,69 @@ func (m Model) updateWorkspace(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			// Switch to selected workspace
 			return m.handleWorkspaceSelection()
+
+		case "up", "k":
+			// Navigate up, skip headers
+			var cmd tea.Cmd
+			m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
+			m.skipHeadersUp()
+			return m, cmd
+
+		case "down", "j":
+			// Navigate down, skip headers
+			var cmd tea.Cmd
+			m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
+			m.skipHeadersDown()
+			return m, cmd
 		}
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-
-		// Calculate workspace list size (similar to main list)
-		listWidth := msg.Width - 4
-		listHeight := msg.Height - 6 // Account for title and status bar
-
-		m.WorkspaceList.SetSize(listWidth, listHeight)
+		// Note: list size is set in render function, not here
 	}
 
-	// Delegate to workspace list for navigation
+	// Delegate to workspace list for other navigation/updates
 	var cmd tea.Cmd
 	m.WorkspaceList, cmd = m.WorkspaceList.Update(msg)
 
 	return m, cmd
+}
+
+// skipHeadersDown moves cursor down past headers
+func (m *Model) skipHeadersDown() {
+	items := m.WorkspaceList.Items()
+	index := m.WorkspaceList.Index()
+
+	// Check if current item is a header, skip to next workspace
+	for index < len(items) {
+		if _, ok := items[index].(WorkspaceHeaderItem); ok {
+			index++
+			if index < len(items) {
+				m.WorkspaceList.Select(index)
+			}
+		} else {
+			break
+		}
+	}
+}
+
+// skipHeadersUp moves cursor up past headers
+func (m *Model) skipHeadersUp() {
+	items := m.WorkspaceList.Items()
+	index := m.WorkspaceList.Index()
+
+	// Check if current item is a header, skip to previous workspace
+	for index >= 0 {
+		if _, ok := items[index].(WorkspaceHeaderItem); ok {
+			index--
+			if index >= 0 {
+				m.WorkspaceList.Select(index)
+			}
+		} else {
+			break
+		}
+	}
 }
 
 // handleWorkspaceSelection processes workspace selection and initiates switch
@@ -122,13 +168,21 @@ func (m *Model) initWorkspacePicker() {
 		return
 	}
 
-	// Record current Makefile as accessed (ensures it appears in the list)
 	m.WorkspaceManager.RecordAccess(m.MakefilePath)
-	_ = m.WorkspaceManager.Save() // Async save, ignore errors (non-critical)
+	_ = m.WorkspaceManager.Save()
 
 	cwd, _ := os.Getwd()
+	discovered := m.discoverWorkspaces(cwd)
+	recent := m.WorkspaceManager.GetRecent(10)
 
-	// Discover Makefiles in the project (starting from cwd or Makefile directory)
+	allWorkspaces := m.buildAllWorkspacesList(recent, discovered, cwd)
+	items := buildWorkspaceListWithSections(allWorkspaces)
+
+	m.WorkspaceList = m.createWorkspaceList(items)
+}
+
+// discoverWorkspaces finds all Makefiles in the project
+func (m *Model) discoverWorkspaces(cwd string) []workspace.DiscoveryResult {
 	searchRoot := cwd
 	if searchRoot == "" {
 		searchRoot = "."
@@ -136,66 +190,124 @@ func (m *Model) initWorkspacePicker() {
 
 	discovered, err := workspace.DiscoverMakefiles(searchRoot, workspace.DefaultDiscoveryOptions())
 	if err != nil {
-		// Fall back to recent-only if discovery fails
-		discovered = []workspace.DiscoveryResult{}
+		return []workspace.DiscoveryResult{}
 	}
+	return discovered
+}
 
-	// Build a map of all discovered Makefiles by path
-	discoveredMap := make(map[string]workspace.DiscoveryResult)
-	for _, result := range discovered {
-		discoveredMap[result.Path] = result
-	}
-
-	// Get recent workspaces
-	recent := m.WorkspaceManager.GetRecent(10)
-
-	// Build combined list: recent first, then discovered (excluding duplicates)
-	var items []list.Item
-
-	// Add recent workspaces first
+// buildAllWorkspacesList combines recent and discovered workspaces
+func (m *Model) buildAllWorkspacesList(recent []workspace.Workspace, discovered []workspace.DiscoveryResult, cwd string) []WorkspaceItem {
+	var allWorkspaces []WorkspaceItem
 	recentPaths := make(map[string]bool)
+	cwdBase := filepath.Base(cwd)
+
+	// Add recent workspaces
 	for _, ws := range recent {
-		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
-		items = append(items, WorkspaceItem{
-			Workspace: ws,
-			RelPath:   relPath,
-		})
+		item := m.createWorkspaceItem(ws, cwd, cwdBase)
+		allWorkspaces = append(allWorkspaces, item)
 		recentPaths[ws.Path] = true
 	}
 
-	// Add discovered Makefiles that aren't already in recent
+	// Add discovered Makefiles that aren't in recent
 	for _, result := range discovered {
 		if !recentPaths[result.Path] {
-			// Create a workspace entry for discovered Makefile
 			ws := workspace.Workspace{
 				Path:         result.Path,
 				LastAccessed: result.ModTime,
 				AccessCount:  0,
 				IsFavorite:   false,
 			}
-			relPath := m.WorkspaceManager.GetRelativePath(result.Path, cwd)
-			items = append(items, WorkspaceItem{
-				Workspace: ws,
-				RelPath:   relPath,
-			})
+			item := m.createWorkspaceItem(ws, cwd, cwdBase)
+			allWorkspaces = append(allWorkspaces, item)
 		}
 	}
 
-	// Create list with workspace delegate
-	delegate := WorkspaceItemDelegate{}
+	return allWorkspaces
+}
+
+// createWorkspaceItem creates a WorkspaceItem with formatted paths
+func (m *Model) createWorkspaceItem(ws workspace.Workspace, cwd, cwdBase string) WorkspaceItem {
+	relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
+	relDir := m.formatRelativeDir(filepath.Dir(relPath), cwdBase)
+
+	return WorkspaceItem{
+		Workspace: ws,
+		RelPath:   filepath.Base(relPath),
+		RelDir:    relDir,
+	}
+}
+
+// formatRelativeDir formats the relative directory with root directory name
+func (m *Model) formatRelativeDir(relDir, cwdBase string) string {
+	switch {
+	case relDir == ".":
+		return "./" + cwdBase
+	case len(relDir) > 2 && relDir[:2] == "./":
+		return "./" + cwdBase + "/" + relDir[2:]
+	case relDir != ".." && !filepath.IsAbs(relDir):
+		return "./" + cwdBase + "/" + relDir
+	default:
+		return relDir
+	}
+}
+
+// createWorkspaceList creates and configures the workspace list
+func (m *Model) createWorkspaceList(items []list.Item) list.Model {
+	delegate := NewWorkspaceItemDelegate()
 	l := list.New(items, delegate, 0, 0)
-	l.Title = "" // Don't show title - we render it manually in the view
+	l.Title = "Switch Workspace"
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = TitleStyle
 
-	// Set list size based on current dimensions
-	listWidth := m.Width - 4
-	listHeight := m.Height - 6
-	l.SetSize(listWidth, listHeight)
+	// Position cursor on first actual workspace (skip headers)
+	for i, item := range items {
+		if _, ok := item.(WorkspaceItem); ok {
+			l.Select(i)
+			break
+		}
+	}
 
-	m.WorkspaceList = l
+	return l
+}
+
+// buildWorkspaceListWithSections organizes workspaces into sections with headers
+func buildWorkspaceListWithSections(workspaces []WorkspaceItem) []list.Item {
+	// Separate favorites from non-favorites
+	var favorites []WorkspaceItem
+	var nonFavorites []WorkspaceItem
+
+	for _, ws := range workspaces {
+		if ws.Workspace.IsFavorite {
+			favorites = append(favorites, ws)
+		} else {
+			nonFavorites = append(nonFavorites, ws)
+		}
+	}
+
+	// Build items list with sections
+	items := make([]list.Item, 0, len(workspaces)+2)
+
+	// Add favorites section if there are any
+	if len(favorites) > 0 {
+		items = append(items, WorkspaceHeaderItem{Label: "FAVORITES", WithSeparator: false})
+		for _, ws := range favorites {
+			items = append(items, ws)
+		}
+	}
+
+	// Add all workspaces section
+	if len(nonFavorites) > 0 {
+		// Add separator before this section if there were favorites
+		withSeparator := len(favorites) > 0
+		items = append(items, WorkspaceHeaderItem{Label: "ALL WORKSPACES", WithSeparator: withSeparator})
+		for _, ws := range nonFavorites {
+			items = append(items, ws)
+		}
+	}
+
+	return items
 }
 
 // refreshWorkspaceList refreshes the workspace list items (e.g., after toggling favorite)
@@ -207,18 +319,36 @@ func (m *Model) refreshWorkspaceList() {
 	// Get recent workspaces
 	recent := m.WorkspaceManager.GetRecent(10)
 
-	// Convert to list items
-	items := make([]list.Item, len(recent))
+	// Convert to workspace items
+	var allWorkspaces []WorkspaceItem
 	cwd, _ := os.Getwd()
-	for i, ws := range recent {
+	cwdBase := filepath.Base(cwd)
+
+	for _, ws := range recent {
 		// Compute relative path for display
 		relPath := m.WorkspaceManager.GetRelativePath(ws.Path, cwd)
+		relDir := filepath.Dir(relPath)
 
-		items[i] = WorkspaceItem{
-			Workspace: ws,
-			RelPath:   relPath,
+		// Add root directory name for current directory paths
+		switch {
+		case relDir == ".":
+			relDir = "./" + cwdBase
+		case len(relDir) > 2 && relDir[:2] == "./":
+			relDir = "./" + cwdBase + "/" + relDir[2:]
+		case relDir != ".." && !filepath.IsAbs(relDir):
+			// Subdirectory without ./ prefix (e.g., "examples")
+			relDir = "./" + cwdBase + "/" + relDir
 		}
+
+		allWorkspaces = append(allWorkspaces, WorkspaceItem{
+			Workspace: ws,
+			RelPath:   filepath.Base(relPath), // Just filename
+			RelDir:    relDir,                  // Full relative path with root
+		})
 	}
+
+	// Build list with sections
+	items := buildWorkspaceListWithSections(allWorkspaces)
 
 	// Update list items
 	m.WorkspaceList.SetItems(items)

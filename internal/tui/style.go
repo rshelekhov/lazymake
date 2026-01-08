@@ -2,15 +2,33 @@ package tui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Color palette
+// Modern "Slate" color palette - GitHub-inspired, minimalist design
 var (
-	PrimaryColor   = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	SecondaryColor = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
-	SuccessColor   = lipgloss.Color("42")
-	ErrorColor     = lipgloss.AdaptiveColor{Light: "196", Dark: "196"}
-	MutedColor     = lipgloss.AdaptiveColor{Light: "241", Dark: "241"}
-	SeparatorColor = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
-	TextColor      = lipgloss.Color("252")
+	// Primary accent - vibrant blue (trust, action, focus)
+	PrimaryColor = lipgloss.AdaptiveColor{Light: "#0969DA", Dark: "#58A6FF"}
+
+	// Secondary accent - teal/cyan (success, info, highlights)
+	SecondaryColor = lipgloss.AdaptiveColor{Light: "#0550AE", Dark: "#79C0FF"}
+
+	// Success - green
+	SuccessColor = lipgloss.AdaptiveColor{Light: "#1F883D", Dark: "#3FB950"}
+
+	// Error - red
+	ErrorColor = lipgloss.AdaptiveColor{Light: "#CF222E", Dark: "#F85149"}
+
+	// Warning - amber
+	WarningColor = lipgloss.AdaptiveColor{Light: "#9A6700", Dark: "#D29922"}
+
+	// Text hierarchy
+	TextPrimary   = lipgloss.AdaptiveColor{Light: "#1F2328", Dark: "#E6EDF3"}
+	TextSecondary = lipgloss.AdaptiveColor{Light: "#656D76", Dark: "#8B949E"}
+	TextMuted     = lipgloss.AdaptiveColor{Light: "#8C959F", Dark: "#6E7681"}
+
+	// Borders and backgrounds
+	BorderColor      = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#30363D"}
+	BorderAccent     = lipgloss.AdaptiveColor{Light: "#0969DA", Dark: "#58A6FF"}
+	BackgroundSubtle = lipgloss.AdaptiveColor{Light: "#F6F8FA", Dark: "#161B22"}
+	ShadowColor      = lipgloss.AdaptiveColor{Light: "#D0D7DE", Dark: "#010409"}
 )
 
 // Styles
@@ -26,16 +44,16 @@ var (
 				PaddingLeft(1)
 
 	NormalItemStyle = lipgloss.NewStyle().
-			Foreground(TextColor).
+			Foreground(TextPrimary).
 			PaddingLeft(1)
 
 	DescriptionStyle = lipgloss.NewStyle().
-				Foreground(MutedColor).
+				Foreground(TextMuted).
 				PaddingLeft(3)
 
 	// DocDescriptionStyle is used for ## documented comments (industry standard)
 	DocDescriptionStyle = lipgloss.NewStyle().
-				Foreground(SecondaryColor).
+				Foreground(TextSecondary).
 				PaddingLeft(3)
 
 	ErrorStyle = lipgloss.NewStyle().
@@ -51,22 +69,22 @@ var (
 
 	// SectionHeaderStyle is used for "RECENT" and "ALL TARGETS" headers
 	SectionHeaderStyle = lipgloss.NewStyle().
-				Foreground(MutedColor).
+				Foreground(TextSecondary).
 				Bold(true).
 				PaddingTop(1).
-				PaddingLeft(1)
+				PaddingLeft(2)
 
 	// SeparatorStyle is used for the line between sections
 	SeparatorStyle = lipgloss.NewStyle().
-			Foreground(SeparatorColor).
+			Foreground(BorderColor).
 			PaddingLeft(1)
 
 	// StatusBarStyle is used for the status bars in different views
 	StatusBarStyle = lipgloss.NewStyle().
-		// Border(lipgloss.RoundedBorder()).
-		// BorderForeground(SecondaryColor).
-		// Foreground(MutedColor).
-		Foreground(lipgloss.AdaptiveColor{Light: "#343433", Dark: "#C1C6B2"}).
-		Background(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#353533"}).
-		Padding(0, 1)
+			Foreground(TextPrimary).
+			Background(BackgroundSubtle).
+			BorderTop(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(BorderColor).
+			Padding(1, 2)
 )

@@ -14,7 +14,7 @@ type Config struct {
 
 func Load() (*Config, error) {
 	// Set defaults
-	viper.SetDefault("makefile", "Makefile")
+	viper.SetDefault("makefile", "")
 
 	// Export defaults
 	viper.SetDefault("export.enabled", false)

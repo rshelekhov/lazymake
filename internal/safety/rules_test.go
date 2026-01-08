@@ -309,11 +309,11 @@ func TestContextAwareSeverityAdjustment(t *testing.T) {
 			expectedSeverity: SeverityWarning,
 		},
 		{
-			name:             "production keyword upgrades warning",
+			name:             "production keyword does not upgrade warning",
 			targetName:       "deploy",
 			matchedLine:      "docker system prune --filter prod",
 			originalSeverity: SeverityWarning,
-			expectedSeverity: SeverityCritical,
+			expectedSeverity: SeverityWarning, // No longer auto-escalates based on keywords
 		},
 		{
 			name:             "normal target keeps critical",

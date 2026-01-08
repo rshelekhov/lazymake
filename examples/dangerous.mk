@@ -6,10 +6,10 @@
 # Try it with: lazymake -f examples/dangerous.mk
 #
 # Expected indicators:
-# 🚨 deploy-prod  (CRITICAL - requires confirmation)
-# 🚨 nuke-db      (CRITICAL - requires confirmation)
-# ⚠️  clean       (WARNING - downgraded from CRITICAL for clean target)
-# ⚠️  docker-clean (WARNING)
+# ○ deploy-prod  (yellow - Warning)
+# ○ nuke-db      (red - Critical, requires confirmation)
+# ○ clean        (yellow - Warning, downgraded from Critical for clean target)
+# ○ docker-clean (blue - Info)
 
 .PHONY: build test clean deploy-prod nuke-db docker-clean safe-target
 
@@ -26,12 +26,12 @@ clean:
 	rm -rf build/
 	rm -f app
 
-## Deploy to production (DANGEROUS!)
+## Deploy to production
 deploy-prod:
 	kubectl apply -f k8s/prod/
 	terraform apply -var-file=prod.tfvars
 
-## Drop production database (CRITICAL!)
+## Drop production database
 nuke-db:
 	psql -c 'DROP DATABASE production;'
 
