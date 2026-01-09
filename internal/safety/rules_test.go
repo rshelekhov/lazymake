@@ -83,8 +83,9 @@ func TestRuleMatching(t *testing.T) {
 			shouldMatch: true,
 		},
 		{
-			name:        "aws-s3-delete matches force remove bucket",
-			ruleID:      "aws-s3-delete",
+			name:   "aws-s3-delete matches force remove bucket",
+			ruleID: "aws-s3-delete",
+		},
 		// Cloud provider tests
 		{
 			name:        "aws-destructive matches cloudformation delete-stack",
@@ -158,6 +159,10 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name:        "firewall-flush matches iptables flush",
 			ruleID:      "firewall-flush",
+			recipe:      []string{"iptables -F"},
+			shouldMatch: true,
+		},
+		{
 			name:        "aws-destructive safe s3 ls does not match",
 			ruleID:      "aws-destructive",
 			recipe:      []string{"aws s3 ls s3://my-bucket"},
@@ -317,6 +322,9 @@ func TestRuleMatching(t *testing.T) {
 			name:        "env-file-overwrite safe cat .env does not match",
 			ruleID:      "env-file-overwrite",
 			recipe:      []string{"cat .env"},
+			shouldMatch: false,
+		},
+		{
 			name:        "iptables-flush matches nft flush",
 			ruleID:      "iptables-flush",
 			recipe:      []string{"nft flush ruleset"},

@@ -249,6 +249,8 @@ var BuiltinRules = []Rule{
 		},
 		Description: "Overwrites environment configuration files. Existing secrets and settings may be lost.",
 		Suggestion:  "Backup .env files before overwriting. Use version control for environment templates.",
+	},
+
 	// ========== CRITICAL: Cloud provider operations ==========
 
 	{
@@ -455,13 +457,15 @@ var BuiltinRules = []Rule{
 		},
 		Description: "Force kills all processes by name. Processes won't have a chance to cleanup, may cause data corruption.",
 		Suggestion:  "Use 'killall' without -9 first to allow graceful shutdown. Check processes with 'pgrep' before killing.",
+	},
+
 	{
 		ID:       "deployment-commands",
 		Severity: SeverityWarning,
 		Patterns: []string{
 			`kubectl\s+apply`,
 			`terraform\s+apply`,
-			`tofu\s+apply`,  // OpenTofu
+			`tofu\s+apply`, // OpenTofu
 			`helm\s+install`,
 			`helm\s+upgrade`,
 		},
