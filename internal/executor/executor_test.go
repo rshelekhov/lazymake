@@ -26,7 +26,7 @@ test:
 	os.Chdir(tempDir)
 
 	// Execute the target
-	result := Execute("test")
+	result := Execute("test", makefile)
 
 	// Verify success
 	if result.Err != nil {
@@ -65,7 +65,7 @@ fail:
 	os.Chdir(tempDir)
 
 	// Execute the failing target
-	result := Execute("fail")
+	result := Execute("fail", makefile)
 
 	// Verify failure
 	if result.Err == nil {
@@ -93,7 +93,7 @@ func TestExecuteNonExistentTarget(t *testing.T) {
 	os.Chdir(tempDir)
 
 	// Execute non-existent target
-	result := Execute("nonexistent")
+	result := Execute("nonexistent", makefile)
 
 	// Verify error
 	if result.Err == nil {
@@ -130,7 +130,7 @@ echo:
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	result := Execute("echo")
+	result := Execute("echo", makefile)
 
 	// Verify output contains all lines
 	expectedLines := []string{"line 1", "line 2", "line 3"}
@@ -159,7 +159,7 @@ slow:
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	result := Execute("slow")
+	result := Execute("slow", makefile)
 
 	// Verify timing fields are set
 	if result.StartTime.IsZero() {
@@ -254,7 +254,7 @@ fail255:
 			defer os.Chdir(oldDir)
 			os.Chdir(tempDir)
 
-			result := Execute(tt.target)
+			result := Execute(tt.target, makefile)
 
 			if (result.Err != nil) != tt.wantError {
 				t.Errorf("Execute() error = %v, wantError %v", result.Err, tt.wantError)
@@ -285,7 +285,7 @@ mixed:
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	result := Execute("mixed")
+	result := Execute("mixed", makefile)
 
 	// CombinedOutput should contain both stdout and stderr
 	if !contains(result.Output, "stdout message") {
@@ -314,7 +314,7 @@ test:
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	result := Execute("test")
+	result := Execute("test", makefile)
 
 	// Verify all fields in Result struct are populated correctly
 	if result.Output == "" {
@@ -381,7 +381,7 @@ three:
 	// Test executing different targets sequentially
 	targets := []string{"one", "two", "three"}
 	for _, target := range targets {
-		result := Execute(target)
+		result := Execute(target, makefile)
 
 		if result.Err != nil {
 			t.Errorf("Execute(%q) error: %v", target, result.Err)
@@ -415,7 +415,7 @@ concurrent:
 
 	for i := 0; i < 5; i++ {
 		go func() {
-			result := Execute("concurrent")
+			result := Execute("concurrent", makefile)
 			done <- result
 		}()
 	}
@@ -439,7 +439,7 @@ func TestExecute_CommandNotFound_SetsAllFields(t *testing.T) {
 	os.Setenv("PATH", "/nonexistent") // Should fail to find 'make'
 
 	start := time.Now()
-	result := Execute("anytarget")
+	result := Execute("anytarget", "makefile")
 	end := time.Now()
 
 	if result.Err == nil {
@@ -502,7 +502,7 @@ func TestExecute_ResultFields_AlwaysSetEvenOnFailure(t *testing.T) {
 			defer os.Chdir(oldDir)
 			os.Chdir(tempDir)
 
-			res := Execute(tc.target)
+			res := Execute(tc.target, f)
 
 			if tc.shouldErr && res.Err == nil {
 				t.Error("expected error, got nil")
@@ -559,6 +559,6 @@ bench:
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Execute("bench")
+		Execute("bench", makefile)
 	}
 }

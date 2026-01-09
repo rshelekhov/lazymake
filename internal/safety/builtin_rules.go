@@ -249,6 +249,224 @@ var BuiltinRules = []Rule{
 		},
 		Description: "Overwrites environment configuration files. Existing secrets and settings may be lost.",
 		Suggestion:  "Backup .env files before overwriting. Use version control for environment templates.",
+	// ========== CRITICAL: Cloud provider operations ==========
+
+	{
+		ID:       "aws-destructive",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`aws\s+cloudformation\s+delete-stack`,
+			`aws\s+s3\s+rb\s+.*--force`,
+			`aws\s+s3\s+rm\s+.*--recursive`,
+			`aws\s+ec2\s+terminate-instances`,
+			`aws\s+rds\s+delete-db-instance`,
+			`aws\s+rds\s+delete-db-cluster`,
+		},
+		Description: "Deletes AWS resources (CloudFormation stacks, S3 buckets, EC2 instances, RDS databases). This will destroy cloud infrastructure and data permanently.",
+		Suggestion:  "Verify AWS profile and region. Use 'aws cloudformation describe-stacks' or 'aws s3 ls' to review resources first. Enable deletion protection for critical resources.",
+	},
+
+	{
+		ID:       "gcp-destructive",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`gcloud\s+projects\s+delete`,
+			`gcloud\s+compute\s+instances\s+delete`,
+			`gcloud\s+sql\s+instances\s+delete`,
+			`gsutil\s+rb`,
+			`gsutil\s+rm\s+.*-r`,
+		},
+		Description: "Deletes GCP resources (projects, instances, Cloud SQL, GCS buckets). This will destroy cloud infrastructure and data.",
+		Suggestion:  "Verify GCP project with 'gcloud config list'. Use 'gcloud compute instances list' to review resources first.",
+	},
+
+	{
+		ID:       "azure-destructive",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`az\s+group\s+delete`,
+			`az\s+vm\s+delete`,
+			`az\s+sql\s+server\s+delete`,
+			`az\s+storage\s+account\s+delete`,
+		},
+		Description: "Deletes Azure resources (resource groups, VMs, SQL servers, storage accounts). This will destroy cloud infrastructure.",
+		Suggestion:  "Verify Azure subscription with 'az account show'. Use 'az group list' to review resources first.",
+	},
+
+	{
+		ID:       "heroku-destructive",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`heroku\s+apps:destroy`,
+			`heroku\s+addons:destroy`,
+			`heroku\s+pg:reset`,
+		},
+		Description: "Destroys Heroku applications, addons, or resets databases. This causes permanent data loss.",
+		Suggestion:  "Verify app name with 'heroku apps'. Create a backup with 'heroku pg:backups:capture' first.",
+	},
+
+	// ========== CRITICAL: Additional database operations ==========
+
+	{
+		ID:       "redis-flush",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`redis-cli\s+.*FLUSHALL`,
+			`redis-cli\s+.*FLUSHDB`,
+			`redis-cli\s+.*flushall`,
+			`redis-cli\s+.*flushdb`,
+		},
+		Description: "Flushes all data from Redis (FLUSHALL clears all databases, FLUSHDB clears current database). Data loss is immediate and unrecoverable.",
+		Suggestion:  "Verify Redis instance with 'redis-cli INFO'. Consider using 'SCAN' and 'DEL' for targeted deletion. Backup with 'BGSAVE' first.",
+	},
+
+	{
+		ID:       "cassandra-drop",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`(?i)cqlsh.*DROP\s+KEYSPACE`,
+			`(?i)cqlsh.*DROP\s+TABLE`,
+			`(?i)nodetool\s+clearsnapshot`,
+		},
+		Description: "Drops Cassandra keyspaces or tables, or clears snapshots. This causes permanent data loss.",
+		Suggestion:  "Verify keyspace with 'DESCRIBE KEYSPACES'. Create snapshot with 'nodetool snapshot' first.",
+	},
+
+	// ========== CRITICAL: System operations ==========
+
+	{
+		ID:       "crontab-remove",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`crontab\s+-r`,
+			`crontab\s+-ri`,
+		},
+		Description: "Removes all cron jobs for the current user. Scheduled tasks will stop running.",
+		Suggestion:  "Backup crontab with 'crontab -l > crontab.backup' first. Use 'crontab -e' to edit specific jobs.",
+	},
+
+	{
+		ID:       "iptables-flush",
+		Severity: SeverityCritical,
+		Patterns: []string{
+			`iptables\s+-F`,
+			`iptables\s+--flush`,
+			`ip6tables\s+-F`,
+			`nft\s+flush\s+ruleset`,
+		},
+		Description: "Flushes all firewall rules. This may expose services to the network or lock you out of remote servers.",
+		Suggestion:  "Save rules with 'iptables-save > rules.backup' first. Test changes in a staging environment.",
+	},
+
+	// ========== WARNING: Version control destructive operations ==========
+
+	{
+		ID:       "git-branch-delete-force",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`git\s+branch\s+-D`,
+			`git\s+branch\s+--delete\s+--force`,
+		},
+		Description: "Force deletes a git branch regardless of merge status. Unmerged commits may be lost.",
+		Suggestion:  "Use 'git branch -d' (lowercase) for safe deletion that checks merge status. Verify branch with 'git log' first.",
+	},
+
+	{
+		ID:       "git-reflog-expire",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`git\s+reflog\s+expire`,
+			`git\s+gc\s+--prune=now`,
+		},
+		Description: "Expires reflog entries or prunes objects immediately. This removes the ability to recover from mistakes.",
+		Suggestion:  "Use default 'git gc' which keeps recent history. Reflog is your safety net for recovering lost commits.",
+	},
+
+	// ========== WARNING: Container orchestration ==========
+
+	{
+		ID:       "docker-swarm-destructive",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`docker\s+stack\s+rm`,
+			`docker\s+swarm\s+leave\s+--force`,
+			`docker\s+service\s+rm`,
+		},
+		Description: "Removes Docker swarm stacks, services, or leaves the swarm cluster. Running services will be stopped.",
+		Suggestion:  "Use 'docker stack services' to review running services. Scale down gradually if possible.",
+	},
+
+	{
+		ID:       "podman-system-reset",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`podman\s+system\s+reset`,
+			`podman\s+volume\s+prune\s+-f`,
+		},
+		Description: "Resets all Podman data or removes unused volumes. All containers, images, and volumes may be deleted.",
+		Suggestion:  "Use 'podman ps -a' and 'podman volume ls' to review resources first.",
+	},
+
+	// ========== WARNING: Package managers ==========
+
+	{
+		ID:       "pip-uninstall-all",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`pip\s+uninstall\s+.*-y`,
+			`pip3\s+uninstall\s+.*-y`,
+			`pip\s+freeze.*xargs.*pip\s+uninstall`,
+		},
+		Description: "Uninstalls Python packages without confirmation. May break Python environments.",
+		Suggestion:  "Use virtual environments (venv/virtualenv). Review packages with 'pip list' first.",
+	},
+
+	{
+		ID:       "go-clean-modcache",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`go\s+clean\s+-modcache`,
+			`go\s+clean\s+.*-cache.*-modcache`,
+		},
+		Description: "Removes all downloaded Go modules from the cache. Requires re-downloading on next build.",
+		Suggestion:  "Use 'go clean -cache' to clear build cache only. Module cache is shared across projects.",
+	},
+
+	// ========== WARNING: Critical service operations ==========
+
+	{
+		ID:       "systemctl-critical-services",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`systemctl\s+(stop|disable)\s+(nginx|apache2|httpd|postgresql|mysql|mariadb|docker|kubelet|sshd)`,
+			`service\s+(nginx|apache2|httpd|postgresql|mysql|mariadb|docker|sshd)\s+stop`,
+		},
+		Description: "Stops or disables critical system services. May cause downtime or lock you out of servers.",
+		Suggestion:  "Use 'systemctl status' to check service state. Consider using 'systemctl reload' for config changes.",
+	},
+
+	{
+		ID:       "killall-force",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`killall\s+-9`,
+			`killall\s+--signal\s+KILL`,
+			`pkill\s+-9`,
+		},
+		Description: "Force kills all processes by name. Processes won't have a chance to cleanup, may cause data corruption.",
+		Suggestion:  "Use 'killall' without -9 first to allow graceful shutdown. Check processes with 'pgrep' before killing.",
+	{
+		ID:       "deployment-commands",
+		Severity: SeverityWarning,
+		Patterns: []string{
+			`kubectl\s+apply`,
+			`terraform\s+apply`,
+			`tofu\s+apply`,  // OpenTofu
+			`helm\s+install`,
+			`helm\s+upgrade`,
+		},
+		Description: "Deploys or applies infrastructure changes. May affect running systems.",
+		Suggestion:  "Review changes with plan/diff first. Verify target environment. Consider using staging before production.",
 	},
 }
 

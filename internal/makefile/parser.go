@@ -78,7 +78,8 @@ func Parse(filename string) ([]Target, error) {
 		}
 
 		// Check for target definition
-		if strings.Contains(line, ":") && !strings.HasPrefix(line, "\t") {
+		// Skip variable assignments (e.g., VAR := value, VAR = value, VAR ?= value, VAR += value)
+		if strings.Contains(line, ":") && !strings.HasPrefix(line, "\t") && !isVariableAssignment(line) {
 			currentTargets = processTargetLine(
 				line, &targets, currentTargets, recipeLines, lastComment)
 			recipeLines = nil
@@ -94,6 +95,19 @@ func Parse(filename string) ([]Target, error) {
 	}
 
 	return targets, nil
+}
+
+// isVariableAssignment checks if a line is a variable assignment
+// Makefile variable assignments use :=, =, ?=, or +=
+func isVariableAssignment(line string) bool {
+	// Check for common variable assignment operators
+	// Note: We need to check := before : to avoid false positives
+	return strings.Contains(line, ":=") ||
+		strings.Contains(line, "?=") ||
+		strings.Contains(line, "+=") ||
+		// For simple = assignments, check that = appears before :
+		// This handles "VAR = value" while allowing "target: dep = value" (shell assignment in recipe)
+		(strings.Contains(line, "=") && strings.Index(line, "=") < strings.Index(line, ":"))
 }
 
 // commitCurrentTargets commits recipe lines to current targets
@@ -129,8 +143,8 @@ func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
 	parts := strings.SplitN(line, ":", 2)
 	targetName := strings.TrimSpace(parts[0])
 
-	// Skip special targets
-	if strings.HasPrefix(targetName, ".") || strings.Contains(targetName, "=") {
+	// Skip special targets (like .PHONY, .SILENT, etc.)
+	if strings.HasPrefix(targetName, ".") {
 		return nil
 	}
 

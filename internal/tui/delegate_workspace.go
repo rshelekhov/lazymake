@@ -14,7 +14,8 @@ import (
 // WorkspaceItem implements list.Item for workspace picker
 type WorkspaceItem struct {
 	Workspace workspace.Workspace
-	RelPath   string // Relative path for display
+	RelPath   string // Relative path to Makefile for display
+	RelDir    string // Relative path to directory for description
 }
 
 // FilterValue returns the string value to filter against
@@ -22,16 +23,78 @@ func (w WorkspaceItem) FilterValue() string {
 	return w.Workspace.Path
 }
 
+// WorkspaceHeaderItem represents a section header in workspace list
+type WorkspaceHeaderItem struct {
+	Label         string
+	WithSeparator bool // Draw separator line before this header
+}
+
+func (h WorkspaceHeaderItem) FilterValue() string { return "" }
+
 // WorkspaceItemDelegate is a custom delegate for rendering workspace list items
-type WorkspaceItemDelegate struct{}
+type WorkspaceItemDelegate struct {
+	list.DefaultDelegate
+}
+
+// NewWorkspaceItemDelegate creates a new delegate with custom styling matching target list
+func NewWorkspaceItemDelegate() WorkspaceItemDelegate {
+	d := list.NewDefaultDelegate()
+
+	// Apply the same GitHub-inspired colors as target list
+	// Selected item (highlighted) - with left border line
+	d.Styles.SelectedTitle = d.Styles.SelectedTitle.
+		Foreground(PrimaryColor).
+		BorderForeground(PrimaryColor)
+
+	d.Styles.SelectedDesc = d.Styles.SelectedDesc.
+		Foreground(SecondaryColor).
+		BorderForeground(PrimaryColor)
+
+	// Normal items
+	d.Styles.NormalTitle = d.Styles.NormalTitle.
+		Foreground(TextPrimary)
+
+	d.Styles.NormalDesc = d.Styles.NormalDesc.
+		Foreground(TextSecondary)
+
+	// Dimmed (when filtering)
+	d.Styles.DimmedTitle = d.Styles.DimmedTitle.
+		Foreground(TextMuted)
+
+	d.Styles.DimmedDesc = d.Styles.DimmedDesc.
+		Foreground(TextMuted)
+
+	// Filter match highlighting
+	d.Styles.FilterMatch = d.Styles.FilterMatch.
+		Foreground(WarningColor).
+		Bold(true)
+
+	return WorkspaceItemDelegate{DefaultDelegate: d}
+}
 
 func (d WorkspaceItemDelegate) Height() int  { return 2 }
 func (d WorkspaceItemDelegate) Spacing() int { return 1 }
 func (d WorkspaceItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	return nil
+	return d.DefaultDelegate.Update(msg, m)
 }
 
 func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	// Handle header items
+	if header, ok := item.(WorkspaceHeaderItem); ok {
+		headerStyle := lipgloss.NewStyle().
+			Foreground(TextMuted).
+			Bold(true).
+			PaddingLeft(2) // Align with list items
+
+		// Add separator before header if requested
+		if header.WithSeparator {
+			fmt.Fprint(w, "\n")
+		}
+		fmt.Fprint(w, headerStyle.Render(header.Label))
+		return
+	}
+
+	// Handle workspace items
 	ws, ok := item.(WorkspaceItem)
 	if !ok {
 		return
@@ -40,37 +103,44 @@ func (d WorkspaceItemDelegate) Render(w io.Writer, m list.Model, index int, item
 	// Determine if this item is selected
 	isSelected := index == m.Index()
 
-	// Line 1: Favorite indicator + path
-	var prefix string
+	// Build title: Favorite indicator + path
+	var titleParts []string
 	if ws.Workspace.IsFavorite {
-		prefix = "⭐ "
-	} else {
-		prefix = "   "
+		favoriteIcon := lipgloss.NewStyle().
+			Foreground(WarningColor).
+			Render(IconFavorite)
+		titleParts = append(titleParts, favoriteIcon)
+	}
+	titleParts = append(titleParts, ws.RelPath)
+	title := titleParts[len(titleParts)-1]
+	if len(titleParts) > 1 {
+		title = titleParts[0] + " " + titleParts[1]
 	}
 
-	// Style the path
-	pathStyle := lipgloss.NewStyle().Foreground(PrimaryColor)
-	if isSelected {
-		pathStyle = pathStyle.Bold(true)
-	}
-
-	line1 := pathStyle.Render(prefix + ws.RelPath)
-
-	// Line 2: Metadata (last accessed time, access count)
-	metaStyle := lipgloss.NewStyle().Foreground(MutedColor)
-
-	var line2 string
+	// Build description: directory path + last accessed time
+	var desc string
 	if ws.Workspace.AccessCount > 0 {
-		// Recently accessed workspace - show access info
+		// Recently accessed workspace - show directory and last used time
 		timeAgo := formatTimeAgo(ws.Workspace.LastAccessed)
-		accessInfo := fmt.Sprintf("%d times", ws.Workspace.AccessCount)
-		line2 = metaStyle.Render(fmt.Sprintf("   Last used: %s • %s", timeAgo, accessInfo))
+		desc = fmt.Sprintf("%s • Last used: %s", ws.RelDir, timeAgo)
 	} else {
-		// Discovered but never accessed - show "discovered" label
-		line2 = metaStyle.Render("   Discovered in project")
+		// Discovered but never accessed - show directory and "discovered" label
+		desc = fmt.Sprintf("%s • Discovered", ws.RelDir)
 	}
 
-	fmt.Fprintf(w, "%s\n%s", line1, line2)
+	// Select appropriate styles based on selection state
+	var titleStyle, descStyle lipgloss.Style
+	if isSelected {
+		titleStyle = d.Styles.SelectedTitle
+		// Description always uses muted color, even when selected
+		descStyle = d.Styles.SelectedDesc.UnsetWidth().Foreground(TextMuted)
+	} else {
+		titleStyle = d.Styles.NormalTitle
+		descStyle = d.Styles.NormalDesc.UnsetWidth()
+	}
+
+	// Render title and description
+	fmt.Fprintf(w, "%s\n%s", titleStyle.Render(title), descStyle.Render(desc))
 }
 
 // formatTimeAgo formats a timestamp as a human-readable "time ago" string

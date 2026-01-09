@@ -15,9 +15,9 @@ type Result struct {
 	EndTime   time.Time // When execution ended
 }
 
-func Execute(target string) Result {
+func Execute(target, makefilePath string) Result {
 	start := time.Now()
-	cmd := exec.Command("make", target)
+	cmd := exec.Command("make", "-f", makefilePath, target)
 	output, err := cmd.CombinedOutput()
 	end := time.Now()
 	duration := end.Sub(start)

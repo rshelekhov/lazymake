@@ -85,6 +85,16 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name:        "aws-s3-delete matches force remove bucket",
 			ruleID:      "aws-s3-delete",
+		// Cloud provider tests
+		{
+			name:        "aws-destructive matches cloudformation delete-stack",
+			ruleID:      "aws-destructive",
+			recipe:      []string{"aws cloudformation delete-stack --stack-name prod-stack"},
+			shouldMatch: true,
+		},
+		{
+			name:        "aws-destructive matches s3 rb force",
+			ruleID:      "aws-destructive",
 			recipe:      []string{"aws s3 rb s3://my-bucket --force"},
 			shouldMatch: true,
 		},
@@ -148,6 +158,70 @@ func TestRuleMatching(t *testing.T) {
 		{
 			name:        "firewall-flush matches iptables flush",
 			ruleID:      "firewall-flush",
+			name:        "aws-destructive safe s3 ls does not match",
+			ruleID:      "aws-destructive",
+			recipe:      []string{"aws s3 ls s3://my-bucket"},
+			shouldMatch: false,
+		},
+		{
+			name:        "gcp-destructive matches projects delete",
+			ruleID:      "gcp-destructive",
+			recipe:      []string{"gcloud projects delete my-project"},
+			shouldMatch: true,
+		},
+		{
+			name:        "azure-destructive matches group delete",
+			ruleID:      "azure-destructive",
+			recipe:      []string{"az group delete --name my-resource-group"},
+			shouldMatch: true,
+		},
+		{
+			name:        "heroku-destructive matches apps destroy",
+			ruleID:      "heroku-destructive",
+			recipe:      []string{"heroku apps:destroy --app myapp"},
+			shouldMatch: true,
+		},
+		// Database tests
+		{
+			name:        "redis-flush matches FLUSHALL",
+			ruleID:      "redis-flush",
+			recipe:      []string{"redis-cli FLUSHALL"},
+			shouldMatch: true,
+		},
+		{
+			name:        "redis-flush matches lowercase flushdb",
+			ruleID:      "redis-flush",
+			recipe:      []string{"redis-cli -h localhost flushdb"},
+			shouldMatch: true,
+		},
+		{
+			name:        "redis-flush safe GET does not match",
+			ruleID:      "redis-flush",
+			recipe:      []string{"redis-cli GET mykey"},
+			shouldMatch: false,
+		},
+		{
+			name:        "cassandra-drop matches DROP KEYSPACE",
+			ruleID:      "cassandra-drop",
+			recipe:      []string{"cqlsh -e 'DROP KEYSPACE production'"},
+			shouldMatch: true,
+		},
+		// System operation tests
+		{
+			name:        "crontab-remove matches crontab -r",
+			ruleID:      "crontab-remove",
+			recipe:      []string{"crontab -r"},
+			shouldMatch: true,
+		},
+		{
+			name:        "crontab-remove safe crontab -l does not match",
+			ruleID:      "crontab-remove",
+			recipe:      []string{"crontab -l"},
+			shouldMatch: false,
+		},
+		{
+			name:        "iptables-flush matches iptables -F",
+			ruleID:      "iptables-flush",
 			recipe:      []string{"iptables -F"},
 			shouldMatch: true,
 		},
@@ -243,6 +317,91 @@ func TestRuleMatching(t *testing.T) {
 			name:        "env-file-overwrite safe cat .env does not match",
 			ruleID:      "env-file-overwrite",
 			recipe:      []string{"cat .env"},
+			name:        "iptables-flush matches nft flush",
+			ruleID:      "iptables-flush",
+			recipe:      []string{"nft flush ruleset"},
+			shouldMatch: true,
+		},
+		// Version control tests
+		{
+			name:        "git-branch-delete-force matches git branch -D",
+			ruleID:      "git-branch-delete-force",
+			recipe:      []string{"git branch -D feature-branch"},
+			shouldMatch: true,
+		},
+		{
+			name:        "git-branch-delete-force safe -d does not match",
+			ruleID:      "git-branch-delete-force",
+			recipe:      []string{"git branch -d feature-branch"},
+			shouldMatch: false,
+		},
+		{
+			name:        "git-reflog-expire matches reflog expire",
+			ruleID:      "git-reflog-expire",
+			recipe:      []string{"git reflog expire --all --expire=now"},
+			shouldMatch: true,
+		},
+		// Container orchestration tests
+		{
+			name:        "docker-swarm-destructive matches stack rm",
+			ruleID:      "docker-swarm-destructive",
+			recipe:      []string{"docker stack rm mystack"},
+			shouldMatch: true,
+		},
+		{
+			name:        "podman-system-reset matches podman system reset",
+			ruleID:      "podman-system-reset",
+			recipe:      []string{"podman system reset"},
+			shouldMatch: true,
+		},
+		// Package manager tests
+		{
+			name:        "pip-uninstall-all matches pip uninstall -y",
+			ruleID:      "pip-uninstall-all",
+			recipe:      []string{"pip uninstall requests -y"},
+			shouldMatch: true,
+		},
+		{
+			name:        "pip-uninstall-all safe pip install does not match",
+			ruleID:      "pip-uninstall-all",
+			recipe:      []string{"pip install requests"},
+			shouldMatch: false,
+		},
+		{
+			name:        "go-clean-modcache matches go clean -modcache",
+			ruleID:      "go-clean-modcache",
+			recipe:      []string{"go clean -modcache"},
+			shouldMatch: true,
+		},
+		// System service tests
+		{
+			name:        "systemctl-critical-services matches stopping nginx",
+			ruleID:      "systemctl-critical-services",
+			recipe:      []string{"systemctl stop nginx"},
+			shouldMatch: true,
+		},
+		{
+			name:        "systemctl-critical-services matches disabling docker",
+			ruleID:      "systemctl-critical-services",
+			recipe:      []string{"systemctl disable docker"},
+			shouldMatch: true,
+		},
+		{
+			name:        "systemctl-critical-services safe start does not match",
+			ruleID:      "systemctl-critical-services",
+			recipe:      []string{"systemctl start nginx"},
+			shouldMatch: false,
+		},
+		{
+			name:        "killall-force matches killall -9",
+			ruleID:      "killall-force",
+			recipe:      []string{"killall -9 node"},
+			shouldMatch: true,
+		},
+		{
+			name:        "killall-force safe killall does not match",
+			ruleID:      "killall-force",
+			recipe:      []string{"killall node"},
 			shouldMatch: false,
 		},
 	}
@@ -310,11 +469,11 @@ func TestContextAwareSeverityAdjustment(t *testing.T) {
 			expectedSeverity: SeverityWarning,
 		},
 		{
-			name:             "production keyword upgrades warning",
+			name:             "production keyword does not upgrade warning",
 			targetName:       "deploy",
 			matchedLine:      "docker system prune --filter prod",
 			originalSeverity: SeverityWarning,
-			expectedSeverity: SeverityCritical,
+			expectedSeverity: SeverityWarning, // No longer auto-escalates based on keywords
 		},
 		{
 			name:             "normal target keeps critical",

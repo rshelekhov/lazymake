@@ -1,11 +1,15 @@
 package tui
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/config"
@@ -35,8 +39,18 @@ const (
 
 type Model struct {
 	// UI Components
-	List     list.Model
-	Viewport viewport.Model
+	List              list.Model
+	Viewport          viewport.Model // Used for output view
+	RecipeViewport    viewport.Model // Used for recipe preview scrolling
+	VariablesViewport viewport.Model // Used for variables view scrolling
+	Progress          progress.Model
+	Spinner           spinner.Model
+
+	// Custom filter state
+	FilterInput    string
+	IsFiltering    bool
+	AllTargets     []Target // Original unfiltered targets
+	FilteredItems  []list.Item
 
 	// State
 	State           AppState
@@ -54,8 +68,7 @@ type Model struct {
 	ShowParallel bool   // Show parallel markers
 
 	// Variable inspector state
-	Variables         []variables.Variable
-	VariableListIndex int
+	Variables []variables.Variable
 
 	// History state
 	History       *history.History
@@ -195,6 +208,13 @@ func buildItemsList(tuiTargets, recentTargets []Target) []list.Item {
 }
 
 func NewModel(cfg *config.Config) Model {
+	if cfg.MakefilePath == "" {
+		path, err := findMakefileInCwd()
+		if err != nil {
+			return Model{Err: errors.New("no Makefile specified and none found in current directory")}
+		}
+		cfg.MakefilePath = path
+	}
 	// Parse makefile and load data
 	targets, depGraph, vars, err := loadAndParseMakefile(cfg.MakefilePath)
 	if err != nil {
@@ -240,17 +260,18 @@ func NewModel(cfg *config.Config) Model {
 		),
 	}
 
-	delegate := ItemDelegate{}
+	delegate := NewItemDelegate()
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Makefile Targets"
 	l.SetShowStatusBar(false) // Disabled - we use custom status bar
 	l.SetShowHelp(false)      // Disabled - help text shown in custom status bar
-	l.SetFilteringEnabled(true)
-	l.Styles.Title = TitleStyle
+	l.SetFilteringEnabled(false) // Disabled - we use custom filtering
 
-	// Customize filter prompt to be shorter and prevent truncation
-	l.FilterInput.Prompt = "/ "
-	l.FilterInput.PromptStyle = lipgloss.NewStyle().Foreground(SecondaryColor)
+	// Custom title style without bottom padding (to match filter spacing)
+	l.Styles.Title = lipgloss.NewStyle().
+		Foreground(PrimaryColor).
+		Bold(true).
+		Padding(0, 0, 0, 0)
 
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return keyBindings
@@ -280,17 +301,33 @@ func NewModel(cfg *config.Config) Model {
 	// Initialize syntax highlighter
 	highlighter := highlight.NewHighlighter()
 
+	// Initialize modern progress bar
+	prog := progress.New(
+		progress.WithDefaultGradient(),
+		progress.WithWidth(40),
+		progress.WithoutPercentage(),
+	)
+
+	// Initialize spinner with modern dot style
+	spin := spinner.New()
+	spin.Spinner = spinner.Dot
+	spin.Style = lipgloss.NewStyle().Foreground(PrimaryColor)
+
 	return Model{
 		List:              l,
+		Progress:          prog,
+		Spinner:           spin,
 		State:             StateList,
 		Targets:           tuiTargets,
+		AllTargets:        tuiTargets,
+		FilterInput:       "",
+		IsFiltering:       false,
 		Graph:             depGraph,
 		GraphDepth:        -1,
 		ShowOrder:         true,
 		ShowCritical:      true,
 		ShowParallel:      true,
 		Variables:         vars,
-		VariableListIndex: 0,
 		History:           hist,
 		MakefilePath:      absPath,
 		RecentTargets:     recentTargets,
@@ -299,6 +336,20 @@ func NewModel(cfg *config.Config) Model {
 		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
 	}
+}
+
+// findMakefileInCwd searches for a Makefile in the current directory
+// From the GNU make manual, the order is:
+// GNUmakefile, makefile and Makefile.
+func findMakefileInCwd() (string, error) {
+	possibleNames := []string{"GNUmakefile", "makefile", "Makefile"}
+	for _, name := range possibleNames {
+		path := filepath.Join(".", name)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+	return "", errors.New("no Makefile found in current directory")
 }
 
 // extractTargetNames extracts just the names from a slice of targets
@@ -348,7 +399,6 @@ func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
 	items := make([]list.Item, 0, len(allTargets)+len(recentTargets)+3)
 
 	if len(recentTargets) > 0 {
-		// Add recent section
 		items = append(items, HeaderTarget{Label: "RECENT"})
 		for _, t := range recentTargets {
 			items = append(items, t)
@@ -356,7 +406,6 @@ func rebuildListItems(recentTargets, allTargets []Target) []list.Item {
 		items = append(items, SeparatorTarget{})
 	}
 
-	// Add all targets section
 	items = append(items, HeaderTarget{Label: "ALL TARGETS"})
 	for _, t := range allTargets {
 		items = append(items, t)
@@ -379,6 +428,36 @@ func (m Model) SwitchWorkspace(newMakefilePath string, cfg *config.Config) Model
 	newModel.Width = m.Width
 	newModel.Height = m.Height
 	newModel.WorkspaceManager = m.WorkspaceManager
+
+	// Initialize recipe viewport if dimensions are available
+	if newModel.Width > 0 && newModel.Height > 0 {
+		// Calculate dimensions for recipe viewport (matching update logic)
+		leftWidthPercent := 0.35
+		minLeftWidth := 35
+		leftWidth := int(float64(newModel.Width) * leftWidthPercent)
+		if leftWidth < minLeftWidth && newModel.Width >= minLeftWidth*2 {
+			leftWidth = minLeftWidth
+		} else if leftWidth < minLeftWidth {
+			leftWidth = int(float64(newModel.Width) * leftWidthPercent)
+		}
+		if leftWidth < 10 {
+			leftWidth = 10
+		}
+
+		rightWidth := max(newModel.Width-leftWidth-1, 10)
+		availableHeight := newModel.Height - 3 // Status bar height
+
+		newModel.initRecipeViewport(rightWidth, availableHeight)
+
+		// Set content for selected target (if any)
+		if selectedItem := newModel.List.SelectedItem(); selectedItem != nil {
+			if target, ok := selectedItem.(Target); ok {
+				content := newModel.buildRecipeContent(&target, rightWidth)
+				newModel.RecipeViewport.SetContent(content)
+				newModel.RecipeViewport.GotoTop()
+			}
+		}
+	}
 
 	// Record workspace access
 	if m.WorkspaceManager != nil {

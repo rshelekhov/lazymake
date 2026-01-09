@@ -657,3 +657,85 @@ func TestParseRecipeSeparation(t *testing.T) {
 		}
 	}
 }
+
+// TestParseVariableAssignments tests that variable assignments are not parsed as targets
+func TestParseVariableAssignments(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// Test all common variable assignment operators
+	content := `# Variable assignments (should NOT be parsed as targets)
+BINARY_NAME := lazymake
+VERSION = 1.0.0
+GOFLAGS ?= -v -race
+LDFLAGS += -ldflags "-X main.version=$(VERSION)"
+BUILD_DIR = ./bin
+
+# Real targets (should be parsed)
+build: ## Build the app
+	go build -o $(BINARY_NAME)
+
+test: ## Run tests
+	go test ./...
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only parse "build" and "test" as targets
+	// Variables should be ignored
+	expectedTargets := map[string]bool{
+		"build": false,
+		"test":  false,
+	}
+
+	// Variables that should NOT be parsed as targets
+	forbiddenTargets := []string{
+		"BINARY_NAME",
+		"VERSION",
+		"GOFLAGS",
+		"LDFLAGS",
+		"BUILD_DIR",
+	}
+
+	for _, target := range targets {
+		// Check if this is an expected target
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		} else {
+			// Check if this is a forbidden variable name
+			for _, forbidden := range forbiddenTargets {
+				if target.Name == forbidden {
+					t.Errorf("Variable assignment %q was incorrectly parsed as a target", forbidden)
+				}
+			}
+		}
+	}
+
+	// Verify all expected targets were found
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+
+	// Verify we have exactly 2 targets
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d. Targets: %v", len(targets), getTargetNames(targets))
+	}
+}
+
+// Helper function to get target names for debugging
+func getTargetNames(targets []Target) []string {
+	names := make([]string, len(targets))
+	for i, t := range targets {
+		names[i] = t.Name
+	}
+	return names
+}

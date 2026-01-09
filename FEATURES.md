@@ -17,7 +17,7 @@
 - Visual representation of target dependencies with ASCII tree structure
 - Shows execution order numbering `[N]` indicating which targets run first
 - Highlights critical path `★` - the longest dependency chain determining minimum build time
-- Identifies parallel opportunities `∥` - targets that can run concurrently with `make -j`
+- Identifies parallel opportunities `||` - targets that can run concurrently with `make -j`
 - Configurable depth control to show more or fewer dependency levels
 - Smart detection: only marks meaningful build chains, not standalone targets
 - Cycle detection with clear warnings for circular dependencies

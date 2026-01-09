@@ -3,6 +3,9 @@ package highlight
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func TestNewHighlighter(t *testing.T) {
@@ -183,31 +186,31 @@ func TestDefaultColorScheme(t *testing.T) {
 	scheme := defaultColorScheme()
 
 	// Verify all colors are set
-	if scheme.Keyword == "" {
+	if scheme.Keyword == nil {
 		t.Error("Keyword color should be set")
 	}
-	if scheme.String == "" {
+	if scheme.String == nil {
 		t.Error("String color should be set")
 	}
-	if scheme.Comment == "" {
+	if scheme.Comment == nil {
 		t.Error("Comment color should be set")
 	}
-	if scheme.Function == "" {
+	if scheme.Function == nil {
 		t.Error("Function color should be set")
 	}
-	if scheme.Number == "" {
+	if scheme.Number == nil {
 		t.Error("Number color should be set")
 	}
-	if scheme.Operator == "" {
+	if scheme.Operator == nil {
 		t.Error("Operator color should be set")
 	}
-	if scheme.Variable == "" {
+	if scheme.Variable == nil {
 		t.Error("Variable color should be set")
 	}
-	if scheme.Type == "" {
+	if scheme.Type == nil {
 		t.Error("Type color should be set")
 	}
-	if scheme.Default == "" {
+	if scheme.Default == nil {
 		t.Error("Default color should be set")
 	}
 }
@@ -284,6 +287,41 @@ func TestHighlightComplexCode(t *testing.T) {
 				if !strings.Contains(result, "\n") {
 					t.Error("multi-line code should preserve newlines")
 				}
+			}
+		})
+	}
+}
+
+func TestHighlightAppliesColors(t *testing.T) {
+	// Force color output in tests (lipgloss auto-detects terminal and may disable colors)
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(termenv.Ascii) // Reset after test
+
+	h := NewHighlighter()
+
+	tests := []struct {
+		name     string
+		code     string
+		language string
+	}{
+		{name: "JavaScript punctuation", code: "const x = 42;", language: "javascript"},
+		{name: "PHP operators", code: "<?php echo 'hello'; ?>", language: "php"},
+		{name: "Java braces", code: "public class Test { }", language: "java"},
+		{name: "Python parens", code: "def hello():\n    pass", language: "python"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := h.Highlight(tt.code, tt.language)
+
+			if result == "" {
+				t.Error("highlight should return non-empty result")
+			}
+
+			// CRITICAL: Verify ANSI color codes are present
+			// ANSI escape codes start with ESC[ (\x1b[)
+			if !strings.Contains(result, "\x1b[") {
+				t.Errorf("output should contain ANSI color codes, got: %q", result)
 			}
 		})
 	}
