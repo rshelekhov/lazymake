@@ -83,8 +83,10 @@ func TestRuleMatching(t *testing.T) {
 			shouldMatch: true,
 		},
 		{
-			name:   "aws-s3-delete matches force remove bucket",
-			ruleID: "aws-s3-delete",
+			name:        "aws-s3-delete matches force remove bucket",
+			ruleID:      "aws-s3-delete",
+			recipe:      []string{"aws s3 rb s3://my-bucket --force"},
+			shouldMatch: true,
 		},
 		// Cloud provider tests
 		{
