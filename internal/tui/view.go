@@ -41,18 +41,8 @@ func (m Model) View() string {
 // renderErrorView displays error message
 func (m Model) renderErrorView() string {
 	contentWidth := getContentWidth(m.Width)
-	// Calculate inner width for text: subtract border (2) + padding (4) = 6
-	innerWidth := max(contentWidth-6, 20)
 
-	// errorStyle := lipgloss.NewStyle().
-	// 	Foreground(ErrorColor).
-	// 	Bold(true).
-	// 	Border(lipgloss.RoundedBorder()).
-	// 	BorderForeground(ErrorColor).
-	// 	Padding(1, 2).
-	// 	Width(innerWidth)
-	//
-	// return "\n" + errorStyle.Render("Error: "+m.Err.Error()) + "\n\n  Press q to quit\n"
+	innerWidth := max(contentWidth-8, 20)
 
 	errorMsg := lipgloss.NewStyle().
 		Foreground(ErrorColor).
@@ -66,7 +56,7 @@ func (m Model) renderErrorView() string {
 
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SecondaryColor).
+		BorderForeground(BorderColor).
 		Padding(1, 2).
 		Width(contentWidth - 2)
 
