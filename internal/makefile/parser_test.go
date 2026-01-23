@@ -739,3 +739,408 @@ func getTargetNames(targets []Target) []string {
 	}
 	return names
 }
+
+// TestParseDefineBlock tests that content inside define blocks is skipped
+func TestParseDefineBlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `## Real target before define
+build: ## Build the app
+	go build
+
+define FAKE_TEMPLATE
+fake-target: fake-dep
+	@echo "This is not a real target"
+another-fake: dep1 dep2
+	@echo "Neither is this"
+endef
+
+## Real target after define
+test: ## Run tests
+	go test ./...
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only have 2 real targets, not the fake ones inside define
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+
+	expectedTargets := map[string]bool{"build": false, "test": false}
+	forbiddenTargets := []string{"fake-target", "another-fake"}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		}
+		for _, forbidden := range forbiddenTargets {
+			if target.Name == forbidden {
+				t.Errorf("Define block content %q was incorrectly parsed as a target", forbidden)
+			}
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
+
+// TestParseDefineWithOperator tests define blocks with various operators
+func TestParseDefineWithOperator(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `real-target: ## Real target
+	@echo "real"
+
+define VAR =
+fake1: dep
+	@echo "fake"
+endef
+
+define VAR2 :=
+fake2: dep
+	@echo "fake"
+endef
+
+define VAR3 +=
+fake3: dep
+	@echo "fake"
+endef
+
+another-real: ## Another real target
+	@echo "another"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only have 2 real targets
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+
+	expectedTargets := map[string]bool{"real-target": false, "another-real": false}
+	forbiddenTargets := []string{"fake1", "fake2", "fake3"}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		}
+		for _, forbidden := range forbiddenTargets {
+			if target.Name == forbidden {
+				t.Errorf("Define block content %q was incorrectly parsed as a target", forbidden)
+			}
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
+
+// TestParseNestedDefineBlocks tests correct handling of nested define/endef pairs
+func TestParseNestedDefineBlocks(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `real1: ## First real
+	@echo "real1"
+
+define OUTER
+fake-outer: dep
+	@echo "outer"
+
+define INNER
+fake-inner: dep
+	@echo "inner"
+endef
+
+still-fake: ## Still inside outer
+	@echo "fake"
+endef
+
+real2: ## Second real
+	@echo "real2"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only have 2 real targets
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+
+	expectedTargets := map[string]bool{"real1": false, "real2": false}
+	forbiddenTargets := []string{"fake-outer", "fake-inner", "still-fake"}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		}
+		for _, forbidden := range forbiddenTargets {
+			if target.Name == forbidden {
+				t.Errorf("Nested define block content %q was incorrectly parsed as a target", forbidden)
+			}
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
+
+// TestParseDefineWithDynamicTargets reproduces issue #21 scenario
+func TestParseDefineWithDynamicTargets(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	// This reproduces the exact pattern from issue #21
+	content := `## Project targets
+all: build ## Build everything
+	@echo "done"
+
+build: ## Build the app
+	@go build
+
+# Dynamic target generation macro
+define make-target
+$(strip $1): $$(addprefix $$(dir $$@),$2)
+	$$(call run-recipe,$3)
+endef
+
+# Another macro with colons
+define check-var
+$(if $1,,$(error $2: variable is required))
+endef
+
+test: ## Run tests
+	@go test ./...
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only have 3 real targets: all, build, test
+	expectedTargets := map[string]bool{"all": false, "build": false, "test": false}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		} else {
+			t.Errorf("Unexpected target found: %q (likely from define block)", target.Name)
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+
+	if len(targets) != 3 {
+		t.Errorf("Expected 3 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+}
+
+// TestParseDefineWhitespaceVariations tests various whitespace around define
+func TestParseDefineWhitespaceVariations(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `real1: ## Real target
+	@echo "real"
+
+define   SPACED_NAME
+fake1: dep
+	@echo "fake"
+endef
+
+define	TABBED
+fake2: dep
+	@echo "fake"
+endef
+
+  define INDENTED_DEFINE
+fake3: dep
+	@echo "fake"
+endef
+
+real2: ## Another real
+	@echo "real"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	expectedTargets := map[string]bool{"real1": false, "real2": false}
+	forbiddenTargets := []string{"fake1", "fake2", "fake3"}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		}
+		for _, forbidden := range forbiddenTargets {
+			if target.Name == forbidden {
+				t.Errorf("Define block content %q was incorrectly parsed as a target", forbidden)
+			}
+		}
+	}
+
+	// real1 and real2 should exist
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
+
+// TestParseEmptyDefineBlock tests empty and whitespace-only define blocks
+func TestParseEmptyDefineBlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `real1: ## Before empty define
+	@echo "real1"
+
+define EMPTY
+endef
+
+define WHITESPACE
+
+
+
+endef
+
+define COMMENTS_ONLY
+# Just a comment
+## Another comment
+endef
+
+real2: ## After empty defines
+	@echo "real2"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should have exactly 2 targets
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+
+	expectedTargets := map[string]bool{"real1": false, "real2": false}
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
+
+// TestParseDefineWithColons tests that colons in define content don't become targets
+func TestParseDefineWithColons(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `real-target: ## Real target
+	@echo "real"
+
+define MESSAGE
+Build status: complete
+Error: none
+Warning: 0
+foo: bar: baz
+endef
+
+define RULE_TEMPLATE
+$(1): $(2)
+	@echo "Building $$@"
+	@echo "Dependencies: $$^"
+endef
+
+another-real: ## Another real target
+	@echo "another"
+`
+
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Should only have 2 real targets
+	if len(targets) != 2 {
+		t.Errorf("Expected 2 targets, got %d: %v", len(targets), getTargetNames(targets))
+	}
+
+	expectedTargets := map[string]bool{"real-target": false, "another-real": false}
+
+	for _, target := range targets {
+		if _, ok := expectedTargets[target.Name]; ok {
+			expectedTargets[target.Name] = true
+		} else {
+			t.Errorf("Unexpected target found: %q (likely from define block)", target.Name)
+		}
+	}
+
+	for name, found := range expectedTargets {
+		if !found {
+			t.Errorf("Expected target %q not found", name)
+		}
+	}
+}
