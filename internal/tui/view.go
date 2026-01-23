@@ -401,10 +401,15 @@ func getContentWidth(terminalWidth int) int {
 	return width
 }
 
-// renderExecutingView renders the execution screen with real-time timer
+// renderExecutingView renders the execution screen with real-time timer and streaming output
 func (m Model) renderExecutingView() string {
 	elapsed := m.ExecutionElapsed
 	width := m.Width
+
+	// Use same container width as renderOutputView for consistency
+	containerWidth := width - 2
+	// Inner content width: container - border (2) - padding (4)
+	innerWidth := containerWidth - 6
 
 	// Get performance stats for the executing target
 	var stats *history.PerformanceStats
@@ -422,7 +427,7 @@ func (m Model) renderExecutingView() string {
 		Foreground(PrimaryColor).
 		Bold(true).
 		Render(m.Spinner.View() + " Executing: make " + m.ExecutingTarget)
-	util.WriteString(&builder, "\n"+title+"\n\n")
+	util.WriteString(&builder, title+"\n\n")
 
 	// Progress bar (if we have avg duration to estimate)
 	if stats != nil && stats.AvgDuration > 0 {
@@ -439,34 +444,67 @@ func (m Model) renderExecutingView() string {
 		timeStyle := lipgloss.NewStyle().
 			Foreground(TextSecondary)
 		timeDisplay := timeStyle.Render(
-			fmt.Sprintf("  %s / ~%s avg",
+			fmt.Sprintf("%s / ~%s avg",
 				formatDuration(elapsed),
 				formatDuration(stats.AvgDuration)))
 
-		util.WriteString(&builder, "  "+progressBar+"\n")
-		util.WriteString(&builder, "  "+progressBar+"\n")
-		util.WriteString(&builder, timeDisplay+"\n\n")
+		util.WriteString(&builder, progressBar+"\n")
+		util.WriteString(&builder, timeDisplay+"\n")
 	} else {
 		// Simple elapsed time
 		timeStyle := lipgloss.NewStyle().
 			Foreground(TextSecondary).
-			Render("  Elapsed: " + formatDuration(elapsed))
-		util.WriteString(&builder, timeStyle+"\n\n")
+			Render("Elapsed: " + formatDuration(elapsed))
+		util.WriteString(&builder, timeStyle+"\n")
 	}
 
-	// Wait message
-	waitMsg := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Italic(true).
-		Render("  Please wait...")
-	util.WriteString(&builder, waitMsg+"\n")
+	// Streaming output section
+	outputContent := m.StreamingOutput.String()
+	if outputContent != "" {
+		// Separator - use innerWidth to ensure it fits
+		separatorWidth := max(innerWidth-2, 20)
+		separator := lipgloss.NewStyle().
+			Foreground(BorderColor).
+			Render(strings.Repeat("─", separatorWidth))
+		util.WriteString(&builder, "\n"+separator+"\n")
 
-	// Modern container with border
+		outputLabel := lipgloss.NewStyle().
+			Foreground(TextSecondary).
+			Bold(true).
+			Render("Output:")
+		util.WriteString(&builder, outputLabel+"\n\n")
+
+		// Viewport with streaming output
+		util.WriteString(&builder, m.ExecutingViewport.View())
+	} else {
+		// Waiting message when no output yet
+		util.WriteString(&builder, "\n")
+		waitMsg := lipgloss.NewStyle().
+			Foreground(TextMuted).
+			Italic(true).
+			Render("Waiting for output...")
+		util.WriteString(&builder, waitMsg+"\n")
+	}
+
 	containerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColor).
-		Padding(2, 3).
-		Width(width - 4)
+		Padding(1, 2).
+		Width(containerWidth)
 
-	return containerStyle.Render(builder.String())
+	content := containerStyle.Render(builder.String())
+
+	helpText := "j/k: scroll • g/G: top/bottom • ctrl+c: cancel"
+	right := lipgloss.NewStyle().
+		Foreground(TextMuted).
+		Padding(0, 1).
+		Render(helpText)
+
+	statusBar := lipgloss.NewStyle().
+		Foreground(TextPrimary).
+		Width(width).
+		Padding(0, 1).
+		Render(right)
+
+	return content + "\n" + statusBar
 }

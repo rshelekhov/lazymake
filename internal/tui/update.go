@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -247,8 +248,12 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 	m.ExecutionStartTime = time.Now()
 	m.ExecutionElapsed = 0
 
+	// Reset streaming output and initialize viewport
+	m.StreamingOutput = &strings.Builder{}
+	m.initExecutingViewport()
+
 	return m, tea.Batch(
-		executeTarget(target.Name, m.MakefilePath),
+		executeTargetStreaming(target.Name, m.MakefilePath),
 		tickTimer(),
 		m.Spinner.Tick,
 	)
@@ -502,78 +507,164 @@ func (m Model) updateGraph(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateExecuting(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		return m.handleExecutingKeyPress(msg)
+
 	case timerTickMsg:
-		// Update elapsed time
-		if m.State == StateExecuting {
-			m.ExecutionElapsed = time.Since(m.ExecutionStartTime)
-			// Update spinner
-			m.Spinner, cmd = m.Spinner.Update(msg)
-			return m, tea.Batch(tickTimer(), cmd) // Continue ticking and spinning
-		}
-		return m, nil // Stop if not executing
+		return m.handleTimerTick(msg)
 
 	case spinner.TickMsg:
-		// Handle spinner animation ticks
-		if m.State == StateExecuting {
-			m.Spinner, cmd = m.Spinner.Update(msg)
-			return m, cmd
-		}
-		return m, nil
+		return m.handleSpinnerTick(msg)
 
-	case executeFinishedMsg:
-		// Timer stops automatically (state changes from StateExecuting)
+	case streamStartedMsg:
+		m.OutputChunks = msg.chunks
+		m.CancelExecution = msg.cancel
+		return m, waitForChunk(m.OutputChunks)
 
-		// Record execution with timing data
-		success := msg.result.Err == nil
-		m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, msg.result.Duration, success)
-		_ = m.History.Save() // Async, ignore errors
-
-		// Export execution result (async, non-blocking)
-		if m.Exporter != nil {
-			go func() {
-				record := export.NewExecutionRecord(
-					m.MakefilePath,
-					m.ExecutingTarget,
-					msg.result,
-				)
-				if err := m.Exporter.Export(record); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
-				}
-			}()
-		}
-
-		// Shell integration (async, non-blocking)
-		if m.ShellIntegration != nil {
-			go func() {
-				if err := m.ShellIntegration.RecordExecution(m.ExecutingTarget); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "Shell integration failed: %v\n", err)
-				}
-			}()
-		}
-
-		// Refresh performance stats for all targets
-		enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
-
-		// Refresh recent targets to show updated timing
-		recentEntries := m.History.GetRecent(m.MakefilePath)
-		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
-
-		// Rebuild and update list items to reflect new performance stats
-		updatedItems := rebuildListItems(m.RecentTargets, m.Targets)
-		m.List.SetItems(updatedItems)
-
-		m.State = StateOutput
-		m.Output = msg.result.Output
-		m.ExecutionError = msg.result.Err
-		m.initViewport(msg.result.Output)
+	case outputChunkMsg:
+		return m.handleOutputChunk(msg)
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		if m.State == StateExecuting {
+			m.initExecutingViewport()
+			m.ExecutingViewport.SetContent(m.StreamingOutput.String())
+			m.ExecutingViewport.GotoBottom()
+		}
 	}
+	return m, nil
+}
+
+// handleExecutingKeyPress handles keyboard input during execution
+func (m Model) handleExecutingKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		if m.CancelExecution != nil {
+			m.CancelExecution()
+		}
+		return m.handleExecutionComplete(fmt.Errorf("execution canceled"))
+	case "j", "down":
+		m.ExecutingViewport.ScrollDown(1)
+	case "k", "up":
+		m.ExecutingViewport.ScrollUp(1)
+	case "ctrl+d":
+		m.ExecutingViewport.HalfPageDown()
+	case "ctrl+u":
+		m.ExecutingViewport.HalfPageUp()
+	case "G":
+		m.ExecutingViewport.GotoBottom()
+	case "g":
+		m.ExecutingViewport.GotoTop()
+	}
+	return m, nil
+}
+
+// handleTimerTick updates elapsed time during execution
+func (m Model) handleTimerTick(msg timerTickMsg) (tea.Model, tea.Cmd) {
+	if m.State != StateExecuting {
+		return m, nil
+	}
+	m.ExecutionElapsed = time.Since(m.ExecutionStartTime)
+	var cmd tea.Cmd
+	m.Spinner, cmd = m.Spinner.Update(msg)
+	return m, tea.Batch(tickTimer(), cmd)
+}
+
+// handleSpinnerTick handles spinner animation ticks
+func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	if m.State != StateExecuting {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.Spinner, cmd = m.Spinner.Update(msg)
+	return m, cmd
+}
+
+// handleOutputChunk processes a chunk of streaming output
+func (m Model) handleOutputChunk(msg outputChunkMsg) (tea.Model, tea.Cmd) {
+	if msg.done {
+		return m.handleExecutionComplete(msg.err)
+	}
+	m.StreamingOutput.WriteString(msg.chunk)
+	m.ExecutingViewport.SetContent(m.StreamingOutput.String())
+	m.ExecutingViewport.GotoBottom()
+	return m, waitForChunk(m.OutputChunks)
+}
+
+// handleExecutionComplete transitions to output state after streaming execution
+func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
+	// Calculate execution duration
+	duration := time.Since(m.ExecutionStartTime)
+
+	// Record execution with timing data
+	success := err == nil
+	m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, duration, success)
+	_ = m.History.Save() // Async, ignore errors
+
+	// Build result for export
+	result := executor.Result{
+		Output:    m.StreamingOutput.String(),
+		Err:       err,
+		Duration:  duration,
+		StartTime: m.ExecutionStartTime,
+		EndTime:   time.Now(),
+	}
+
+	// Extract exit code from error
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitError.ExitCode()
+		} else {
+			result.ExitCode = -1
+		}
+	}
+
+	// Export execution result (async, non-blocking)
+	if m.Exporter != nil {
+		go func() {
+			record := export.NewExecutionRecord(
+				m.MakefilePath,
+				m.ExecutingTarget,
+				result,
+			)
+			if err := m.Exporter.Export(record); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
+			}
+		}()
+	}
+
+	// Shell integration (async, non-blocking)
+	if m.ShellIntegration != nil {
+		go func() {
+			if err := m.ShellIntegration.RecordExecution(m.ExecutingTarget); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Shell integration failed: %v\n", err)
+			}
+		}()
+	}
+
+	// Refresh performance stats for all targets
+	enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
+
+	// Refresh recent targets to show updated timing
+	recentEntries := m.History.GetRecent(m.MakefilePath)
+	m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+
+	// Rebuild and update list items to reflect new performance stats
+	updatedItems := rebuildListItems(m.RecentTargets, m.Targets)
+	m.List.SetItems(updatedItems)
+
+	// Transition to output view
+	m.State = StateOutput
+	m.Output = m.StreamingOutput.String()
+	m.ExecutionError = err
+	m.initViewport(m.Output)
+
+	// Clean up
+	m.CancelExecution = nil
+	m.OutputChunks = nil
+
 	return m, nil
 }
 
@@ -601,6 +692,35 @@ func (m *Model) initRecipeViewport(width, height int) {
 
 	// Start at top (will auto-scroll on selection change)
 	m.RecipeViewport.YPosition = 0
+}
+
+// initExecutingViewport initializes viewport for streaming output
+func (m *Model) initExecutingViewport() {
+	// Calculate available height - must account for ALL UI elements:
+	// - Title + 2 newlines: 3 lines
+	// - Progress bar + time display: 2 lines
+	// - Newline + separator + newline: 3 lines
+	// - "Output:" + 2 newlines: 3 lines
+	// - Container border (top + bottom): 2 lines
+	// - Container padding (top + bottom): 2 lines
+	// - Status bar: 2 lines
+	// Total overhead: ~17 lines, use 18 for safety
+	availableHeight := m.Height - 18
+	if availableHeight < 3 {
+		availableHeight = 3
+	}
+
+	// Calculate content width to match container inner width
+	// Container: width-2, border: 2, padding: 4 (2 left + 2 right)
+	// Inner content width: (width-2) - 2 - 4 = width - 8
+	contentWidth := m.Width - 8
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	m.ExecutingViewport = viewport.New(contentWidth, availableHeight)
+	m.ExecutingViewport.Style = lipgloss.NewStyle()
+	m.ExecutingViewport.YPosition = 0
 }
 
 func (m *Model) initVariablesViewport() {
@@ -683,8 +803,13 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ExecutingTarget = target.Name
 				m.ExecutionStartTime = time.Now()
 				m.ExecutionElapsed = 0
+
+				// Reset streaming output and initialize viewport
+				m.StreamingOutput = &strings.Builder{}
+				m.initExecutingViewport()
+
 				return m, tea.Batch(
-					executeTarget(target.Name, m.MakefilePath),
+					executeTargetStreaming(target.Name, m.MakefilePath),
 					tickTimer(),   // Start timer
 					m.Spinner.Tick, // Start spinner animation
 				)
@@ -699,25 +824,50 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// Custom message for execution results
-type executeFinishedMsg struct {
-	result executor.Result
-}
-
 // Custom message for timer ticks
 type timerTickMsg struct{}
 
-func executeTarget(target, makefilePath string) tea.Cmd {
-	return func() tea.Msg {
-		result := executor.Execute(target, makefilePath)
-		return executeFinishedMsg{result: result}
-	}
+// streamStartedMsg indicates streaming has begun
+type streamStartedMsg struct {
+	chunks <-chan executor.OutputChunk
+	cancel func()
+}
+
+// outputChunkMsg delivers a chunk of output during streaming
+type outputChunkMsg struct {
+	chunk string
+	done  bool
+	err   error
 }
 
 func tickTimer() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return timerTickMsg{}
 	})
+}
+
+// executeTargetStreaming starts streaming execution
+func executeTargetStreaming(target, makefilePath string) tea.Cmd {
+	return func() tea.Msg {
+		chunks, cancel := executor.ExecuteStreaming(target, makefilePath)
+		return streamStartedMsg{chunks: chunks, cancel: cancel}
+	}
+}
+
+// waitForChunk waits for next output chunk from channel
+func waitForChunk(chunks <-chan executor.OutputChunk) tea.Cmd {
+	return func() tea.Msg {
+		chunk, ok := <-chunks
+		if !ok {
+			// Channel closed
+			return outputChunkMsg{done: true}
+		}
+		return outputChunkMsg{
+			chunk: chunk.Data,
+			done:  chunk.Done,
+			err:   chunk.Err,
+		}
+	}
 }
 
 // updateVariables handles the variable inspector view state

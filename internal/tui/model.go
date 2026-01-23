@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/config"
+	"github.com/rshelekhov/lazymake/internal/executor"
 	"github.com/rshelekhov/lazymake/internal/export"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/highlight"
@@ -81,6 +83,12 @@ type Model struct {
 	// Execution timing
 	ExecutionStartTime time.Time
 	ExecutionElapsed   time.Duration
+
+	// Streaming execution fields
+	StreamingOutput   *strings.Builder        // Accumulated output during streaming
+	ExecutingViewport viewport.Model          // Viewport for streaming output display
+	OutputChunks      <-chan executor.OutputChunk // Channel for receiving chunks
+	CancelExecution   func()                  // Function to cancel running command
 
 	// Export and shell integration
 	Exporter         *export.Exporter
@@ -335,6 +343,7 @@ func NewModel(cfg *config.Config) Model {
 		ShellIntegration:  shellInteg,
 		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
+		StreamingOutput:   &strings.Builder{},
 	}
 }
 
