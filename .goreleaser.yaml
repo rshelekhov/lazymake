@@ -67,14 +67,6 @@ release:
     owner: rshelekhov
     name: lazymake
   footer: |
-    ## Contributors
-    
-    Thanks to all contributors who made this release possible:
-    
-    {{- range .Contributors }}
-    * @{{ .Login }}
-    {{- end }}
-    
     **Full Changelog**: https://github.com/rshelekhov/lazymake/compare/{{ .PreviousTag }}...{{ .Tag }}
 
 # Homebrew tap
