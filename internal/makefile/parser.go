@@ -42,11 +42,31 @@ func Parse(filename string) ([]Target, error) {
 	var lastComment commentInfo
 	var currentTargets []*Target
 	var recipeLines []string
+	var defineDepth int
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
+
+		// Handle define/endef blocks
+		if isDefineStart(line) {
+			commitCurrentTargets(currentTargets, recipeLines)
+			currentTargets = nil
+			recipeLines = nil
+			lastComment = commentInfo{}
+			defineDepth++
+			continue
+		}
+		if isDefineEnd(line) {
+			if defineDepth > 0 {
+				defineDepth--
+			}
+			continue
+		}
+		if defineDepth > 0 {
+			continue // Skip all content inside define blocks
+		}
 
 		// Empty line: commit and reset
 		if trimmed == "" {
@@ -209,6 +229,31 @@ func extractInlineComment(dependencies string) commentInfo {
 	}
 
 	return commentInfo{}
+}
+
+// isDefineStart checks if a line starts a define block
+// Handles: "define NAME", "define NAME =", "define NAME :=", etc.
+func isDefineStart(line string) bool {
+	if strings.HasPrefix(line, "\t") {
+		return false // Recipe lines are not define directives
+	}
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "#") {
+		return false // Comments are not define directives
+	}
+	if !strings.HasPrefix(trimmed, "define") {
+		return false
+	}
+	rest := strings.TrimPrefix(trimmed, "define")
+	if len(rest) == 0 {
+		return false // Just "define" with nothing after
+	}
+	return rest[0] == ' ' || rest[0] == '\t'
+}
+
+// isDefineEnd checks if a line ends a define block
+func isDefineEnd(line string) bool {
+	return strings.TrimSpace(line) == "endef"
 }
 
 // parseDependencies extracts dependency target names from the dependency section
