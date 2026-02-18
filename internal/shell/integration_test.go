@@ -206,6 +206,130 @@ func TestBashWriterConcurrent(t *testing.T) {
 	}
 }
 
+func TestFishWriter(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "fish_history")
+
+	writer := NewFishWriter(tempFile, false)
+
+	// Test writing entries
+	entries := []string{
+		"make build",
+		"make test",
+		"make deploy",
+	}
+
+	for _, entry := range entries {
+		if err := writer.Append(entry); err != nil {
+			t.Fatalf("Append(%q) failed: %v", entry, err)
+		}
+	}
+
+	// Verify file contents
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	for _, entry := range entries {
+		expected := "- cmd: " + entry
+		if !strings.Contains(string(content), expected) {
+			t.Errorf("Expected %q in history, got: %s", expected, string(content))
+		}
+	}
+
+	// Verify no "when:" lines (timestamp disabled)
+	if strings.Contains(string(content), "when:") {
+		t.Error("Expected no 'when:' lines with includeTimestamp=false")
+	}
+}
+
+func TestFishWriterWithTimestamp(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "fish_history")
+
+	writer := NewFishWriter(tempFile, true)
+
+	if err := writer.Append("make build"); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify "- cmd:" line
+	if !strings.Contains(contentStr, "- cmd: make build") {
+		t.Errorf("Expected '- cmd: make build' in history, got: %s", contentStr)
+	}
+
+	// Verify "  when:" line with a timestamp
+	if !strings.Contains(contentStr, "  when: ") {
+		t.Errorf("Expected '  when: <timestamp>' in history, got: %s", contentStr)
+	}
+}
+
+func TestFishWriterTimestampDisabled(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "fish_history")
+
+	writer := NewFishWriter(tempFile, false)
+
+	if err := writer.Append("make build"); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	if !strings.Contains(contentStr, "- cmd: make build") {
+		t.Errorf("Expected '- cmd: make build', got: %s", contentStr)
+	}
+
+	if strings.Contains(contentStr, "when:") {
+		t.Error("Expected no 'when:' field with includeTimestamp=false")
+	}
+}
+
+func TestFishWriterConcurrent(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "fish_history")
+	writer := NewFishWriter(tempFile, false)
+
+	// Write concurrently to test file locking
+	done := make(chan bool)
+	numGoroutines := 10
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			entry := "make test"
+			if err := writer.Append(entry); err != nil {
+				t.Errorf("Concurrent Append failed: %v", err)
+			}
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+
+	// Verify all entries were written
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	count := strings.Count(string(content), "- cmd: make test")
+	if count != numGoroutines {
+		t.Errorf("Expected %d entries after concurrent writes, got %d", numGoroutines, count)
+	}
+}
+
 func TestZshWriterStandardFormat(t *testing.T) {
 	tempFile := filepath.Join(t.TempDir(), "zsh_history")
 
@@ -409,6 +533,16 @@ func TestNewIntegration(t *testing.T) {
 				Enabled:     true,
 				Shell:       "zsh",
 				HistoryFile: filepath.Join(tempDir, "zsh_history"),
+			},
+			wantNil:    false,
+			wantWriter: true,
+		},
+		{
+			name: "enabled with fish",
+			config: &Config{
+				Enabled:     true,
+				Shell:       "fish",
+				HistoryFile: filepath.Join(tempDir, "fish_history"),
 			},
 			wantNil:    false,
 			wantWriter: true,
@@ -628,6 +762,74 @@ func TestAutoDetection(t *testing.T) {
 	// Verify writer is bash writer
 	if _, ok := integ.writer.(*BashWriter); !ok {
 		t.Errorf("Expected BashWriter with auto-detection of bash, got %T", integ.writer)
+	}
+}
+
+func TestAutoDetectionFish(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Save original SHELL env
+	originalShell := os.Getenv("SHELL")
+	defer os.Setenv("SHELL", originalShell)
+
+	// Test auto-detection with fish
+	os.Setenv("SHELL", "/usr/local/bin/fish")
+
+	config := &Config{
+		Enabled:     true,
+		Shell:       "auto",
+		HistoryFile: filepath.Join(tempDir, "fish_history"),
+	}
+
+	integ, err := NewIntegration(config)
+	if err != nil {
+		t.Fatalf("Failed to create integration: %v", err)
+	}
+
+	if integ == nil {
+		t.Fatal("Expected non-nil integration with auto detection of fish")
+		return
+	}
+
+	// Verify writer is fish writer
+	if _, ok := integ.writer.(*FishWriter); !ok {
+		t.Errorf("Expected FishWriter with auto-detection of fish, got %T", integ.writer)
+	}
+}
+
+func TestFishIntegrationTimestampPassthrough(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "fish_history")
+
+	config := &Config{
+		Enabled:          true,
+		Shell:            "fish",
+		HistoryFile:      tempFile,
+		IncludeTimestamp: false,
+		FormatTemplate:   "make {target}",
+	}
+
+	integ, err := NewIntegration(config)
+	if err != nil {
+		t.Fatalf("Failed to create integration: %v", err)
+	}
+
+	if err := integ.RecordExecution(ExecutionInfo{Target: "deploy"}); err != nil {
+		t.Fatalf("RecordExecution failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	if !strings.Contains(contentStr, "- cmd: make deploy") {
+		t.Errorf("Expected '- cmd: make deploy' in history, got: %s", contentStr)
+	}
+
+	if strings.Contains(contentStr, "when:") {
+		t.Error("Expected no 'when:' field with IncludeTimestamp=false")
 	}
 }
 

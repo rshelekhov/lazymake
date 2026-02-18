@@ -261,19 +261,21 @@ shell_integration:
   # Enable/disable shell history integration (default: false)
   enabled: false
 
-  # Shell type: "auto", "bash", "zsh", or "none" (default: "auto")
+  # Shell type: "auto", "bash", "zsh", "fish", or "none" (default: "auto")
   shell: auto
 
   # Override shell history file path (default: "")
   # Leave empty to use shell defaults:
   # - bash: ~/.bash_history
   # - zsh: ~/.zsh_history or $HISTFILE
+  # - fish: ~/.local/share/fish/fish_history
   history_file: ""
 
   # Include timestamp in history entry (default: true)
-  # - true: auto-detects zsh extended history format and writes timestamps when detected
-  # - false: always writes plain entries, even if the history file uses extended format
-  # No effect on bash (bash history has no file-level timestamp format)
+  # - zsh: auto-detects extended history format and writes timestamps when detected
+  # - fish: writes the "when:" timestamp field
+  # - bash: no effect
+  # When false, always writes plain entries regardless of shell.
   include_timestamp: true
 ```
 
@@ -318,7 +320,15 @@ shell_integration:
   include_timestamp: true
 ```
 
-**Scenario 3: Custom format with context**
+**Scenario 3: Enable for fish with timestamps**
+```yaml
+shell_integration:
+  enabled: true
+  shell: fish
+  include_timestamp: true
+```
+
+**Scenario 4: Custom format with context**
 ```yaml
 shell_integration:
   enabled: true
