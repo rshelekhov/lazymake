@@ -381,7 +381,7 @@ func TestRecordExecution(t *testing.T) {
 	}
 
 	// Record execution
-	if err := integ.RecordExecution("build"); err != nil {
+	if err := integ.RecordExecution(ExecutionInfo{Target: "build"}); err != nil {
 		t.Fatalf("RecordExecution failed: %v", err)
 	}
 
@@ -412,7 +412,7 @@ func TestRecordExecutionWithExclusions(t *testing.T) {
 	}
 
 	// Record excluded target
-	if err := integ.RecordExecution("help"); err != nil {
+	if err := integ.RecordExecution(ExecutionInfo{Target: "help"}); err != nil {
 		t.Fatalf("RecordExecution failed: %v", err)
 	}
 
@@ -427,7 +427,7 @@ func TestRecordExecutionWithExclusions(t *testing.T) {
 	}
 
 	// Record non-excluded target
-	if err := integ.RecordExecution("build"); err != nil {
+	if err := integ.RecordExecution(ExecutionInfo{Target: "build"}); err != nil {
 		t.Fatalf("RecordExecution failed: %v", err)
 	}
 
@@ -446,34 +446,58 @@ func TestFormatEntry(t *testing.T) {
 	tests := []struct {
 		name     string
 		template string
-		target   string
+		info     ExecutionInfo
 		want     string
 	}{
 		{
 			name:     "default template",
 			template: "",
-			target:   "build",
+			info:     ExecutionInfo{Target: "build"},
 			want:     "make build",
 		},
 		{
 			name:     "simple template",
 			template: "make {target}",
-			target:   "test",
+			info:     ExecutionInfo{Target: "test"},
 			want:     "make test",
 		},
 		{
 			name:     "custom template",
 			template: "run make {target}",
-			target:   "deploy",
+			info:     ExecutionInfo{Target: "deploy"},
 			want:     "run make deploy",
+		},
+		{
+			name:     "makefile variable",
+			template: "make -f {makefile} {target}",
+			info:     ExecutionInfo{Target: "build", MakefilePath: "/home/user/project/Makefile"},
+			want:     "make -f /home/user/project/Makefile build",
+		},
+		{
+			name:     "dir variable",
+			template: "cd {dir} && make {target}",
+			info:     ExecutionInfo{Target: "test", MakefilePath: "/home/user/project/Makefile"},
+			want:     "cd /home/user/project && make test",
+		},
+		{
+			name:     "all three variables",
+			template: "cd {dir} && make -f {makefile} {target}",
+			info:     ExecutionInfo{Target: "deploy", MakefilePath: "/opt/app/Makefile"},
+			want:     "cd /opt/app && make -f /opt/app/Makefile deploy",
+		},
+		{
+			name:     "empty makefile path",
+			template: "cd {dir} && make -f {makefile} {target}",
+			info:     ExecutionInfo{Target: "build", MakefilePath: ""},
+			want:     "cd . && make -f  build",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatEntry(tt.template, tt.target)
+			got := formatEntry(tt.template, tt.info)
 			if got != tt.want {
-				t.Errorf("formatEntry(%q, %q) = %q, want %q", tt.template, tt.target, got, tt.want)
+				t.Errorf("formatEntry(%q, %+v) = %q, want %q", tt.template, tt.info, got, tt.want)
 			}
 		})
 	}
@@ -629,7 +653,7 @@ func TestReadmeExample(t *testing.T) {
 	// Simulate running 'build' and 'test' targets
 	targets := []string{"build", "test", "build", "lint"}
 	for _, target := range targets {
-		if err := integ.RecordExecution(target); err != nil {
+		if err := integ.RecordExecution(ExecutionInfo{Target: target}); err != nil {
 			t.Fatalf("RecordExecution(%q) failed: %v", target, err)
 		}
 	}

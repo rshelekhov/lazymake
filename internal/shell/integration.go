@@ -1,8 +1,15 @@
 package shell
 
 import (
+	"path/filepath"
 	"strings"
 )
+
+// ExecutionInfo holds the data needed to record a shell history entry.
+type ExecutionInfo struct {
+	Target       string
+	MakefilePath string
+}
 
 // HistoryWriter interface for writing to shell history
 type HistoryWriter interface {
@@ -55,33 +62,34 @@ func NewIntegration(config *Config) (*Integration, error) {
 }
 
 // RecordExecution records a target execution in shell history
-func (i *Integration) RecordExecution(target string) error {
+func (i *Integration) RecordExecution(info ExecutionInfo) error {
 	if i == nil || i.writer == nil {
 		return nil // Disabled
 	}
 
 	// Check if target is excluded
 	for _, excluded := range i.config.ExcludeTargets {
-		if target == excluded {
+		if info.Target == excluded {
 			return nil
 		}
 	}
 
 	// Format entry using template
-	entry := formatEntry(i.config.FormatTemplate, target)
+	entry := formatEntry(i.config.FormatTemplate, info)
 
 	// Write to history file
 	return i.writer.Append(entry)
 }
 
 // formatEntry formats a history entry using the template
-func formatEntry(template, target string) string {
+func formatEntry(template string, info ExecutionInfo) string {
 	if template == "" {
 		template = "make {target}"
 	}
 
-	// Replace {target} placeholder
-	entry := strings.ReplaceAll(template, "{target}", target)
+	entry := strings.ReplaceAll(template, "{target}", info.Target)
+	entry = strings.ReplaceAll(entry, "{makefile}", info.MakefilePath)
+	entry = strings.ReplaceAll(entry, "{dir}", filepath.Dir(info.MakefilePath))
 
 	return entry
 }

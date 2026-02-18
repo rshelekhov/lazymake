@@ -15,6 +15,7 @@ import (
 	"github.com/rshelekhov/lazymake/internal/executor"
 	"github.com/rshelekhov/lazymake/internal/export"
 	"github.com/rshelekhov/lazymake/internal/safety"
+	"github.com/rshelekhov/lazymake/internal/shell"
 )
 
 func (m Model) Init() tea.Cmd {
@@ -638,7 +639,10 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 	// Shell integration (async, non-blocking)
 	if m.ShellIntegration != nil {
 		go func() {
-			if err := m.ShellIntegration.RecordExecution(m.ExecutingTarget); err != nil {
+			if err := m.ShellIntegration.RecordExecution(shell.ExecutionInfo{
+			Target:       m.ExecutingTarget,
+			MakefilePath: m.MakefilePath,
+		}); err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "Shell integration failed: %v\n", err)
 			}
 		}()

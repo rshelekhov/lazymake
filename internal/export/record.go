@@ -87,24 +87,24 @@ func (r *ExecutionRecord) FormatLog() string {
 	b.WriteString("\n")
 
 	// Metadata
-	b.WriteString(fmt.Sprintf("Target:        %s\n", r.TargetName))
-	b.WriteString(fmt.Sprintf("Makefile:      %s\n", r.MakefilePath))
-	b.WriteString(fmt.Sprintf("Timestamp:     %s\n", r.Timestamp.Format("2006-01-02 15:04:05")))
-	b.WriteString(fmt.Sprintf("Duration:      %.3fs\n", r.Duration.Seconds()))
-	b.WriteString(fmt.Sprintf("Exit Code:     %d\n", r.ExitCode))
+	fmt.Fprintf(&b, "Target:        %s\n", r.TargetName)
+	fmt.Fprintf(&b, "Makefile:      %s\n", r.MakefilePath)
+	fmt.Fprintf(&b, "Timestamp:     %s\n", r.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(&b, "Duration:      %.3fs\n", r.Duration.Seconds())
+	fmt.Fprintf(&b, "Exit Code:     %d\n", r.ExitCode)
 
 	status := "SUCCESS"
 	if !r.Success {
 		status = "FAILED"
 	}
-	b.WriteString(fmt.Sprintf("Status:        %s\n", status))
+	fmt.Fprintf(&b, "Status:        %s\n", status)
 
-	b.WriteString(fmt.Sprintf("Working Dir:   %s\n", r.WorkingDir))
+	fmt.Fprintf(&b, "Working Dir:   %s\n", r.WorkingDir)
 	if r.User != "" {
-		b.WriteString(fmt.Sprintf("User:          %s\n", r.User))
+		fmt.Fprintf(&b, "User:          %s\n", r.User)
 	}
 	if r.Hostname != "" {
-		b.WriteString(fmt.Sprintf("Host:          %s\n", r.Hostname))
+		fmt.Fprintf(&b, "Host:          %s\n", r.Hostname)
 	}
 
 	// Output section
@@ -120,11 +120,11 @@ func (r *ExecutionRecord) FormatLog() string {
 	b.WriteString(strings.Repeat("=", 80))
 	b.WriteString("\n")
 	if r.Success {
-		b.WriteString(fmt.Sprintf("Execution completed successfully in %.3fs\n", r.Duration.Seconds()))
+		fmt.Fprintf(&b, "Execution completed successfully in %.3fs\n", r.Duration.Seconds())
 	} else {
-		b.WriteString(fmt.Sprintf("Execution failed after %.3fs\n", r.Duration.Seconds()))
+		fmt.Fprintf(&b, "Execution failed after %.3fs\n", r.Duration.Seconds())
 		if r.ErrorMessage != "" {
-			b.WriteString(fmt.Sprintf("Error: %s\n", r.ErrorMessage))
+			fmt.Fprintf(&b, "Error: %s\n", r.ErrorMessage)
 		}
 	}
 	b.WriteString(strings.Repeat("=", 80))
