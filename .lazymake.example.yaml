@@ -203,10 +203,11 @@ shell_integration:
   # Default: false (opt-in feature)
   enabled: false
 
-  # Shell type: "auto", "bash", "zsh", or "none"
+  # Shell type: "auto", "bash", "zsh", "fish", or "none"
   # - auto: Detect from $SHELL environment variable (recommended)
   # - bash: Force bash history format
   # - zsh: Force zsh history format (detects extended history automatically)
+  # - fish: Force fish history format (- cmd: / when: entries)
   # - none: Disable shell integration
   # Default: "auto"
   shell: auto
@@ -215,15 +216,16 @@ shell_integration:
   # Leave empty to use shell defaults:
   # - bash: ~/.bash_history
   # - zsh: ~/.zsh_history or $HISTFILE
+  # - fish: ~/.local/share/fish/fish_history
   # Default: "" (use shell default)
   history_file: ""
 
   # Include timestamp in history entry (for shells that support it)
-  # - true (default): auto-detects zsh extended history format (setopt EXTENDED_HISTORY)
+  # - zsh: auto-detects extended history format (setopt EXTENDED_HISTORY)
   #   and writes timestamped entries (: <timestamp>:0;command) when detected
-  # - false: always writes plain entries, even if the history file uses extended format.
-  #   Useful if you want simple entries that don't clutter extended history display.
-  # No effect on bash (bash history has no file-level timestamp format)
+  # - fish: writes the "when:" timestamp field in fish history format
+  # - bash: no effect
+  # When false, always writes plain entries regardless of shell.
   include_timestamp: true
 
   # Custom format template for history entries
@@ -281,7 +283,13 @@ shell_integration:
 #   shell: zsh
 #   include_timestamp: true
 #
-# Scenario 3: Custom format with context
+# Scenario 3: Enable for fish with timestamps
+# shell_integration:
+#   enabled: true
+#   shell: fish
+#   include_timestamp: true
+#
+# Scenario 4: Custom format with context
 # shell_integration:
 #   enabled: true
 #   format_template: "make -f {makefile} {target}"

@@ -40,7 +40,7 @@ go test -race ./...                       # Tests with race detector (CI uses th
 - `config/` — Viper-based config from `.lazymake.yaml` (project) and `~/.lazymake.yaml` (global), merged
 - `internal/makefile/` — Parses targets, dependencies, recipes; handles `define/endef` blocks and `##` comments
 - `internal/safety/` — Regex-based dangerous command detection with built-in + custom rules
-- `internal/shell/` — `HistoryWriter` interface with `BashWriter` and `ZshWriter` implementations; file locking via platform-specific code (`filelock_unix.go`/`filelock_windows.go`)
+- `internal/shell/` — `HistoryWriter` interface with `BashWriter`, `ZshWriter`, and `FishWriter` implementations; file locking via platform-specific code (`filelock_unix.go`/`filelock_windows.go`)
 - `internal/graph/` — Dependency graph with cycle detection, topological sort, critical path
 - `internal/history/` — JSON-persisted execution history with performance regression detection (>25% slower)
 - `internal/export/` — JSON/log export with rotation (by count, age, size)

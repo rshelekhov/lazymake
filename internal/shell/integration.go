@@ -51,6 +51,8 @@ func NewIntegration(config *Config) (*Integration, error) {
 		writer = NewBashWriter(historyFile)
 	case "zsh":
 		writer = NewZshWriter(historyFile, config.IncludeTimestamp)
+	case "fish":
+		writer = NewFishWriter(historyFile, config.IncludeTimestamp)
 	default:
 		return nil, nil // Unsupported shell, disable gracefully
 	}

@@ -5,13 +5,13 @@ type Config struct {
 	// Master switch
 	Enabled bool `yaml:"enabled"`
 
-	// Shell selection: "auto", "bash", "zsh", or "none"
+	// Shell selection: "auto", "bash", "zsh", "fish", or "none"
 	Shell string `yaml:"shell"`
 
 	// Override default history file path
 	HistoryFile string `yaml:"history_file"`
 
-	// Include timestamp in history entry (for zsh extended history)
+	// Include timestamp in history entry (for zsh extended history and fish "when:" field)
 	IncludeTimestamp bool `yaml:"include_timestamp"`
 
 	// Custom format template for history entries

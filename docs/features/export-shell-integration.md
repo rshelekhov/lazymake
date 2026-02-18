@@ -114,7 +114,7 @@ Add executed make commands to your shell history, making it easy to re-run comma
 
 ### Features
 
-- **Automatic detection**: Detects your shell (bash, zsh) from `$SHELL` environment variable
+- **Automatic detection**: Detects your shell (bash, zsh, fish) from `$SHELL` environment variable
 - **Format support**: Handles both standard and extended zsh history formats
 - **File locking**: Safe concurrent writes prevent history corruption
 - **Custom templates**: Customize the command format added to history
@@ -127,7 +127,9 @@ Add executed make commands to your shell history, making it easy to re-run comma
 - **zsh**: Appends to `~/.zsh_history` or `$HISTFILE`
   - Automatically detects extended history format
   - Includes timestamps when `setopt EXTENDED_HISTORY` is enabled
-- **fish**: Coming soon
+- **fish**: Appends to `~/.local/share/fish/fish_history`
+  - Uses fish's native `- cmd:` / `when:` format
+  - Includes timestamps when `include_timestamp` is enabled
 
 ### How It Works
 
@@ -160,16 +162,17 @@ shell_integration:
   # Enable shell integration (default: false)
   enabled: true
 
-  # Shell type: "auto", "bash", "zsh", or "none" (default: "auto")
+  # Shell type: "auto", "bash", "zsh", "fish", or "none" (default: "auto")
   shell: auto
 
   # Override history file path (default: use shell default)
   history_file: ""
 
-  # Include timestamp for zsh extended history (default: true)
-  # When true, auto-detects extended format and writes timestamps if detected.
-  # When false, always writes plain entries regardless of history file format.
-  # No effect on bash.
+  # Include timestamp in history entry (default: true)
+  # - zsh: auto-detects extended format and writes timestamps if detected
+  # - fish: writes the "when:" timestamp field
+  # - bash: no effect
+  # When false, always writes plain entries regardless of shell.
   include_timestamp: true
 
   # Custom format template (default: "make {target}")
@@ -234,7 +237,15 @@ shell_integration:
   shell: bash
 ```
 
-### Scenario 4: zsh with custom format
+### Scenario 4: fish with timestamps
+```yaml
+shell_integration:
+  enabled: true
+  shell: fish
+  include_timestamp: true
+```
+
+### Scenario 5: zsh with custom format
 ```yaml
 shell_integration:
   enabled: true
