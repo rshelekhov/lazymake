@@ -11,18 +11,22 @@ import (
 
 // ZshWriter handles zsh history writing
 type ZshWriter struct {
-	historyFile     string
-	extendedHistory bool
+	historyFile      string
+	extendedHistory  bool
+	includeTimestamp bool
 }
 
-// NewZshWriter creates a new ZshWriter and detects extended history format
-func NewZshWriter(historyFile string) *ZshWriter {
+// NewZshWriter creates a new ZshWriter and detects extended history format.
+// When includeTimestamp is true and the history file uses extended format,
+// entries are written with timestamps. When false, entries are always plain.
+func NewZshWriter(historyFile string, includeTimestamp bool) *ZshWriter {
 	// Detect if extended history is enabled
 	extended := detectZshExtendedHistory(historyFile)
 
 	return &ZshWriter{
-		historyFile:     historyFile,
-		extendedHistory: extended,
+		historyFile:      historyFile,
+		extendedHistory:  extended,
+		includeTimestamp: includeTimestamp,
 	}
 }
 
@@ -51,7 +55,7 @@ func detectZshExtendedHistory(path string) bool {
 func (w *ZshWriter) Append(entry string) error {
 	var formattedEntry string
 
-	if w.extendedHistory {
+	if w.extendedHistory && w.includeTimestamp {
 		// Extended history format: : <timestamp>:0;command
 		timestamp := time.Now().Unix()
 		formattedEntry = fmt.Sprintf(": %d:0;%s", timestamp, entry)

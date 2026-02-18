@@ -167,6 +167,9 @@ shell_integration:
   history_file: ""
 
   # Include timestamp for zsh extended history (default: true)
+  # When true, auto-detects extended format and writes timestamps if detected.
+  # When false, always writes plain entries regardless of history file format.
+  # No effect on bash.
   include_timestamp: true
 
   # Custom format template (default: "make {target}")

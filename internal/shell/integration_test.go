@@ -215,7 +215,7 @@ func TestZshWriterStandardFormat(t *testing.T) {
 		t.Fatalf("Failed to create test history file: %v", err)
 	}
 
-	writer := NewZshWriter(tempFile)
+	writer := NewZshWriter(tempFile, true)
 
 	// Verify standard format detected
 	if writer.extendedHistory {
@@ -248,7 +248,7 @@ func TestZshWriterExtendedFormat(t *testing.T) {
 		t.Fatalf("Failed to create test history file: %v", err)
 	}
 
-	writer := NewZshWriter(tempFile)
+	writer := NewZshWriter(tempFile, true)
 
 	// Verify extended format detected
 	if !writer.extendedHistory {
@@ -280,11 +280,107 @@ func TestZshWriterEmptyFile(t *testing.T) {
 		t.Fatalf("Failed to create test history file: %v", err)
 	}
 
-	writer := NewZshWriter(tempFile)
+	writer := NewZshWriter(tempFile, true)
 
 	// Should default to standard format for empty file
 	if writer.extendedHistory {
 		t.Error("Expected standard format for empty file, got extended")
+	}
+}
+
+func TestZshWriterTimestampDisabled(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "zsh_history")
+
+	// Create history file with extended format
+	extendedHistory := ": 1234567890:0;make build\n: 1234567891:0;make test\n"
+	if err := os.WriteFile(tempFile, []byte(extendedHistory), 0600); err != nil {
+		t.Fatalf("Failed to create test history file: %v", err)
+	}
+
+	writer := NewZshWriter(tempFile, false)
+
+	// Extended history should be detected
+	if !writer.extendedHistory {
+		t.Error("Expected extended format to be detected")
+	}
+
+	// Append entry — should be plain despite extended-format file
+	if err := writer.Append("make deploy"); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	lastLine := getLastLine(string(content))
+	if lastLine != "make deploy" {
+		t.Errorf("Expected plain entry 'make deploy', got %q", lastLine)
+	}
+}
+
+func TestZshWriterTimestampEnabled(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "zsh_history")
+
+	// Create history file with extended format
+	extendedHistory := ": 1234567890:0;make build\n: 1234567891:0;make test\n"
+	if err := os.WriteFile(tempFile, []byte(extendedHistory), 0600); err != nil {
+		t.Fatalf("Failed to create test history file: %v", err)
+	}
+
+	writer := NewZshWriter(tempFile, true)
+
+	// Append entry — should include timestamp
+	if err := writer.Append("make deploy"); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	lastLine := getLastLine(string(content))
+	if !strings.HasPrefix(lastLine, ": ") || !strings.Contains(lastLine, ":0;make deploy") {
+		t.Errorf("Expected extended format entry, got %q", lastLine)
+	}
+}
+
+func TestIntegrationTimestampPassthrough(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "zsh_history")
+
+	// Create history file with extended format
+	extendedHistory := ": 1234567890:0;make build\n"
+	if err := os.WriteFile(tempFile, []byte(extendedHistory), 0600); err != nil {
+		t.Fatalf("Failed to create test history file: %v", err)
+	}
+
+	config := &Config{
+		Enabled:          true,
+		Shell:            "zsh",
+		HistoryFile:      tempFile,
+		IncludeTimestamp: false,
+		FormatTemplate:   "make {target}",
+	}
+
+	integ, err := NewIntegration(config)
+	if err != nil {
+		t.Fatalf("Failed to create integration: %v", err)
+	}
+
+	if err := integ.RecordExecution(ExecutionInfo{Target: "deploy"}); err != nil {
+		t.Fatalf("RecordExecution failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to read history file: %v", err)
+	}
+
+	lastLine := getLastLine(string(content))
+	if lastLine != "make deploy" {
+		t.Errorf("Expected plain entry 'make deploy' with IncludeTimestamp=false, got %q", lastLine)
 	}
 }
 

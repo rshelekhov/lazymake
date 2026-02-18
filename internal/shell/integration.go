@@ -50,7 +50,7 @@ func NewIntegration(config *Config) (*Integration, error) {
 	case "bash":
 		writer = NewBashWriter(historyFile)
 	case "zsh":
-		writer = NewZshWriter(historyFile)
+		writer = NewZshWriter(historyFile, config.IncludeTimestamp)
 	default:
 		return nil, nil // Unsupported shell, disable gracefully
 	}

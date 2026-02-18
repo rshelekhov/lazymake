@@ -271,7 +271,9 @@ shell_integration:
   history_file: ""
 
   # Include timestamp in history entry (default: true)
-  # Only works with zsh extended history format
+  # - true: auto-detects zsh extended history format and writes timestamps when detected
+  # - false: always writes plain entries, even if the history file uses extended format
+  # No effect on bash (bash history has no file-level timestamp format)
   include_timestamp: true
 ```
 
