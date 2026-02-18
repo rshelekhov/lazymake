@@ -4,3 +4,4 @@
 
 # Build artifacts
 lazymake
+dist/
