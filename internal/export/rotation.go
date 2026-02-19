@@ -10,7 +10,7 @@ import (
 
 // RotateFiles performs file rotation based on config settings
 func RotateFiles(outputDir, targetName string, config *Config) error {
-	if config.MaxFiles == 0 && config.KeepDays == 0 {
+	if config.MaxFiles == 0 && config.KeepDays == 0 && config.MaxFileSize == 0 {
 		return nil // No rotation configured
 	}
 
@@ -25,6 +25,11 @@ func RotateFiles(outputDir, targetName string, config *Config) error {
 	fileInfos := collectFileInfos(expandedDir, sanitized)
 	if len(fileInfos) == 0 {
 		return nil // No files to rotate
+	}
+
+	// Apply size-based rotation
+	if config.MaxFileSize > 0 {
+		fileInfos = applySizeLimit(fileInfos, config.MaxFileSize)
 	}
 
 	// Apply age-based rotation
@@ -105,6 +110,20 @@ func collectFileInfos(expandedDir, sanitized string) []fileInfo {
 	})
 
 	return fileInfos
+}
+
+// applySizeLimit removes files that exceed the configured size limit
+func applySizeLimit(fileInfos []fileInfo, maxSizeMB int64) []fileInfo {
+	maxBytes := maxSizeMB * 1024 * 1024
+	var remaining []fileInfo
+	for _, fi := range fileInfos {
+		if fi.size > maxBytes {
+			_ = os.Remove(fi.path)
+		} else {
+			remaining = append(remaining, fi)
+		}
+	}
+	return remaining
 }
 
 // applyAgeCutoff removes files older than the specified number of days

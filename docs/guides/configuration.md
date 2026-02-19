@@ -11,15 +11,18 @@ Place configuration files at:
 
 ### Configuration Merging
 
-When both files exist, they are merged with these rules:
-- **`enabled`** settings: Project config overrides global
-- **Lists** (`enabled_rules`, `exclude_targets`, `custom_rules`): Union of both
+When both files exist, they are merged with consistent rules across all sections (`safety`, `export`, `shell_integration`):
+
+- **Scalars** (`enabled`, `format`, `shell`, `max_files`, etc.): Project config overrides global
+- **String lists** (`enabled_rules`, `exclude_targets`): Union of both, deduplicated
+- **Struct lists** (`custom_rules`): Appended (global rules first, then project rules)
 
 ## Basic Settings
 
 ```yaml
-# Makefile path (default: "Makefile")
-makefile: Makefile
+# Makefile path (default: auto-detect GNUmakefile, makefile, Makefile)
+# When empty, lazymake searches in GNU make order: GNUmakefile → makefile → Makefile
+makefile: ""
 ```
 
 ## Safety Features
@@ -48,7 +51,7 @@ safety:
 
 ### Enable Specific Rules
 
-Enable only certain built-in rules (omit to enable all 11 rules):
+Enable only certain built-in rules (omit to enable all 36 rules):
 
 ```yaml
 safety:
@@ -60,18 +63,61 @@ safety:
     - kubectl-delete
 ```
 
-**Available built-in rules:**
+**Available built-in rules (36 total):**
+
+*Critical — system-wide destructive operations:*
 - `rm-rf-root` - Recursive deletion of system paths
 - `disk-wipe` - Disk formatting or block device writes
 - `database-drop` - Database/table deletion
 - `git-force-push` - Force pushing to repositories
 - `terraform-destroy` - Infrastructure destruction
 - `kubectl-delete` - Kubernetes resource deletion
+
+*Critical — cloud infrastructure destruction:*
+- `aws-s3-delete` - AWS S3 bucket/object deletion
+- `cloud-instance-terminate` - Cloud compute instance termination
+- `curl-pipe-shell` - Piping remote content to shell
+- `aws-destructive` - AWS resource destruction (CloudFormation, EC2, RDS)
+- `gcp-destructive` - GCP resource destruction (projects, instances, Cloud SQL)
+- `azure-destructive` - Azure resource destruction (resource groups, VMs, SQL)
+- `heroku-destructive` - Heroku app/addon destruction
+
+*Critical — database operations:*
+- `redis-flush` - Redis FLUSHALL/FLUSHDB
+- `cassandra-drop` - Cassandra keyspace/table deletion
+
+*Critical — system operations:*
+- `crontab-remove` - Removing all cron jobs
+- `iptables-flush` - Flushing all firewall rules
+
+*Warning — project-level destructive operations:*
 - `docker-system-prune` - Docker cleanup operations
 - `git-reset-hard` - Discarding uncommitted changes
-- `npm-uninstall-all` - Removing all dependencies
+- `npm-uninstall-all` - Removing all Node.js dependencies
 - `package-remove` - System package removal
 - `chmod-777` - Overly permissive file permissions
+- `firewall-flush` - Firewall rule removal
+- `process-kill-force` - Force killing processes (SIGKILL)
+- `helm-delete` - Helm release deletion
+- `ssh-key-delete` - SSH key/config deletion
+- `env-file-overwrite` - Environment file overwriting
+
+*Warning — version control:*
+- `git-branch-delete-force` - Force deleting git branches
+- `git-reflog-expire` - Expiring reflog/pruning objects
+
+*Warning — container orchestration:*
+- `docker-swarm-destructive` - Docker swarm stack/service removal
+- `podman-system-reset` - Podman system reset
+
+*Warning — package managers:*
+- `pip-uninstall-all` - Python package uninstall
+- `go-clean-modcache` - Go module cache cleanup
+
+*Warning — critical services:*
+- `systemctl-critical-services` - Stopping critical system services
+- `killall-force` - Force killing all processes by name
+- `deployment-commands` - Deployment operations (kubectl apply, terraform apply)
 
 ### Custom Rules
 
@@ -190,17 +236,17 @@ Control automatic cleanup of old exports:
 
 ```yaml
 export:
-  # Maximum file size in MB (0 = unlimited, default: 10)
-  # Files exceeding this size won't be created
-  max_file_size_mb: 10
+  # Maximum file size in MB (default: 0 = unlimited)
+  # Files exceeding this size are removed during rotation
+  max_file_size_mb: 0
 
-  # Maximum files per target (0 = unlimited, default: 50)
+  # Maximum files per target (default: 0 = unlimited)
   # Older files are automatically deleted
-  max_files: 50
+  max_files: 0
 
-  # Keep exports for N days (0 = forever, default: 30)
+  # Keep exports for N days (default: 0 = forever)
   # Files older than N days are cleaned up
-  keep_days: 30
+  keep_days: 0
 ```
 
 ### Filtering
@@ -344,8 +390,8 @@ shell_integration:
 Here's a comprehensive example combining multiple features:
 
 ```yaml
-# Basic settings
-makefile: Makefile
+# Basic settings (makefile defaults to auto-detect if omitted)
+# makefile: Makefile
 
 # Safety features
 safety:

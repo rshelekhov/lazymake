@@ -82,10 +82,11 @@ Critical commands show a prominent warning dialog:
 - Press `Esc` to cancel safely
 - Press `Enter` to proceed with execution
 
-## Built-in Dangerous Patterns
+## Built-in Dangerous Patterns (36 rules)
 
 ### Critical (○ red + Confirmation Required)
 
+*System-wide destructive operations:*
 - **rm-rf-root**: Recursive deletion of system paths (`rm -rf /`, `sudo rm -rf`)
 - **disk-wipe**: Disk formatting or block device writes (`dd`, `mkfs`)
 - **database-drop**: Database/table deletion (`DROP DATABASE`, `TRUNCATE TABLE`)
@@ -93,14 +94,53 @@ Critical commands show a prominent warning dialog:
 - **terraform-destroy**: Infrastructure destruction (`terraform destroy`)
 - **kubectl-delete**: Kubernetes resource deletion (`kubectl delete namespace`)
 
+*Cloud infrastructure destruction:*
+- **aws-s3-delete**: AWS S3 bucket/object deletion (`aws s3 rm --recursive`)
+- **cloud-instance-terminate**: Cloud compute instance termination (AWS, GCP, Azure)
+- **curl-pipe-shell**: Piping remote content to shell (`curl ... | sh`)
+- **aws-destructive**: AWS resource destruction (CloudFormation, EC2, RDS)
+- **gcp-destructive**: GCP resource destruction (projects, instances, Cloud SQL)
+- **azure-destructive**: Azure resource destruction (resource groups, VMs, SQL)
+- **heroku-destructive**: Heroku app/addon destruction
+
+*Database operations:*
+- **redis-flush**: Redis FLUSHALL/FLUSHDB
+- **cassandra-drop**: Cassandra keyspace/table deletion
+
+*System operations:*
+- **crontab-remove**: Removing all cron jobs (`crontab -r`)
+- **iptables-flush**: Flushing all firewall rules
+
 ### Warning (○ yellow)
 
-- **deployment-commands**: Deployment operations (`kubectl apply`, `terraform apply`)
+*Project-level destructive operations:*
 - **docker-system-prune**: Docker cleanup operations
 - **git-reset-hard**: Discarding uncommitted changes
-- **npm-uninstall-all**: Removing all dependencies
+- **npm-uninstall-all**: Removing all Node.js dependencies
 - **package-remove**: System package removal
 - **chmod-777**: Overly permissive file permissions
+- **firewall-flush**: Firewall rule removal
+- **process-kill-force**: Force killing processes (SIGKILL)
+- **helm-delete**: Helm release deletion
+- **ssh-key-delete**: SSH key/config deletion
+- **env-file-overwrite**: Environment file overwriting
+
+*Version control:*
+- **git-branch-delete-force**: Force deleting git branches
+- **git-reflog-expire**: Expiring reflog/pruning objects
+
+*Container orchestration:*
+- **docker-swarm-destructive**: Docker swarm stack/service removal
+- **podman-system-reset**: Podman system reset
+
+*Package managers:*
+- **pip-uninstall-all**: Python package uninstall
+- **go-clean-modcache**: Go module cache cleanup
+
+*Critical services & deployment:*
+- **systemctl-critical-services**: Stopping critical system services
+- **killall-force**: Force killing all processes by name
+- **deployment-commands**: Deployment operations (`kubectl apply`, `terraform apply`)
 
 ### Info (○ blue)
 
