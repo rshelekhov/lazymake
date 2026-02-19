@@ -136,16 +136,14 @@ func loadAndParseMakefile(makefilePath string) ([]makefile.Target, *graph.Graph,
 }
 
 // convertAndEnrichWithSafety converts makefile targets to TUI targets and adds safety checks
-func convertAndEnrichWithSafety(targets []makefile.Target) []Target {
-	// Load safety configuration
-	safetyConfig, err := safety.LoadConfig()
-	if err != nil {
-		safetyConfig = safety.DefaultConfig()
+func convertAndEnrichWithSafety(targets []makefile.Target, safetyCfg *safety.Config) []Target {
+	if safetyCfg == nil {
+		safetyCfg = safety.DefaultConfig()
 	}
 
 	var safetyResults map[string]*safety.CheckResult
-	if safetyConfig.Enabled {
-		checker, err := safety.NewChecker(safetyConfig)
+	if safetyCfg.Enabled {
+		checker, err := safety.NewChecker(safetyCfg)
 		if err == nil {
 			safetyResults = checker.CheckAllTargets(targets)
 		}
@@ -230,7 +228,7 @@ func NewModel(cfg *config.Config) Model {
 	}
 
 	// Convert to TUI targets and enrich with safety checks
-	tuiTargets := convertAndEnrichWithSafety(targets)
+	tuiTargets := convertAndEnrichWithSafety(targets, cfg.Safety)
 
 	// Get absolute path for history lookups
 	absPath, err := filepath.Abs(cfg.MakefilePath)

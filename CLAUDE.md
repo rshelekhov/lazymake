@@ -37,9 +37,9 @@ go test -race ./...                       # Tests with race detector (CI uses th
 3. On completion: record in `history`, export via `export.Exporter`, write to `shell.Integration`
 
 **Key packages:**
-- `config/` — Viper-based config from `.lazymake.yaml` (project) and `~/.lazymake.yaml` (global), merged
+- `config/` — Loads `.lazymake.yaml` (project) and `~/.lazymake.yaml` (global) independently, merges all sections (export, shell_integration, safety) with consistent rules: scalars project-overrides-global, string slices unioned/deduplicated, struct slices appended. Merge logic lives in `merge.go`
 - `internal/makefile/` — Parses targets, dependencies, recipes; handles `define/endef` blocks and `##` comments
-- `internal/safety/` — Regex-based dangerous command detection with built-in + custom rules
+- `internal/safety/` — Regex-based dangerous command detection with built-in + custom rules; types and rule-matching only (config loading is centralized in `config/`)
 - `internal/shell/` — `HistoryWriter` interface with `BashWriter`, `ZshWriter`, and `FishWriter` implementations; file locking via platform-specific code (`filelock_unix.go`/`filelock_windows.go`)
 - `internal/graph/` — Dependency graph with cycle detection, topological sort, critical path
 - `internal/history/` — JSON-persisted execution history with performance regression detection (>25% slower)

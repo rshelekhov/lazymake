@@ -21,3 +21,15 @@ type Config struct {
 	// Don't add these targets to shell history
 	ExcludeTargets []string `yaml:"exclude_targets"`
 }
+
+// Defaults returns a Config with sensible default values
+func Defaults() *Config {
+	return &Config{
+		Enabled:          false,
+		Shell:            "auto",
+		HistoryFile:      "",
+		IncludeTimestamp: true,
+		FormatTemplate:   "make {target}",
+		ExcludeTargets:   []string{},
+	}
+}
