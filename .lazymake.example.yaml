@@ -4,12 +4,14 @@
 # - ~/.lazymake.yaml for global configuration
 # - ./.lazymake.yaml for project-specific configuration
 #
-# Global and project configs are merged:
-# - enabled: project overrides global
-# - enabled_rules, exclude_targets, custom_rules: union of both
+# Global and project configs are merged (applies to safety, export, shell_integration):
+# - Scalars (enabled, format, shell, etc.): project overrides global
+# - String lists (enabled_rules, exclude_targets): union, deduplicated
+# - Struct lists (custom_rules): appended (global + project)
 
-# Makefile path (default: "Makefile")
-makefile: Makefile
+# Makefile path (default: auto-detect GNUmakefile, makefile, Makefile)
+# When empty, lazymake searches in GNU make order: GNUmakefile → makefile → Makefile
+# makefile: Makefile
 
 # Safety Features Configuration
 safety:
@@ -24,11 +26,22 @@ safety:
     - distclean      # Deep cleanup
     - reset-dev-db   # Known safe development operation
 
-  # Enable only specific built-in rules (omit to enable all 11 rules)
+  # Enable only specific built-in rules (omit to enable all 36 rules)
   # Useful if you only care about certain types of dangerous operations
-  # Available rules: rm-rf-root, disk-wipe, database-drop, git-force-push,
-  #                  terraform-destroy, kubectl-delete, docker-system-prune,
-  #                  git-reset-hard, npm-uninstall-all, package-remove, chmod-777
+  #
+  # Available rules (36 total):
+  #   Critical: rm-rf-root, disk-wipe, database-drop, git-force-push,
+  #     terraform-destroy, kubectl-delete, aws-s3-delete,
+  #     cloud-instance-terminate, curl-pipe-shell, aws-destructive,
+  #     gcp-destructive, azure-destructive, heroku-destructive,
+  #     redis-flush, cassandra-drop, crontab-remove, iptables-flush
+  #   Warning: docker-system-prune, git-reset-hard, npm-uninstall-all,
+  #     package-remove, chmod-777, firewall-flush, process-kill-force,
+  #     helm-delete, ssh-key-delete, env-file-overwrite,
+  #     git-branch-delete-force, git-reflog-expire,
+  #     docker-swarm-destructive, podman-system-reset, pip-uninstall-all,
+  #     go-clean-modcache, systemctl-critical-services, killall-force,
+  #     deployment-commands
   #
   # Example: Only check for the most critical operations
   # enabled_rules:
@@ -170,20 +183,20 @@ export:
   naming_strategy: timestamp
 
   # Rotation settings - cleanup old exports
-  # All settings are optional, 0 means unlimited/disabled
+  # All rotation settings default to 0 (disabled). Set non-zero values to enable.
 
-  # Maximum file size in MB before rotation (0 = unlimited)
-  # Files exceeding this size won't be created (prevents disk issues)
-  max_file_size_mb: 10
+  # Maximum file size in MB (default: 0 = unlimited)
+  # Files exceeding this size are removed during rotation
+  max_file_size_mb: 0
 
-  # Maximum number of files to keep per target (0 = unlimited)
+  # Maximum number of files to keep per target (default: 0 = unlimited)
   # Only applies when naming_strategy is "timestamp" or "sequential"
   # Older files are automatically deleted
-  max_files: 50
+  max_files: 0
 
-  # Keep exports for N days (0 = forever)
+  # Keep exports for N days (default: 0 = forever)
   # Files older than N days are automatically cleaned up
-  keep_days: 30
+  keep_days: 0
 
   # Only export successful executions (ignore failures)
   # Default: false (export everything including failures)
