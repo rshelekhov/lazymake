@@ -23,8 +23,10 @@ func ExpandVariables(makefilePath string, variables []Variable) error {
 		return nil
 	}
 
-	// Run make --print-data-base to get all variable values
-	cmd := exec.Command("make", "-f", makefilePath, "--print-data-base", "--no-builtin-rules", "--no-builtin-variables")
+	// Run make --print-data-base to get all variable values.
+	// The -q (question mode) flag prevents make from executing the default target,
+	// which would otherwise run as a side effect of --print-data-base.
+	cmd := exec.Command("make", "-f", makefilePath, "-q", "--print-data-base", "--no-builtin-rules", "--no-builtin-variables")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Graceful degradation: if make fails, just return without expanding
