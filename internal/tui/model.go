@@ -153,10 +153,11 @@ func convertAndEnrichWithSafety(targets []makefile.Target, safetyCfg *safety.Con
 	tuiTargets := make([]Target, len(targets))
 	for i, t := range targets {
 		tuiTargets[i] = Target{
-			Name:        t.Name,
-			Description: t.Description,
-			CommentType: t.CommentType,
-			Recipe:      t.Recipe,
+			Name:         t.Name,
+			Description:  t.Description,
+			CommentType:  t.CommentType,
+			Recipe:       t.Recipe,
+			IsPatternRule: t.IsPatternRule,
 		}
 
 		// Populate safety fields if target was flagged
