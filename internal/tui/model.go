@@ -118,6 +118,14 @@ func loadAndParseMakefile(makefilePath string) ([]makefile.Target, *graph.Graph,
 		return nil, nil, nil, err
 	}
 
+	// Expand pattern targets (e.g., build-%) by scanning for matching directories
+	targets, err = makefile.ExpandPatternTargets(targets, makefilePath)
+	if err != nil {
+		// Graceful degradation: continue without expansion
+		// Re-parse to get original targets
+		targets, _ = makefile.Parse(makefilePath)
+	}
+
 	depGraph := graph.BuildGraph(targets)
 
 	// Parse and analyze variables
