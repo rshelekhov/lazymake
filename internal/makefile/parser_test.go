@@ -1144,3 +1144,71 @@ another-real: ## Another real target
 		}
 	}
 }
+
+func TestExpandPatternTargets(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `MODULES = foo bar baz
+
+build-tui: $(addprefix build-tui-,$(MODULES))
+
+build-%:
+	echo "Building $*"
+
+build-tui-%:
+	echo "Building $*-tui"
+`
+	err := os.WriteFile(testFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patternTargets := 0
+	for _, t := range targets {
+		if t.IsPatternRule {
+			patternTargets++
+		}
+	}
+	if patternTargets == 0 {
+		t.Fatal("Expected pattern targets but found none")
+	}
+
+	expanded, err := ExpandPatternTargets(targets, testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasBuildTuiFoo := false
+	hasBuildTuiBar := false
+	hasBuildTuiBaz := false
+	stillHasPattern := false
+
+	for _, t := range expanded {
+		if t.Name == "build-tui-foo" {
+			hasBuildTuiFoo = true
+		}
+		if t.Name == "build-tui-bar" {
+			hasBuildTuiBar = true
+		}
+		if t.Name == "build-tui-baz" {
+			hasBuildTuiBaz = true
+		}
+		if t.IsPatternRule {
+			stillHasPattern = true
+		}
+	}
+
+	if !hasBuildTuiFoo || !hasBuildTuiBar || !hasBuildTuiBaz {
+		t.Errorf("Expected build-tui-{foo,bar,baz}, got: %v", getTargetNames(expanded))
+	}
+
+	if stillHasPattern {
+		t.Error("Pattern targets should have been expanded")
+	}
+}
