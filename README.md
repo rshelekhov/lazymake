@@ -16,7 +16,7 @@ A terminal UI for browsing and running Makefile targets.
 
 ```bash
 # Install
-brew install rshelekhov/tap/lazymake
+brew install lazymake
 
 # Run in any directory with a Makefile
 lazymake
@@ -44,7 +44,7 @@ The dependency graph is particularly useful for understanding complex build syst
 
 ### Homebrew (macOS/Linux)
 ```bash
-brew install rshelekhov/tap/lazymake
+brew install lazymake
 ```
 
 ### Go
