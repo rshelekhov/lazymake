@@ -21,6 +21,7 @@ type Target struct {
 	Description string
 	CommentType makefile.CommentType
 	IsRecent    bool // Marks targets that appear in recent history
+	IsPatternRule bool // True if target uses pattern matching (e.g., build-%)
 
 	// Recipe and safety fields
 	Recipe           []string             // Command lines to execute
@@ -35,6 +36,10 @@ type Target struct {
 
 // Implement list.Item interface
 func (t Target) FilterValue() string {
+	// Add a visual marker for pattern rules
+	if t.IsPatternRule {
+		return t.Name + " " + t.Description + " [pattern]"
+	}
 	return t.Name + " " + t.Description
 }
 

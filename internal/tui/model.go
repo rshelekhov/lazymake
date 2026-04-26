@@ -49,10 +49,10 @@ type Model struct {
 	Spinner           spinner.Model
 
 	// Custom filter state
-	FilterInput    string
-	IsFiltering    bool
-	AllTargets     []Target // Original unfiltered targets
-	FilteredItems  []list.Item
+	FilterInput   string
+	IsFiltering   bool
+	AllTargets    []Target // Original unfiltered targets
+	FilteredItems []list.Item
 
 	// State
 	State           AppState
@@ -85,10 +85,10 @@ type Model struct {
 	ExecutionElapsed   time.Duration
 
 	// Streaming execution fields
-	StreamingOutput   *strings.Builder        // Accumulated output during streaming
-	ExecutingViewport viewport.Model          // Viewport for streaming output display
+	StreamingOutput   *strings.Builder            // Accumulated output during streaming
+	ExecutingViewport viewport.Model              // Viewport for streaming output display
 	OutputChunks      <-chan executor.OutputChunk // Channel for receiving chunks
-	CancelExecution   func()                  // Function to cancel running command
+	CancelExecution   func()                      // Function to cancel running command
 
 	// Export and shell integration
 	Exporter         *export.Exporter
@@ -114,6 +114,11 @@ type Model struct {
 // loadAndParseMakefile parses the makefile and related data
 func loadAndParseMakefile(makefilePath string) ([]makefile.Target, *graph.Graph, []variables.Variable, error) {
 	targets, err := makefile.Parse(makefilePath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	targets, err = makefile.ExpandPatternTargets(targets, makefilePath)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -153,10 +158,11 @@ func convertAndEnrichWithSafety(targets []makefile.Target, safetyCfg *safety.Con
 	tuiTargets := make([]Target, len(targets))
 	for i, t := range targets {
 		tuiTargets[i] = Target{
-			Name:        t.Name,
-			Description: t.Description,
-			CommentType: t.CommentType,
-			Recipe:      t.Recipe,
+			Name:          t.Name,
+			Description:   t.Description,
+			CommentType:   t.CommentType,
+			Recipe:        t.Recipe,
+			IsPatternRule: t.IsPatternRule,
 		}
 
 		// Populate safety fields if target was flagged
@@ -269,8 +275,8 @@ func NewModel(cfg *config.Config) Model {
 	delegate := NewItemDelegate()
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Makefile Targets"
-	l.SetShowStatusBar(false) // Disabled - we use custom status bar
-	l.SetShowHelp(false)      // Disabled - help text shown in custom status bar
+	l.SetShowStatusBar(false)    // Disabled - we use custom status bar
+	l.SetShowHelp(false)         // Disabled - help text shown in custom status bar
 	l.SetFilteringEnabled(false) // Disabled - we use custom filtering
 
 	// Custom title style without bottom padding (to match filter spacing)
@@ -320,28 +326,28 @@ func NewModel(cfg *config.Config) Model {
 	spin.Style = lipgloss.NewStyle().Foreground(PrimaryColor)
 
 	return Model{
-		List:              l,
-		Progress:          prog,
-		Spinner:           spin,
-		State:             StateList,
-		Targets:           tuiTargets,
-		AllTargets:        tuiTargets,
-		FilterInput:       "",
-		IsFiltering:       false,
-		Graph:             depGraph,
-		GraphDepth:        -1,
-		ShowOrder:         true,
-		ShowCritical:      true,
-		ShowParallel:      true,
-		Variables:         vars,
-		History:           hist,
-		MakefilePath:      absPath,
-		RecentTargets:     recentTargets,
-		Exporter:          exporter,
-		ShellIntegration:  shellInteg,
-		Highlighter:       highlighter,
-		KeyBindings:       keyBindings,
-		StreamingOutput:   &strings.Builder{},
+		List:             l,
+		Progress:         prog,
+		Spinner:          spin,
+		State:            StateList,
+		Targets:          tuiTargets,
+		AllTargets:       tuiTargets,
+		FilterInput:      "",
+		IsFiltering:      false,
+		Graph:            depGraph,
+		GraphDepth:       -1,
+		ShowOrder:        true,
+		ShowCritical:     true,
+		ShowParallel:     true,
+		Variables:        vars,
+		History:          hist,
+		MakefilePath:     absPath,
+		RecentTargets:    recentTargets,
+		Exporter:         exporter,
+		ShellIntegration: shellInteg,
+		Highlighter:      highlighter,
+		KeyBindings:      keyBindings,
+		StreamingOutput:  &strings.Builder{},
 	}
 }
 

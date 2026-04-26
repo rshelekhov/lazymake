@@ -18,11 +18,12 @@ const (
 
 // Target represents a Makefile target
 type Target struct {
-	Name         string
+	Name          string
 	Description  string
 	CommentType  CommentType
-	Dependencies []string // List of target names this target depends on
-	Recipe       []string // Recipe lines (commands to execute)
+	Dependencies []string
+	Recipe       []string
+	IsPatternRule bool    // True if target uses pattern matching (e.g., build-%)
 }
 
 // commentInfo holds information about a comment
@@ -164,9 +165,13 @@ func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
 	targetName := strings.TrimSpace(parts[0])
 
 	// Skip special targets (like .PHONY, .SILENT, etc.)
-	if strings.HasPrefix(targetName, ".") {
+	// But NOT pattern rules (they start with pattern like build-%)
+	if strings.HasPrefix(targetName, ".") && !strings.Contains(targetName, "%") {
 		return nil
 	}
+
+	// Check if this is a pattern rule
+	isPatternRule := strings.Contains(targetName, "%")
 
 	// Extract inline comment and dependencies
 	dependencies := parts[1]
@@ -177,7 +182,7 @@ func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
 	if idx := strings.Index(dependencies, "#"); idx >= 0 {
 		cleanDeps = dependencies[:idx]
 	}
-	depList := parseDependencies(cleanDeps)
+	depList := parseDependencies(cleanDeps, isPatternRule)
 
 	// Determine final description and comment type
 	finalDesc := lastComment.text
@@ -192,11 +197,12 @@ func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
 	names := strings.FieldsSeq(targetName)
 	for name := range names {
 		*targets = append(*targets, Target{
-			Name:         name,
+			Name:          name,
 			Description:  finalDesc,
 			CommentType:  finalType,
 			Dependencies: depList,
-			Recipe:       nil,
+			Recipe:     nil,
+			IsPatternRule: isPatternRule,
 		})
 	}
 
@@ -264,13 +270,15 @@ func isDefineEnd(line string) bool {
 // - Pattern rules like %.o are skipped (these are templates, not concrete targets)
 // - Order-only prerequisites (after |) are separated out
 //
+// The isPatternRule parameter indicates if the target itself is a pattern rule;
+// if so, dependencies containing % are NOT skipped since they represent the pattern stems.
+//
 // Example inputs and outputs:
 //
 //	"deps compile"           -> ["deps", "compile"]
 //	"deps | order-only"      -> ["deps"]           (ignores order-only)
 //	"$VAR target"            -> ["target"]         (skips variable)
-//	"%.o: %.c"               -> []                 (skips pattern rule)
-func parseDependencies(depStr string) []string {
+func parseDependencies(depStr string, isPatternRule bool) []string {
 	if depStr == "" {
 		return nil
 	}
@@ -303,7 +311,9 @@ func parseDependencies(depStr string) []string {
 		// Skip pattern rules (contain %)
 		// Example: %.o in "%.o: %.c"
 		// Pattern rules are templates, not actual targets we can visualize
-		if strings.Contains(field, "%") {
+		// BUT if the target itself is a pattern rule, we don't skip deps with %
+		// because they represent the pattern stems
+		if !isPatternRule && strings.Contains(field, "%") {
 			continue
 		}
 
