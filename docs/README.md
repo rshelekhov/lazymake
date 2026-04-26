@@ -19,6 +19,11 @@ This directory contains detailed guides and feature documentation to help you ge
 - [Performance Profiling](features/performance-tracking.md) - Track execution times and detect regressions
 - [Export & Shell Integration](features/export-shell-integration.md) - Export results and integrate with shell history
 
+## Product Planning
+
+- [Product Roadmap](product-roadmap.md) - Recommended product direction, phases, risks, and success metrics
+- [GitHub Issues Backlog](github-issues-backlog.md) - Ready-to-create issue drafts grouped by milestone
+
 ## Contributing
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
