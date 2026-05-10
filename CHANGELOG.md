@@ -5,6 +5,12 @@ All notable changes to the lazymake project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Dry-run mode (#38): preview target execution via `make -n` without running the recipe. Activate session-wide via the `--dry-run` CLI flag or `dry_run: true` in `.lazymake.yaml`. CLI flag overrides the config. Dangerous-target confirmation still fires; history, exports, and shell integration entries are skipped. A `DRY-RUN` badge in the status bar and `make -n` in the executing/output headers indicate the active mode.
+
 ## [0.4.1] - 2026-03-27
 
 ### Fixed

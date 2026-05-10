@@ -244,6 +244,48 @@ Safety checks are enabled by default because:
 3. **Easy to disable**: One config line turns it off if unwanted
 4. **Better safe than sorry**: Confirmation dialogs take 1 second; data recovery takes hours
 
+## Dry-Run Mode
+
+Sometimes you want to know what `make <target>` would do *before* committing to it — especially in unfamiliar repositories or before running cleanup or deployment targets. Dry-run mode launches lazymake in a session-wide preview state: every target you select is invoked with `make -n`, which prints the recipe commands without executing them.
+
+**Activate via CLI:**
+
+```bash
+lazymake --dry-run
+```
+
+**Activate via config (`./.lazymake.yaml` or `~/.lazymake.yaml`):**
+
+```yaml
+dry_run: true
+```
+
+The CLI flag takes precedence over the config field, so `lazymake --dry-run=false` re-enables normal execution even when the config has `dry_run: true`.
+
+**What dry-run does:**
+
+- Invokes `make -n <target>` instead of `make <target>`
+- Prints the fully-expanded recipe commands (variables resolved, includes followed)
+- Propagates `-n` to recursive sub-makes via `MAKEFLAGS`
+- Does **not** record the run in execution history
+- Does **not** write to the export directory
+- Does **not** add an entry to your shell history
+
+**Visual indicators:**
+
+A bold `DRY-RUN` badge appears at the left of the status bar in the target list, and the executing/output views show `make -n <target>` instead of `make <target>` so you can see exactly what was invoked.
+
+**Interaction with safety confirmation:**
+
+Dangerous targets still display the confirmation dialog before dry-run execution. While `make -n` cannot itself trigger destructive commands, the confirmation step protects against misreading a recipe — for example, a target that uses `$(shell ...)` (which `make -n` *does* evaluate) or a misclassified rule.
+
+**When to use it:**
+
+- Exploring a new repository without fear of side effects
+- Verifying that variables expand to the values you expect before a real run
+- Sanity-checking a deployment or migration target before committing to it
+- Onboarding teammates by walking them through what each target actually does
+
 ## Real-World Scenarios
 
 **Scenario 1: New developer runs `make clean`**
