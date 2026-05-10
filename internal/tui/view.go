@@ -334,12 +334,23 @@ func (m Model) renderGraphStatusBar(width int) string {
 func (m Model) renderOutputView() string {
 	var builder strings.Builder
 
-	// Header inside the box
+	// Header inside the box. In dry-run we substitute `make -n` so the
+	// header reflects what was actually invoked.
+	makeVerb := "make "
+	if m.DryRun {
+		makeVerb = "make -n "
+	}
 	var header string
 	if m.ExecutionError != nil {
-		header = ErrorStyle.Render("❌ Failed: make " + m.ExecutingTarget)
+		header = ErrorStyle.Render("❌ Failed: " + makeVerb + m.ExecutingTarget)
 	} else {
-		header = SuccessStyle.Render("✓ Success: make " + m.ExecutingTarget)
+		header = SuccessStyle.Render("✓ Success: " + makeVerb + m.ExecutingTarget)
+	}
+	if m.DryRun {
+		header += "  " + lipgloss.NewStyle().
+			Foreground(WarningColor).
+			Bold(true).
+			Render("[DRY-RUN]")
 	}
 	util.WriteString(&builder, header+"\n")
 
@@ -422,11 +433,16 @@ func (m Model) renderExecutingView() string {
 
 	var builder strings.Builder
 
-	// Title with spinner
+	// Title with spinner. In dry-run we show `make -n` so the user can
+	// see exactly what was invoked.
+	makeVerb := "make "
+	if m.DryRun {
+		makeVerb = "make -n "
+	}
 	title := lipgloss.NewStyle().
 		Foreground(PrimaryColor).
 		Bold(true).
-		Render(m.Spinner.View() + " Executing: make " + m.ExecutingTarget)
+		Render(m.Spinner.View() + " Executing: " + makeVerb + m.ExecutingTarget)
 	util.WriteString(&builder, title+"\n\n")
 
 	// Progress bar (if we have avg duration to estimate)
