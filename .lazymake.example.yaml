@@ -13,6 +13,13 @@
 # When empty, lazymake searches in GNU make order: GNUmakefile → makefile → Makefile
 # makefile: Makefile
 
+# Dry-run mode: pass -n to make so commands are printed but not executed.
+# Useful for previewing what `make <target>` would do in unfamiliar repositories.
+# When enabled, history, exports, and shell integration entries are skipped.
+# CLI flag --dry-run overrides this value.
+# Default: false
+# dry_run: false
+
 # Safety Features Configuration
 safety:
   # Master switch - enable/disable all safety checks
