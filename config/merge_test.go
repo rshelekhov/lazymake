@@ -20,6 +20,85 @@ func writeYAML(t *testing.T, dir, name, content string) {
 	}
 }
 
+// TestLoadDryRun exercises the dry_run resolution paths in Load(): the
+// CLI flag set via viper.Set (matching what cobra+BindPFlag does at
+// runtime), the YAML field via .lazymake.yaml, and CLI-overrides-YAML.
+//
+// Viper is global state, so each subtest resets it explicitly. We chdir
+// to a tempdir so Load() never reads the real project .lazymake.yaml.
+func TestLoadDryRun(t *testing.T) {
+	tests := []struct {
+		name       string
+		yamlBody   string // content for project .lazymake.yaml; empty = no file
+		viperSetTo *bool  // simulated CLI flag; nil = not set
+		want       bool
+	}{
+		{
+			name: "default false when neither CLI nor YAML set",
+			want: false,
+		},
+		{
+			name:     "YAML true, no CLI flag",
+			yamlBody: "dry_run: true\n",
+			want:     true,
+		},
+		{
+			name:     "YAML false, no CLI flag",
+			yamlBody: "dry_run: false\n",
+			want:     false,
+		},
+		{
+			name:       "CLI true, no YAML",
+			viperSetTo: ptrBool(true),
+			want:       true,
+		},
+		{
+			name:       "CLI true overrides YAML false",
+			yamlBody:   "dry_run: false\n",
+			viperSetTo: ptrBool(true),
+			want:       true,
+		},
+		{
+			name:       "CLI false overrides YAML true",
+			yamlBody:   "dry_run: true\n",
+			viperSetTo: ptrBool(false),
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			if tt.yamlBody != "" {
+				writeYAML(t, tempDir, ".lazymake.yaml", tt.yamlBody)
+			}
+
+			oldDir, _ := os.Getwd()
+			defer os.Chdir(oldDir)
+			if err := os.Chdir(tempDir); err != nil {
+				t.Fatalf("chdir: %v", err)
+			}
+
+			viper.Reset()
+			defer viper.Reset()
+
+			if tt.viperSetTo != nil {
+				viper.Set("dry_run", *tt.viperSetTo)
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() returned error: %v", err)
+			}
+			if cfg.DryRun != tt.want {
+				t.Errorf("cfg.DryRun = %v, want %v", cfg.DryRun, tt.want)
+			}
+		})
+	}
+}
+
+func ptrBool(b bool) *bool { return &b }
+
 func TestMergeStringSliceUnion(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -54,16 +54,28 @@ type OutputChunk struct {
 	Err  error
 }
 
-// ExecuteStreaming runs a make target and streams output via channel
-// Returns: channel for output chunks, cancel function
-func ExecuteStreaming(target, makefilePath string) (<-chan OutputChunk, func()) {
+// ExecuteStreaming runs a make target and streams output via channel.
+// When dryRun is true, the command is invoked with `make -n`, which prints
+// the recipe lines that would have been executed without actually running them.
+// Returns: channel for output chunks, cancel function.
+//
+// TODO(#93): replace dryRun bool with an ExecutionOptions struct once
+// interactive execution parameters (env vars, make flags) land.
+func ExecuteStreaming(target, makefilePath string, dryRun bool) (<-chan OutputChunk, func()) {
 	chunks := make(chan OutputChunk, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		defer close(chunks)
 
-		cmd := exec.CommandContext(ctx, "make", "-f", makefilePath, target)
+		args := []string{"-f", makefilePath}
+		if dryRun {
+			// `-n` (--just-print / --dry-run): print recipe commands without executing them.
+			// MAKEFLAGS propagates -n to recursive sub-makes automatically.
+			args = append(args, "-n")
+		}
+		args = append(args, target)
+		cmd := exec.CommandContext(ctx, "make", args...)
 
 		// Create pipes for stdout and stderr
 		stdout, err := cmd.StdoutPipe()

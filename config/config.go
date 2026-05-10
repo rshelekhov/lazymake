@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	MakefilePath     string
+	DryRun           bool
 	Export           *export.Config
 	ShellIntegration *shell.Config
 	Safety           *safety.Config
@@ -53,6 +54,12 @@ func Load() (*Config, error) {
 	// CLI flag override for makefile path
 	if viper.IsSet("makefile") {
 		cfg.MakefilePath = viper.GetString("makefile")
+	}
+
+	// Dry-run mode: settable via --dry-run CLI flag or `dry_run: true` in YAML.
+	// Cobra+Viper give the CLI flag precedence over the YAML scalar automatically.
+	if viper.IsSet("dry_run") {
+		cfg.DryRun = viper.GetBool("dry_run")
 	}
 
 	return cfg, nil

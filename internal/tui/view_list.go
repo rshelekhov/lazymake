@@ -489,6 +489,18 @@ func (m Model) buildLeftStatusBar(stats targetStats) string {
 
 	var sections []string
 
+	// Dry-run badge (most prominent — always at the very left).
+	// Mirrors the workspace-path nugget styling (same foreground/padding,
+	// just a different background) so weight and tone are consistent.
+	if m.DryRun {
+		dryRunNuggetStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+			Background(WarningColor).
+			Padding(0, 1).
+			MarginRight(1)
+		sections = append(sections, dryRunNuggetStyle.Render("DRY-RUN"))
+	}
+
 	// Workspace path (colored)
 	workspacePath := m.getWorkspaceDisplayPath()
 	sections = append(sections, coloredNuggetStyle.Render(workspacePath))

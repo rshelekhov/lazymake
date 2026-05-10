@@ -529,6 +529,76 @@ func TestExecute_ResultFields_AlwaysSetEvenOnFailure(t *testing.T) {
 	}
 }
 
+// TestExecuteStreamingDryRun verifies that ExecuteStreaming with dryRun=true
+// invokes `make -n` and therefore prints recipe commands without actually
+// executing them. Behavioral test — checks the on-disk side effect rather
+// than reaching into argv.
+func TestExecuteStreamingDryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	makefile := tempDir + "/Makefile"
+	sentinel := tempDir + "/sentinel"
+
+	// Recipe creates a sentinel file. In dry-run the file must NOT appear.
+	makefileContent := ".PHONY: touch-sentinel\ntouch-sentinel:\n\ttouch " + sentinel + "\n"
+	if err := os.WriteFile(makefile, []byte(makefileContent), 0644); err != nil {
+		t.Fatalf("Failed to create test Makefile: %v", err)
+	}
+
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+	os.Chdir(tempDir)
+
+	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, true)
+
+	// Drain the channel and concatenate streamed output.
+	var output string
+	var execErr error
+	for chunk := range chunks {
+		output += chunk.Data
+		if chunk.Done {
+			execErr = chunk.Err
+		}
+	}
+
+	if execErr != nil {
+		t.Errorf("expected no error from dry-run, got: %v", execErr)
+	}
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Errorf("expected sentinel file NOT to exist after dry-run, but stat returned: %v", err)
+	}
+	if !contains(output, "touch "+sentinel) {
+		t.Errorf("expected dry-run output to contain the un-executed touch command, got: %q", output)
+	}
+}
+
+// TestExecuteStreamingNormalRunsCommands is a control test confirming the
+// non-dry-run path still produces the side effect.
+func TestExecuteStreamingNormalRunsCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	makefile := tempDir + "/Makefile"
+	sentinel := tempDir + "/sentinel"
+
+	makefileContent := ".PHONY: touch-sentinel\ntouch-sentinel:\n\ttouch " + sentinel + "\n"
+	if err := os.WriteFile(makefile, []byte(makefileContent), 0644); err != nil {
+		t.Fatalf("Failed to create test Makefile: %v", err)
+	}
+
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+	os.Chdir(tempDir)
+
+	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, false)
+	for chunk := range chunks {
+		if chunk.Done && chunk.Err != nil {
+			t.Fatalf("unexpected error from normal run: %v", chunk.Err)
+		}
+	}
+
+	if _, err := os.Stat(sentinel); err != nil {
+		t.Errorf("expected sentinel file to exist after normal run, got: %v", err)
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {

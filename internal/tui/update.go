@@ -236,13 +236,17 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Safe or non-critical target - execute immediately
-	m.History.RecordExecution(m.MakefilePath, target.Name)
-	_ = m.History.Save()
+	// Safe or non-critical target - execute immediately.
+	// In dry-run mode we skip history recording so preview-only runs
+	// don't pollute the RECENT list or perf stats (issue #38).
+	if !m.DryRun {
+		m.History.RecordExecution(m.MakefilePath, target.Name)
+		_ = m.History.Save()
 
-	// Refresh recent targets for next render
-	recentEntries := m.History.GetRecent(m.MakefilePath)
-	m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+		// Refresh recent targets for next render
+		recentEntries := m.History.GetRecent(m.MakefilePath)
+		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+	}
 
 	m.State = StateExecuting
 	m.ExecutingTarget = target.Name
@@ -254,7 +258,7 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 	m.initExecutingViewport()
 
 	return m, tea.Batch(
-		executeTargetStreaming(target.Name, m.MakefilePath),
+		executeTargetStreaming(target.Name, m.MakefilePath, m.DryRun),
 		tickTimer(),
 		m.Spinner.Tick,
 	)
@@ -599,10 +603,15 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 	// Calculate execution duration
 	duration := time.Since(m.ExecutionStartTime)
 
-	// Record execution with timing data
-	success := err == nil
-	m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, duration, success)
-	_ = m.History.Save() // Async, ignore errors
+	// Per ACR for #38: dry-run does not write history, exports, or shell
+	// integration entries. We still build the Result for the output view
+	// so the user can read what `make -n` printed.
+	if !m.DryRun {
+		// Record execution with timing data
+		success := err == nil
+		m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, duration, success)
+		_ = m.History.Save() // Async, ignore errors
+	}
 
 	// Build result for export
 	result := executor.Result{
@@ -622,8 +631,8 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Export execution result (async, non-blocking)
-	if m.Exporter != nil {
+	// Export execution result (async, non-blocking) — skipped in dry-run.
+	if m.Exporter != nil && !m.DryRun {
 		go func() {
 			record := export.NewExecutionRecord(
 				m.MakefilePath,
@@ -636,8 +645,8 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 		}()
 	}
 
-	// Shell integration (async, non-blocking)
-	if m.ShellIntegration != nil {
+	// Shell integration (async, non-blocking) — skipped in dry-run.
+	if m.ShellIntegration != nil && !m.DryRun {
 		go func() {
 			if err := m.ShellIntegration.RecordExecution(shell.ExecutionInfo{
 			Target:       m.ExecutingTarget,
@@ -648,16 +657,16 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 		}()
 	}
 
-	// Refresh performance stats for all targets
-	enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
+	// Refresh perf stats and RECENT list only when history was updated.
+	if !m.DryRun {
+		enrichTargetsWithPerformance(m.History, m.MakefilePath, m.Targets)
 
-	// Refresh recent targets to show updated timing
-	recentEntries := m.History.GetRecent(m.MakefilePath)
-	m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+		recentEntries := m.History.GetRecent(m.MakefilePath)
+		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
 
-	// Rebuild and update list items to reflect new performance stats
-	updatedItems := rebuildListItems(m.RecentTargets, m.Targets)
-	m.List.SetItems(updatedItems)
+		updatedItems := rebuildListItems(m.RecentTargets, m.Targets)
+		m.List.SetItems(updatedItems)
+	}
 
 	// Transition to output view
 	m.State = StateOutput
@@ -789,17 +798,22 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "enter":
-			// Proceed with execution of dangerous target
+			// Proceed with execution of dangerous target.
+			// Per ACR for #38: dangerous targets still show this confirm
+			// dialog in dry-run mode, but the actual run uses `make -n`
+			// and skips history recording.
 			if m.PendingTarget != nil {
 				target := *m.PendingTarget
 
-				// Record execution in history
-				m.History.RecordExecution(m.MakefilePath, target.Name)
-				_ = m.History.Save()
+				if !m.DryRun {
+					// Record execution in history
+					m.History.RecordExecution(m.MakefilePath, target.Name)
+					_ = m.History.Save()
 
-				// Refresh recent targets
-				recentEntries := m.History.GetRecent(m.MakefilePath)
-				m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+					// Refresh recent targets
+					recentEntries := m.History.GetRecent(m.MakefilePath)
+					m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
+				}
 
 				// Clear pending target and start execution
 				m.PendingTarget = nil
@@ -813,7 +827,7 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initExecutingViewport()
 
 				return m, tea.Batch(
-					executeTargetStreaming(target.Name, m.MakefilePath),
+					executeTargetStreaming(target.Name, m.MakefilePath, m.DryRun),
 					tickTimer(),   // Start timer
 					m.Spinner.Tick, // Start spinner animation
 				)
@@ -850,10 +864,12 @@ func tickTimer() tea.Cmd {
 	})
 }
 
-// executeTargetStreaming starts streaming execution
-func executeTargetStreaming(target, makefilePath string) tea.Cmd {
+// executeTargetStreaming starts streaming execution.
+// When dryRun is true, the executor invokes `make -n` to preview commands
+// without running them.
+func executeTargetStreaming(target, makefilePath string, dryRun bool) tea.Cmd {
 	return func() tea.Msg {
-		chunks, cancel := executor.ExecuteStreaming(target, makefilePath)
+		chunks, cancel := executor.ExecuteStreaming(target, makefilePath, dryRun)
 		return streamStartedMsg{chunks: chunks, cancel: cancel}
 	}
 }

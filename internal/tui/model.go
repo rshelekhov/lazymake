@@ -94,6 +94,11 @@ type Model struct {
 	Exporter         *export.Exporter
 	ShellIntegration *shell.Integration
 
+	// Dry-run mode: when true, targets execute via `make -n` and side
+	// effects (history, exports, shell integration) are skipped.
+	// Set at startup from CLI flag / config; immutable for the session.
+	DryRun bool
+
 	// Workspace management
 	WorkspaceManager *workspace.Manager
 	WorkspaceList    list.Model // For workspace picker UI
@@ -339,6 +344,7 @@ func NewModel(cfg *config.Config) Model {
 		RecentTargets:     recentTargets,
 		Exporter:          exporter,
 		ShellIntegration:  shellInteg,
+		DryRun:            cfg.DryRun,
 		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
 		StreamingOutput:   &strings.Builder{},

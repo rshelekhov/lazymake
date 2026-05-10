@@ -21,9 +21,15 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().StringP("file", "f", "Makefile", "Path to Makefile")
+	rootCmd.Flags().Bool("dry-run", false, "Preview commands via 'make -n' without executing them")
 
 	if err := viper.BindPFlag("makefile", rootCmd.Flags().Lookup("file")); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error binding makefile flag: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := viper.BindPFlag("dry_run", rootCmd.Flags().Lookup("dry-run")); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error binding dry-run flag: %v\n", err)
 		os.Exit(1)
 	}
 }

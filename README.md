@@ -31,6 +31,7 @@ lazymake provides an interactive interface for Makefiles with:
 - **Variable inspector** for debugging complex variable expansions
 - **Syntax highlighting** for recipes (detects Python, Go, shell scripts, etc.)
 - **Safety warnings** for destructive commands (configurable)
+- **Dry-run mode** (`--dry-run`) — preview commands via `make -n` without side effects
 - **Performance tracking** to identify slow targets
 
 
@@ -60,6 +61,9 @@ lazymake
 
 # Specify path
 lazymake -f path/to/Makefile
+
+# Preview commands without executing (uses `make -n` under the hood)
+lazymake --dry-run
 ```
 
 ### Keyboard shortcuts

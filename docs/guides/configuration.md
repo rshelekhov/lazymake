@@ -25,6 +25,17 @@ When both files exist, they are merged with consistent rules across all sections
 makefile: ""
 ```
 
+### Dry-Run Mode
+
+Run lazymake in a session-wide preview state. When enabled, targets execute via `make -n` (commands are printed but not run), and history, exports, and shell integration entries are skipped.
+
+```yaml
+# Default: false
+dry_run: false
+```
+
+The `--dry-run` CLI flag overrides this value. Use `lazymake --dry-run` to enable for one session without editing config, or `lazymake --dry-run=false` to disable when the config has it on. See [Safety Features → Dry-Run Mode](../features/safety-features.md#dry-run-mode) for details.
+
 ## Safety Features
 
 Configure dangerous command detection and confirmation dialogs.
