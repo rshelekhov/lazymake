@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -140,4 +141,47 @@ func shellSplit(s string) ([]string, error) {
 	}
 	flush()
 	return tokens, nil
+}
+
+// formatEnvRaw serializes a parsed env map back into the raw textinput
+// format. Keys are sorted to make the result deterministic and stable
+// across saves; values containing whitespace are double-quoted to
+// round-trip through parseEnvLine.
+//
+// Returns "" for an empty/nil map so the textinput shows its
+// placeholder instead of a blank string of quotes.
+func formatEnvRaw(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		v := env[k]
+		if strings.ContainsAny(v, " \t\"") {
+			// Escape embedded double quotes by stripping them — the
+			// textinput parser doesn't support escapes, so this is
+			// the closest we can do without breaking round-trip.
+			v = strings.ReplaceAll(v, `"`, "")
+			parts = append(parts, k+`="`+v+`"`)
+			continue
+		}
+		parts = append(parts, k+"="+v)
+	}
+	return strings.Join(parts, " ")
+}
+
+// formatFlagsRaw serializes a parsed flags slice back into the raw
+// textinput format. Flags don't carry whitespace today, so a plain
+// space-join suffices; the helper exists for symmetry with
+// formatEnvRaw and to centralize this rule.
+func formatFlagsRaw(flags []string) string {
+	if len(flags) == 0 {
+		return ""
+	}
+	return strings.Join(flags, " ")
 }

@@ -236,6 +236,85 @@ func TestParamsTabTogglesFocus(t *testing.T) {
 	}
 }
 
+func TestFormatEnvRaw(t *testing.T) {
+	tests := []struct {
+		name string
+		in   map[string]string
+		want string
+	}{
+		{name: "empty", in: nil, want: ""},
+		{name: "zero len", in: map[string]string{}, want: ""},
+		{name: "single", in: map[string]string{"FOO": "bar"}, want: "FOO=bar"},
+		{
+			name: "sorted by key",
+			in:   map[string]string{"B": "2", "A": "1", "C": "3"},
+			want: "A=1 B=2 C=3",
+		},
+		{
+			name: "value with space gets quoted",
+			in:   map[string]string{"MSG": "hello world"},
+			want: `MSG="hello world"`,
+		},
+		{
+			name: "value with embedded quote",
+			in:   map[string]string{"X": `a"b`},
+			// The current parser doesn't support quote escapes, so we
+			// strip them rather than emit something parseEnvLine would
+			// reject when the user re-opens the form.
+			want: `X="ab"`,
+		},
+		{
+			name: "empty value preserved",
+			in:   map[string]string{"E": ""},
+			want: "E=",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatEnvRaw(tt.in)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatEnvRaw_RoundTripsThroughParseEnvLine(t *testing.T) {
+	in := map[string]string{
+		"FOO":   "bar",
+		"MSG":   "hello world",
+		"EMPTY": "",
+	}
+	got, err := parseEnvLine(formatEnvRaw(in))
+	if err != nil {
+		t.Fatalf("re-parse failed: %v", err)
+	}
+	if !reflect.DeepEqual(got, in) {
+		t.Errorf("round-trip mismatch:\n  got  %v\n  want %v", got, in)
+	}
+}
+
+func TestFormatFlagsRaw(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want string
+	}{
+		{name: "empty", in: nil, want: ""},
+		{name: "zero len", in: []string{}, want: ""},
+		{name: "single", in: []string{"-j4"}, want: "-j4"},
+		{name: "multiple", in: []string{"-j4", "-k", "--always-make"}, want: "-j4 -k --always-make"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatFlagsRaw(tt.in)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestParamsPrefillsFromLastRunParams verifies opening the form for a
 // target that was previously run with params restores those values.
 func TestParamsPrefillsFromLastRunParams(t *testing.T) {
