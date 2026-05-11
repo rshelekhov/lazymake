@@ -48,6 +48,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateRunParams(msg)
 	case StateRunPresets:
 		return m.updateRunPresets(msg)
+	case StateConfirmRerun:
+		return m.updateConfirmRerun(msg)
 	default:
 		return m, nil
 	}
@@ -115,16 +117,12 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOpenPresetsPicker()
 	case "R":
 		return m.handleRerunLastUsed()
+	case "ctrl+r":
+		return m.handleRerunLast()
 	case "ctrl+d", "ctrl+u":
 		return m.handleRecipeHalfPage(msg.String())
-	case "down", "j":
-		m = navigateToTarget(m, true)
-		m = updateRecipeViewportContent(m)
-		return m, nil
-	case "up", "k":
-		m = navigateToTarget(m, false)
-		m = updateRecipeViewportContent(m)
-		return m, nil
+	case "down", "j", "up", "k":
+		return m.handleListNavigation(msg.String()), nil
 	}
 
 	// Delegate all other keys to the list component
@@ -136,6 +134,20 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m = updateRecipeViewportContent(m)
 
 	return m, cmd
+}
+
+// handleListNavigation moves the cursor up or down to the next/prev
+// Target row, skipping headers and separators, then refreshes the
+// recipe preview viewport for the new selection.
+//
+// Extracted from handleKeyPress to keep the dispatcher under the
+// gocyclo limit configured in .golangci.yml — both directions share
+// the same post-move refresh, so collapsing them removes a branch.
+func (m Model) handleListNavigation(key string) Model {
+	down := key == "down" || key == "j"
+	m = navigateToTarget(m, down)
+	m = updateRecipeViewportContent(m)
+	return m
 }
 
 // handleRecipeHalfPage scrolls the recipe preview viewport by half a
