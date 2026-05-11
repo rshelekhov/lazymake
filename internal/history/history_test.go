@@ -4,9 +4,62 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
+
+// TestRecordExecutionWithParams covers issue #37: env and flags are
+// persisted alongside the timing record so post-mortem inspection (and
+// future preset/rerun features) can see exactly how a target was run.
+func TestRecordExecutionWithParams(t *testing.T) {
+	h := newEmptyHistory()
+	env := map[string]string{"FOO": "bar"}
+	flags := []string{"-j4", "-k"}
+
+	h.RecordExecutionWithParams("/test/Makefile", "build", 250*time.Millisecond, true, env, flags)
+
+	entries := h.Entries["/test/Makefile"]
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if len(entries[0].RecentExecutions) != 1 {
+		t.Fatalf("expected 1 execution record, got %d", len(entries[0].RecentExecutions))
+	}
+	rec := entries[0].RecentExecutions[0]
+	if !reflect.DeepEqual(rec.Env, env) {
+		t.Errorf("env: got %v, want %v", rec.Env, env)
+	}
+	if !reflect.DeepEqual(rec.Flags, flags) {
+		t.Errorf("flags: got %v, want %v", rec.Flags, flags)
+	}
+}
+
+// TestRecordExecutionWithTimingOmitsParams confirms the legacy
+// RecordExecutionWithTiming entry point leaves env/flags nil, so plain
+// runs continue to serialize identically.
+func TestRecordExecutionWithTimingOmitsParams(t *testing.T) {
+	h := newEmptyHistory()
+	h.RecordExecutionWithTiming("/test/Makefile", "build", 250*time.Millisecond, true)
+
+	rec := h.Entries["/test/Makefile"][0].RecentExecutions[0]
+	if rec.Env != nil {
+		t.Errorf("expected nil env for legacy timing call, got %v", rec.Env)
+	}
+	if rec.Flags != nil {
+		t.Errorf("expected nil flags for legacy timing call, got %v", rec.Flags)
+	}
+
+	// And the JSON form must not contain env/flags keys.
+	data, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(data); strings.Contains(got, `"env"`) || strings.Contains(got, `"flags"`) {
+		t.Errorf("expected omitempty to drop env/flags from JSON, got: %s", got)
+	}
+}
 
 func TestLoad_NonExistentFile(t *testing.T) {
 	h := &History{

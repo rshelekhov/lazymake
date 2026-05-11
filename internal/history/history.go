@@ -17,10 +17,17 @@ const (
 )
 
 // ExecutionRecord represents a single target execution with timing
+//
+// Env and Flags are recorded when the run was launched via the
+// interactive parameters form (issue #37). Both are omitted from JSON
+// when empty so existing on-disk history files stay byte-identical for
+// runs that didn't use parameters.
 type ExecutionRecord struct {
-	Duration  time.Duration `json:"duration"`
-	Timestamp time.Time     `json:"timestamp"`
-	Success   bool          `json:"success"`
+	Duration  time.Duration     `json:"duration"`
+	Timestamp time.Time         `json:"timestamp"`
+	Success   bool              `json:"success"`
+	Env       map[string]string `json:"env,omitempty"`
+	Flags     []string          `json:"flags,omitempty"`
 }
 
 // Entry represents a single target execution record
@@ -116,6 +123,14 @@ func (h *History) RecordExecution(makefilePath, targetName string) {
 // Implements LRU eviction: keeps only the maxRecentTargets most recent targets
 // Implements execution history LRU: keeps only the maxRecentExecutions most recent executions
 func (h *History) RecordExecutionWithTiming(makefilePath, targetName string, duration time.Duration, success bool) {
+	h.RecordExecutionWithParams(makefilePath, targetName, duration, success, nil, nil)
+}
+
+// RecordExecutionWithParams is the full-fidelity recording method. It
+// behaves identically to RecordExecutionWithTiming but also persists
+// the env vars and make flags supplied via the params form (issue #37).
+// Both env and flags may be nil for runs that didn't use parameters.
+func (h *History) RecordExecutionWithParams(makefilePath, targetName string, duration time.Duration, success bool, env map[string]string, flags []string) {
 	now := time.Now()
 
 	entries := h.Entries[makefilePath]
@@ -134,6 +149,8 @@ func (h *History) RecordExecutionWithTiming(makefilePath, targetName string, dur
 					Duration:  duration,
 					Timestamp: now,
 					Success:   success,
+					Env:       env,
+					Flags:     flags,
 				}
 				entries[i].RecentExecutions = append(entries[i].RecentExecutions, exec)
 
@@ -162,6 +179,8 @@ func (h *History) RecordExecutionWithTiming(makefilePath, targetName string, dur
 				Duration:  duration,
 				Timestamp: now,
 				Success:   success,
+				Env:       env,
+				Flags:     flags,
 			}}
 		}
 

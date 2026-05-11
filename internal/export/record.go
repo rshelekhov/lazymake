@@ -4,12 +4,37 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/rshelekhov/lazymake/internal/executor"
 	"github.com/rshelekhov/lazymake/version"
 )
+
+// formatEnvForLog renders env pairs deterministically as
+// "KEY=val KEY2=val2", values quoted if they contain whitespace.
+// Used by FormatLog so consecutive runs with the same env produce
+// identical strings.
+func formatEnvForLog(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		v := env[k]
+		if strings.ContainsAny(v, " \t") {
+			v = `"` + v + `"`
+		}
+		parts = append(parts, k+"="+v)
+	}
+	return strings.Join(parts, " ")
+}
 
 // ExecutionRecord represents a complete execution result for export
 type ExecutionRecord struct {
@@ -30,6 +55,12 @@ type ExecutionRecord struct {
 	Output       string `json:"output"`
 	ErrorMessage string `json:"error_message,omitempty"`
 
+	// Run parameters supplied via the interactive form (issue #37).
+	// Omitted from JSON when empty so plain runs serialize identically
+	// to previous versions of the format.
+	Env   map[string]string `json:"env,omitempty"`
+	Flags []string          `json:"flags,omitempty"`
+
 	// Environment context
 	WorkingDir      string `json:"working_dir"`
 	User            string `json:"user,omitempty"`
@@ -37,8 +68,17 @@ type ExecutionRecord struct {
 	LazymakeVersion string `json:"lazymake_version,omitempty"`
 }
 
-// NewExecutionRecord creates an ExecutionRecord from execution data
+// NewExecutionRecord creates an ExecutionRecord from execution data.
+// Env and flags default to empty; use NewExecutionRecordWithParams
+// to record interactive-form parameters (issue #37).
 func NewExecutionRecord(makefilePath, targetName string, result executor.Result) *ExecutionRecord {
+	return NewExecutionRecordWithParams(makefilePath, targetName, result, nil, nil)
+}
+
+// NewExecutionRecordWithParams is the full-fidelity factory. env and
+// flags may be nil for plain runs; both are emitted in JSON output
+// only when non-empty.
+func NewExecutionRecordWithParams(makefilePath, targetName string, result executor.Result, env map[string]string, flags []string) *ExecutionRecord {
 	// Get working directory
 	workingDir, _ := os.Getwd()
 
@@ -69,6 +109,8 @@ func NewExecutionRecord(makefilePath, targetName string, result executor.Result)
 		ExitCode:        result.ExitCode,
 		Output:          result.Output,
 		ErrorMessage:    errMsg,
+		Env:             env,
+		Flags:           flags,
 		WorkingDir:      workingDir,
 		User:            currentUser,
 		Hostname:        hostname,
@@ -105,6 +147,14 @@ func (r *ExecutionRecord) FormatLog() string {
 	}
 	if r.Hostname != "" {
 		fmt.Fprintf(&b, "Host:          %s\n", r.Hostname)
+	}
+
+	// Interactive run parameters, when present (issue #37).
+	if len(r.Env) > 0 {
+		fmt.Fprintf(&b, "Env:           %s\n", formatEnvForLog(r.Env))
+	}
+	if len(r.Flags) > 0 {
+		fmt.Fprintf(&b, "Flags:         %s\n", strings.Join(r.Flags, " "))
 	}
 
 	// Output section

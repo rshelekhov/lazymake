@@ -548,7 +548,7 @@ func TestExecuteStreamingDryRun(t *testing.T) {
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, true)
+	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, ExecutionOptions{DryRun: true})
 
 	// Drain the channel and concatenate streamed output.
 	var output string
@@ -587,7 +587,7 @@ func TestExecuteStreamingNormalRunsCommands(t *testing.T) {
 	defer os.Chdir(oldDir)
 	os.Chdir(tempDir)
 
-	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, false)
+	chunks, _ := ExecuteStreaming("touch-sentinel", makefile, ExecutionOptions{})
 	for chunk := range chunks {
 		if chunk.Done && chunk.Err != nil {
 			t.Fatalf("unexpected error from normal run: %v", chunk.Err)
@@ -596,6 +596,164 @@ func TestExecuteStreamingNormalRunsCommands(t *testing.T) {
 
 	if _, err := os.Stat(sentinel); err != nil {
 		t.Errorf("expected sentinel file to exist after normal run, got: %v", err)
+	}
+}
+
+// TestBuildArgs verifies argv construction for ExecuteStreaming.
+//
+// The order matters: `-f <path>` first, then `-n` (if dry-run), then user
+// flags, then the target last. User code relies on this for predictable
+// behavior — see docs/features/execution-parameters.md.
+func TestBuildArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		opts ExecutionOptions
+		want []string
+	}{
+		{
+			name: "zero options",
+			opts: ExecutionOptions{},
+			want: []string{"-f", "Makefile", "build"},
+		},
+		{
+			name: "dry-run only",
+			opts: ExecutionOptions{DryRun: true},
+			want: []string{"-f", "Makefile", "-n", "build"},
+		},
+		{
+			name: "flags only",
+			opts: ExecutionOptions{Flags: []string{"-j4", "-k"}},
+			want: []string{"-f", "Makefile", "-j4", "-k", "build"},
+		},
+		{
+			name: "dry-run + flags: -n precedes user flags",
+			opts: ExecutionOptions{DryRun: true, Flags: []string{"-j4"}},
+			want: []string{"-f", "Makefile", "-n", "-j4", "build"},
+		},
+		{
+			name: "env does not appear in argv",
+			opts: ExecutionOptions{Env: map[string]string{"FOO": "bar"}},
+			want: []string{"-f", "Makefile", "build"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildArgs("build", "Makefile", tt.opts)
+			if len(got) != len(tt.want) {
+				t.Fatalf("args length: got %d %v, want %d %v", len(got), got, len(tt.want), tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("args[%d]: got %q, want %q (full: %v)", i, got[i], tt.want[i], got)
+				}
+			}
+		})
+	}
+}
+
+// TestBuildEnv verifies env construction. Keys must be sorted so the
+// resulting argv-equivalent string is deterministic (helpful for testing
+// and for users reading the output).
+func TestBuildEnv(t *testing.T) {
+	t.Run("nil when empty", func(t *testing.T) {
+		if got := buildEnv(ExecutionOptions{}); got != nil {
+			t.Errorf("expected nil for empty env, got %v", got)
+		}
+	})
+
+	t.Run("keys appended in sorted order", func(t *testing.T) {
+		opts := ExecutionOptions{Env: map[string]string{
+			"ZETA":  "z",
+			"ALPHA": "a",
+			"BETA":  "b",
+		}}
+		env := buildEnv(opts)
+		if env == nil {
+			t.Fatal("expected non-nil env")
+		}
+		// The last three entries are our additions, in sorted-by-key order.
+		got := env[len(env)-3:]
+		want := []string{"ALPHA=a", "BETA=b", "ZETA=z"}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("env[%d]: got %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("includes os.Environ", func(t *testing.T) {
+		t.Setenv("LAZYMAKE_TEST_MARKER", "yes")
+		opts := ExecutionOptions{Env: map[string]string{"EXTRA": "1"}}
+		env := buildEnv(opts)
+		found := false
+		for _, e := range env {
+			if e == "LAZYMAKE_TEST_MARKER=yes" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected os.Environ to be merged into result")
+		}
+	})
+}
+
+// TestExecuteStreaming_EnvIsPassedToMake verifies env vars actually reach
+// the spawned make process by echoing the variable from a recipe.
+func TestExecuteStreaming_EnvIsPassedToMake(t *testing.T) {
+	tempDir := t.TempDir()
+	makefile := tempDir + "/Makefile"
+
+	makefileContent := `.PHONY: show-env
+show-env:
+	@echo "GREETING=$(GREETING)"
+`
+	if err := os.WriteFile(makefile, []byte(makefileContent), 0644); err != nil {
+		t.Fatalf("Failed to create test Makefile: %v", err)
+	}
+
+	chunks, _ := ExecuteStreaming(
+		"show-env",
+		makefile,
+		ExecutionOptions{Env: map[string]string{"GREETING": "hello"}},
+	)
+
+	var output string
+	for chunk := range chunks {
+		output += chunk.Data
+	}
+
+	if !contains(output, "GREETING=hello") {
+		t.Errorf("expected output to contain GREETING=hello, got: %q", output)
+	}
+}
+
+// TestExecuteStreaming_FlagsReachMake passes `-n` via opts.Flags (not
+// opts.DryRun) and confirms make still prints rather than runs. This
+// is the closest "user flag was honored" check we can do without
+// reaching into argv.
+func TestExecuteStreaming_FlagsReachMake(t *testing.T) {
+	tempDir := t.TempDir()
+	makefile := tempDir + "/Makefile"
+	sentinel := tempDir + "/flags-sentinel"
+
+	makefileContent := ".PHONY: touch-it\ntouch-it:\n\ttouch " + sentinel + "\n"
+	if err := os.WriteFile(makefile, []byte(makefileContent), 0644); err != nil {
+		t.Fatalf("Failed to create test Makefile: %v", err)
+	}
+
+	chunks, _ := ExecuteStreaming(
+		"touch-it",
+		makefile,
+		ExecutionOptions{Flags: []string{"-n"}},
+	)
+	for chunk := range chunks {
+		_ = chunk
+	}
+
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Errorf("flag -n via opts.Flags should have prevented sentinel creation, stat: %v", err)
 	}
 }
 
