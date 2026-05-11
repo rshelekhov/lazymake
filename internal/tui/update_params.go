@@ -64,6 +64,12 @@ func (m *Model) initParamsForm(target *Target) {
 	m.ParamsFocus = paramsFieldEnv
 	m.ParamsTarget = target
 	m.ParamsError = ""
+	// Form starts in the normal "type and submit" sub-mode. The
+	// save-as-preset wizard (Ctrl+S) flips this to SaveName, and
+	// commitPresetName may then flip it to OverwriteConfirm.
+	m.ParamsSubMode = paramsSubModeForm
+	m.PendingPresetName = ""
+	m.PresetsStatus = ""
 }
 
 // updateRunParams handles key input while the params form is active.
@@ -72,7 +78,21 @@ func (m *Model) initParamsForm(target *Target) {
 // inputs. Enter parses both fields; on success it stores the parsed
 // values in LastRunParams and m.CurrentRunOpts, then transitions to
 // the executor (or to dangerous confirmation, for critical targets).
+//
+// Ctrl+S enters the save-as-preset wizard, Ctrl+P opens the saved
+// presets picker (issue #35). Both keep the user inside StateRunParams
+// via sub-modes so a cancel-on-error never strands them in a half-open
+// dialog.
 func (m Model) updateRunParams(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Sub-mode dispatch first — the form's main key handling only
+	// runs when we're in the "type and submit" mode.
+	switch m.ParamsSubMode {
+	case paramsSubModeSaveName:
+		return m.updateParamsSaveName(msg)
+	case paramsSubModeOverwriteConfirm:
+		return m.updateParamsOverwriteConfirm(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -84,9 +104,17 @@ func (m Model) updateRunParams(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			return m.submitParamsForm()
 		}
-		// Ctrl+C still quits.
-		if msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+s":
+			return m.handleParamsSavePreset()
+		case "ctrl+p":
+			if m.ParamsTarget == nil {
+				return m, nil
+			}
+			target := *m.ParamsTarget
+			return m.openPresetsPicker(&target, StateRunParams), nil
 		}
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
@@ -118,6 +146,9 @@ func (m Model) cancelParamsForm() Model {
 	m.State = StateList
 	m.ParamsTarget = nil
 	m.ParamsError = ""
+	m.ParamsSubMode = paramsSubModeForm
+	m.PendingPresetName = ""
+	m.PresetsStatus = ""
 	return m
 }
 

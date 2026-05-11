@@ -29,6 +29,8 @@ func (m Model) View() string {
 		return m.renderConfirmView()
 	case StateRunParams:
 		return m.renderRunParamsView()
+	case StateRunPresets:
+		return m.renderRunPresetsView()
 	case StateVariables:
 		return m.renderVariablesView()
 	case StateWorkspace:

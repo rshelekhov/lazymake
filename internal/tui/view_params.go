@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -33,13 +34,25 @@ func (m Model) renderRunParamsContent(width int) string {
 	title := TitleStyle.Render("Run Parameters")
 	util.WriteString(&builder, title+"\n\n")
 
-	// Target name
+	// Target name + (if any) saved-presets badge so users discover
+	// the Ctrl+P / Ctrl+S workflow without having to read the docs.
 	if m.ParamsTarget != nil {
 		targetInfo := lipgloss.NewStyle().
 			Foreground(PrimaryColor).
 			Bold(true).
 			Render("Target: " + m.ParamsTarget.Name)
-		util.WriteString(&builder, targetInfo+"\n")
+		util.WriteString(&builder, targetInfo)
+
+		if m.Presets != nil {
+			n := m.Presets.Count(m.MakefilePath, m.ParamsTarget.Name)
+			if n > 0 {
+				badge := lipgloss.NewStyle().
+					Foreground(TextMuted).
+					Render(fmt.Sprintf("   %d preset(s) available — Ctrl+P to load", n))
+				util.WriteString(&builder, badge)
+			}
+		}
+		util.WriteString(&builder, "\n")
 
 		if m.ParamsTarget.Description != "" {
 			desc := lipgloss.NewStyle().
@@ -60,6 +73,31 @@ func (m Model) renderRunParamsContent(width int) string {
 		Italic(true).
 		Render("Tip: KEY=value pairs in env, quote values with spaces: MSG=\"hi there\"")
 	util.WriteString(&builder, hint)
+
+	// Inline preset wizard overlay (Ctrl+S → name → optional overwrite).
+	if m.ParamsSubMode == paramsSubModeSaveName {
+		label := lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true).
+			Render("Save as preset:")
+		util.WriteString(&builder, "\n\n"+label+"\n"+m.PresetNameInput.View())
+	}
+	if m.ParamsSubMode == paramsSubModeOverwriteConfirm {
+		confirm := lipgloss.NewStyle().
+			Foreground(WarningColor).
+			Bold(true).
+			Render(fmt.Sprintf("Preset %q already exists. Overwrite? [y/n]", m.PendingPresetName))
+		util.WriteString(&builder, "\n\n"+confirm)
+	}
+
+	// Transient success message after Ctrl+S → save.
+	if m.PresetsStatus != "" && m.ParamsSubMode == paramsSubModeForm {
+		ok := lipgloss.NewStyle().
+			Foreground(SuccessColor).
+			Bold(true).
+			Render("✓ " + m.PresetsStatus)
+		util.WriteString(&builder, "\n\n"+ok)
+	}
 
 	// Inline validation error, if any
 	if m.ParamsError != "" {
@@ -97,7 +135,13 @@ func (m Model) renderRunParamsStatusBar(width int) string {
 	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, pathNugget)
 	leftWidth := lipgloss.Width(leftBar)
 
-	helpText := "enter: run • tab: switch field • esc: cancel • q: quit"
+	helpText := "enter: run • tab: switch field • ctrl+s: save preset • ctrl+p: load preset • esc: cancel"
+	switch m.ParamsSubMode {
+	case paramsSubModeSaveName:
+		helpText = "enter: confirm name • esc: back"
+	case paramsSubModeOverwriteConfirm:
+		helpText = "y: overwrite • n/esc: back"
+	}
 	right := lipgloss.NewStyle().
 		Foreground(TextMuted).
 		Padding(0, 1).
