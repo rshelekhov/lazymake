@@ -27,6 +27,8 @@ func (m Model) View() string {
 		return m.renderOutputView()
 	case StateConfirmDangerous:
 		return m.renderConfirmView()
+	case StateConfirmRerun:
+		return m.renderConfirmRerunView()
 	case StateRunParams:
 		return m.renderRunParamsView()
 	case StateRunPresets:

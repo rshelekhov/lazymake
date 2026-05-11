@@ -41,6 +41,7 @@ const (
 	StateWorkspace
 	StateRunParams   // Interactive form for env vars and make flags (issue #37)
 	StateRunPresets  // Saved presets picker for a target (issue #35)
+	StateConfirmRerun // Full-screen confirm for rerun-last (issue #36)
 )
 
 // Indices for the focused field in the run-params form.
@@ -354,6 +355,10 @@ func NewModel(cfg *config.Config) Model {
 		key.NewBinding(
 			key.WithKeys("R"),
 			key.WithHelp("R", "rerun last preset"),
+		),
+		key.NewBinding(
+			key.WithKeys("ctrl+r"),
+			key.WithHelp("ctrl+r", "rerun last execution"),
 		),
 		key.NewBinding(
 			key.WithKeys("/"),
