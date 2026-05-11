@@ -200,6 +200,27 @@ func (h *History) RecordExecutionWithParams(makefilePath, targetName string, dur
 	h.Entries[makefilePath] = entries
 }
 
+// LastExecution returns the most recent ExecutionRecord for the given
+// target if one exists. Designed for the rerun-last flow (issue #36):
+// the caller uses ExecutionRecord.Env and ExecutionRecord.Flags to
+// repeat the previous run with the same runtime parameters.
+//
+// Returns (zero, false) when the target has no recorded executions or
+// isn't tracked under makefilePath yet — both are valid no-op cases
+// for the shortcut.
+func (h *History) LastExecution(makefilePath, targetName string) (ExecutionRecord, bool) {
+	for _, entry := range h.Entries[makefilePath] {
+		if entry.Name != targetName {
+			continue
+		}
+		if len(entry.RecentExecutions) == 0 {
+			return ExecutionRecord{}, false
+		}
+		return entry.RecentExecutions[len(entry.RecentExecutions)-1], true
+	}
+	return ExecutionRecord{}, false
+}
+
 // GetPerformanceStats calculates and returns performance statistics for a target
 // Returns nil if target has no performance data
 func (h *History) GetPerformanceStats(makefilePath, targetName string) *PerformanceStats {

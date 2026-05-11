@@ -61,6 +61,96 @@ func TestRecordExecutionWithTimingOmitsParams(t *testing.T) {
 	}
 }
 
+// TestLastExecution covers the rerun-last helper added for issue #36.
+// The helper backs the ctrl+r shortcut so it must survive the same
+// edge cases as the surrounding history machinery: missing makefile,
+// missing target, target without execution records, and the happy
+// path where env/flags need to round-trip back to the caller.
+func TestLastExecution(t *testing.T) {
+	h := newEmptyHistory()
+	mkA := "/test/Makefile"
+	mkB := "/other/Makefile"
+	env := map[string]string{"FOO": "bar", "BAZ": "qux"}
+	flags := []string{"-j4", "-k"}
+
+	// Older run on "build" with no params; newer run carries env/flags.
+	h.RecordExecutionWithTiming(mkA, "build", 100*time.Millisecond, true)
+	time.Sleep(2 * time.Millisecond)
+	h.RecordExecutionWithParams(mkA, "build", 250*time.Millisecond, true, env, flags)
+	// A separate target on the same Makefile, plus a target on another
+	// Makefile, to verify isolation.
+	h.RecordExecutionWithTiming(mkA, "test", 50*time.Millisecond, true)
+	h.RecordExecutionWithTiming(mkB, "build", 80*time.Millisecond, true)
+	// Target with a use record but no execution timing (legacy path).
+	h.RecordExecution(mkA, "no-exec")
+
+	cases := []struct {
+		name        string
+		makefile    string
+		target      string
+		wantFound   bool
+		wantEnv     map[string]string
+		wantFlags   []string
+	}{
+		{
+			name:      "returns latest record with env and flags",
+			makefile:  mkA,
+			target:    "build",
+			wantFound: true,
+			wantEnv:   env,
+			wantFlags: flags,
+		},
+		{
+			name:      "returns record without params when run had none",
+			makefile:  mkA,
+			target:    "test",
+			wantFound: true,
+		},
+		{
+			name:      "isolates by makefile path",
+			makefile:  mkB,
+			target:    "build",
+			wantFound: true,
+		},
+		{
+			name:      "unknown target → not found",
+			makefile:  mkA,
+			target:    "missing",
+			wantFound: false,
+		},
+		{
+			name:      "unknown makefile → not found",
+			makefile:  "/nowhere",
+			target:    "build",
+			wantFound: false,
+		},
+		{
+			name:      "target tracked without timing → not found",
+			makefile:  mkA,
+			target:    "no-exec",
+			wantFound: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, ok := h.LastExecution(tc.makefile, tc.target)
+			if ok != tc.wantFound {
+				t.Fatalf("LastExecution(%q, %q) found=%v, want %v", tc.makefile, tc.target, ok, tc.wantFound)
+			}
+			if !tc.wantFound {
+				return
+			}
+			if !reflect.DeepEqual(rec.Env, tc.wantEnv) {
+				t.Errorf("env: got %v, want %v", rec.Env, tc.wantEnv)
+			}
+			if !reflect.DeepEqual(rec.Flags, tc.wantFlags) {
+				t.Errorf("flags: got %v, want %v", rec.Flags, tc.wantFlags)
+			}
+		})
+	}
+}
+
 func TestLoad_NonExistentFile(t *testing.T) {
 	h := &History{
 		Entries: make(map[string][]Entry),
