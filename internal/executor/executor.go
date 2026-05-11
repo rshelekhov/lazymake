@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"os"
 	"os/exec"
+	"sort"
 	"sync"
 	"time"
 )
@@ -54,28 +56,87 @@ type OutputChunk struct {
 	Err  error
 }
 
-// ExecuteStreaming runs a make target and streams output via channel.
-// When dryRun is true, the command is invoked with `make -n`, which prints
-// the recipe lines that would have been executed without actually running them.
-// Returns: channel for output chunks, cancel function.
+// ExecutionOptions controls how ExecuteStreaming invokes `make`.
 //
-// TODO(#93): replace dryRun bool with an ExecutionOptions struct once
-// interactive execution parameters (env vars, make flags) land.
-func ExecuteStreaming(target, makefilePath string, dryRun bool) (<-chan OutputChunk, func()) {
+// All fields are optional. The zero value is equivalent to a normal,
+// no-extra-env, no-extra-flags execution.
+type ExecutionOptions struct {
+	// DryRun adds `-n` (`--just-print`) so make prints recipe lines
+	// without actually running them.
+	DryRun bool
+
+	// Env are additional environment variables applied on top of
+	// os.Environ() in the spawned process. Make picks them up the same
+	// way as a regular shell would. Keys are sorted before applying
+	// so command construction is deterministic.
+	Env map[string]string
+
+	// Flags are extra arguments inserted between the makefile path and
+	// the target, e.g. ["-j4", "-k"]. They are passed through exec
+	// argv (not the shell), so no escaping is performed and no shell
+	// metacharacters are interpreted.
+	Flags []string
+}
+
+// buildArgs constructs the argv (excluding the leading "make") for the
+// given options and target. Order is:
+//
+//	-f <makefilePath> [-n] [user flags...] <target>
+//
+// `-n` is injected before user flags so users can still override or
+// extend dry-run with additional flags like `-j1`.
+func buildArgs(target, makefilePath string, opts ExecutionOptions) []string {
+	args := make([]string, 0, 3+len(opts.Flags))
+	args = append(args, "-f", makefilePath)
+	if opts.DryRun {
+		// `-n` (--just-print / --dry-run): print recipe commands without executing them.
+		// MAKEFLAGS propagates -n to recursive sub-makes automatically.
+		args = append(args, "-n")
+	}
+	args = append(args, opts.Flags...)
+	args = append(args, target)
+	return args
+}
+
+// buildEnv returns the environment for the spawned process: os.Environ()
+// plus opts.Env, with deterministic ordering (keys sorted). Returns nil
+// when opts.Env is empty so cmd.Env can stay at the os/exec default.
+func buildEnv(opts ExecutionOptions) []string {
+	if len(opts.Env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(opts.Env))
+	for k := range opts.Env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	env := os.Environ()
+	for _, k := range keys {
+		env = append(env, k+"="+opts.Env[k])
+	}
+	return env
+}
+
+// ExecuteStreaming runs a make target and streams output via channel.
+//
+// Options control dry-run mode, additional environment variables, and
+// extra make flags. The command is invoked via exec argv (no shell), so
+// values are not subject to shell interpretation.
+//
+// Returns: channel for output chunks, cancel function.
+func ExecuteStreaming(target, makefilePath string, opts ExecutionOptions) (<-chan OutputChunk, func()) {
 	chunks := make(chan OutputChunk, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		defer close(chunks)
 
-		args := []string{"-f", makefilePath}
-		if dryRun {
-			// `-n` (--just-print / --dry-run): print recipe commands without executing them.
-			// MAKEFLAGS propagates -n to recursive sub-makes automatically.
-			args = append(args, "-n")
-		}
-		args = append(args, target)
+		args := buildArgs(target, makefilePath, opts)
 		cmd := exec.CommandContext(ctx, "make", args...)
+		if env := buildEnv(opts); env != nil {
+			cmd.Env = env
+		}
 
 		// Create pipes for stdout and stderr
 		stdout, err := cmd.StdoutPipe()

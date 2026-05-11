@@ -17,6 +17,7 @@ This directory contains detailed guides and feature documentation to help you ge
 - [Recent History & Smart Search](features/history-search.md) - Fast access to frequently used targets
 - [Workspace Management](features/workspace-management.md) - Work with multiple Makefiles across projects
 - [Performance Profiling](features/performance-tracking.md) - Track execution times and detect regressions
+- [Interactive Execution Parameters](features/execution-parameters.md) - Run a target with custom env vars and make flags
 - [Export & Shell Integration](features/export-shell-integration.md) - Export results and integrate with shell history
 
 ## Product Planning

@@ -27,6 +27,8 @@ func (m Model) View() string {
 		return m.renderOutputView()
 	case StateConfirmDangerous:
 		return m.renderConfirmView()
+	case StateRunParams:
+		return m.renderRunParamsView()
 	case StateVariables:
 		return m.renderVariablesView()
 	case StateWorkspace:
@@ -353,6 +355,12 @@ func (m Model) renderOutputView() string {
 			Render("[DRY-RUN]")
 	}
 	util.WriteString(&builder, header+"\n")
+
+	// Echo run parameters (issue #37) so the output clearly reflects
+	// the env vars and make flags that were applied to this run.
+	if paramsLine := renderParamsLine(m.LastRunOpts); paramsLine != "" {
+		util.WriteString(&builder, paramsLine+"\n")
+	}
 
 	// Check for performance regression
 	for _, target := range m.Targets {

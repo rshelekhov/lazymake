@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/config"
@@ -37,6 +38,13 @@ const (
 	StateConfirmDangerous
 	StateVariables
 	StateWorkspace
+	StateRunParams // Interactive form for env vars and make flags (issue #37)
+)
+
+// Indices for the focused field in the run-params form.
+const (
+	paramsFieldEnv   = 0
+	paramsFieldFlags = 1
 )
 
 type Model struct {
@@ -79,6 +87,31 @@ type Model struct {
 
 	// Confirmation state
 	PendingTarget *Target // Target awaiting dangerous command confirmation
+
+	// Interactive execution parameters (issue #37).
+	// ParamsEnvInput and ParamsFlagsInput are lazily initialized on first
+	// openParamsForm call so we don't allocate textinputs for users who
+	// never open the form. ParamsFocus tracks which input is active.
+	// ParamsTarget pins the target the form was opened for so cursor
+	// movement in the list doesn't change what gets executed.
+	// ParamsError holds the latest validation error, displayed inline.
+	// LastRunParams caches the last submitted params per target name so
+	// reopening the form pre-fills the previous values; it lives only
+	// for the current session.
+	// CurrentRunOpts carries parsed params from the form through the
+	// (optional) dangerous-confirmation step into the executor and on
+	// to history/export bookkeeping in handleExecutionComplete.
+	ParamsEnvInput   textinput.Model
+	ParamsFlagsInput textinput.Model
+	ParamsFocus      int
+	ParamsTarget     *Target
+	ParamsError      string
+	LastRunParams    map[string]ExecutionParams
+	CurrentRunOpts   executor.ExecutionOptions
+	// LastRunOpts mirrors CurrentRunOpts at the moment a run finished,
+	// so the output view can display the env/flags that were used even
+	// after CurrentRunOpts is cleared.
+	LastRunOpts executor.ExecutionOptions
 
 	// Execution timing
 	ExecutionStartTime time.Time
@@ -254,6 +287,10 @@ func NewModel(cfg *config.Config) Model {
 			key.WithHelp("enter", "run"),
 		),
 		key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", "run with params"),
+		),
+		key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "filter"),
 		),
@@ -348,6 +385,7 @@ func NewModel(cfg *config.Config) Model {
 		Highlighter:       highlighter,
 		KeyBindings:       keyBindings,
 		StreamingOutput:   &strings.Builder{},
+		LastRunParams:     make(map[string]ExecutionParams),
 	}
 }
 

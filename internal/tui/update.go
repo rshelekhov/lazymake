@@ -44,6 +44,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateVariables(msg)
 	case StateWorkspace:
 		return m.updateWorkspace(msg)
+	case StateRunParams:
+		return m.updateRunParams(msg)
 	default:
 		return m, nil
 	}
@@ -105,6 +107,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleGraphView()
 	case "enter":
 		return m.handleTargetSelection()
+	case "e":
+		return m.handleOpenParamsForm()
 	case "ctrl+d":
 		m.RecipeViewport.HalfPageDown()
 		return m, nil
@@ -220,13 +224,20 @@ func (m Model) handleGraphView() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleTargetSelection executes or confirms the selected target
+// handleTargetSelection executes or confirms the selected target.
+// This is the quick-run path (Enter from the list) — no env/flags;
+// the parameterized path goes through handleOpenParamsForm.
 func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 	selected := m.List.SelectedItem()
 	target, ok := selected.(Target)
 	if !ok {
 		return m, nil
 	}
+
+	// Plain Enter must never inherit params from a previous form
+	// submission. Reset CurrentRunOpts so dangerous-confirm and
+	// startExecution see a clean slate.
+	m.CurrentRunOpts = executor.ExecutionOptions{DryRun: m.DryRun}
 
 	// Check if target is critical and requires confirmation
 	if target.IsDangerous && target.DangerLevel == safety.SeverityCritical {
@@ -236,32 +247,7 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Safe or non-critical target - execute immediately.
-	// In dry-run mode we skip history recording so preview-only runs
-	// don't pollute the RECENT list or perf stats (issue #38).
-	if !m.DryRun {
-		m.History.RecordExecution(m.MakefilePath, target.Name)
-		_ = m.History.Save()
-
-		// Refresh recent targets for next render
-		recentEntries := m.History.GetRecent(m.MakefilePath)
-		m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
-	}
-
-	m.State = StateExecuting
-	m.ExecutingTarget = target.Name
-	m.ExecutionStartTime = time.Now()
-	m.ExecutionElapsed = 0
-
-	// Reset streaming output and initialize viewport
-	m.StreamingOutput = &strings.Builder{}
-	m.initExecutingViewport()
-
-	return m, tea.Batch(
-		executeTargetStreaming(target.Name, m.MakefilePath, m.DryRun),
-		tickTimer(),
-		m.Spinner.Tick,
-	)
+	return m.startExecution(target, m.CurrentRunOpts)
 }
 
 // handleWindowResize updates dimensions and layout when window size changes
@@ -607,9 +593,17 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 	// integration entries. We still build the Result for the output view
 	// so the user can read what `make -n` printed.
 	if !m.DryRun {
-		// Record execution with timing data
+		// Record execution with timing data and (if present) the
+		// interactive-form parameters from issue #37.
 		success := err == nil
-		m.History.RecordExecutionWithTiming(m.MakefilePath, m.ExecutingTarget, duration, success)
+		m.History.RecordExecutionWithParams(
+			m.MakefilePath,
+			m.ExecutingTarget,
+			duration,
+			success,
+			m.CurrentRunOpts.Env,
+			m.CurrentRunOpts.Flags,
+		)
 		_ = m.History.Save() // Async, ignore errors
 	}
 
@@ -633,11 +627,17 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 
 	// Export execution result (async, non-blocking) — skipped in dry-run.
 	if m.Exporter != nil && !m.DryRun {
+		// Snapshot params before the goroutine so the cleanup below
+		// can clear CurrentRunOpts without racing.
+		env := m.CurrentRunOpts.Env
+		flags := m.CurrentRunOpts.Flags
 		go func() {
-			record := export.NewExecutionRecord(
+			record := export.NewExecutionRecordWithParams(
 				m.MakefilePath,
 				m.ExecutingTarget,
 				result,
+				env,
+				flags,
 			)
 			if err := m.Exporter.Export(record); err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
@@ -668,15 +668,20 @@ func (m Model) handleExecutionComplete(err error) (tea.Model, tea.Cmd) {
 		m.List.SetItems(updatedItems)
 	}
 
-	// Transition to output view
+	// Transition to output view. Pin LastRunOpts so the output header
+	// can show env/flags even after we clear CurrentRunOpts.
+	m.LastRunOpts = m.CurrentRunOpts
+
 	m.State = StateOutput
 	m.Output = m.StreamingOutput.String()
 	m.ExecutionError = err
 	m.initViewport(m.Output)
 
-	// Clean up
+	// Clean up: drop CurrentRunOpts so a subsequent quick-Enter doesn't
+	// inherit the last run's parameters.
 	m.CancelExecution = nil
 	m.OutputChunks = nil
+	m.CurrentRunOpts = executor.ExecutionOptions{}
 
 	return m, nil
 }
@@ -802,35 +807,18 @@ func (m Model) updateConfirmDangerous(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Per ACR for #38: dangerous targets still show this confirm
 			// dialog in dry-run mode, but the actual run uses `make -n`
 			// and skips history recording.
+			//
+			// Per issue #37: if the user arrived here via the params
+			// form, m.CurrentRunOpts carries the parsed env+flags.
+			// For the plain Enter-from-list path CurrentRunOpts is the
+			// zero value, with DryRun still respected via startExecution.
 			if m.PendingTarget != nil {
 				target := *m.PendingTarget
-
-				if !m.DryRun {
-					// Record execution in history
-					m.History.RecordExecution(m.MakefilePath, target.Name)
-					_ = m.History.Save()
-
-					// Refresh recent targets
-					recentEntries := m.History.GetRecent(m.MakefilePath)
-					m.RecentTargets = buildRecentTargets(recentEntries, m.Targets)
-				}
-
-				// Clear pending target and start execution
 				m.PendingTarget = nil
-				m.State = StateExecuting
-				m.ExecutingTarget = target.Name
-				m.ExecutionStartTime = time.Now()
-				m.ExecutionElapsed = 0
 
-				// Reset streaming output and initialize viewport
-				m.StreamingOutput = &strings.Builder{}
-				m.initExecutingViewport()
-
-				return m, tea.Batch(
-					executeTargetStreaming(target.Name, m.MakefilePath, m.DryRun),
-					tickTimer(),   // Start timer
-					m.Spinner.Tick, // Start spinner animation
-				)
+				opts := m.CurrentRunOpts
+				opts.DryRun = m.DryRun // session flag always wins over stale form state
+				return m.startExecution(target, opts)
 			}
 		}
 
@@ -865,11 +853,11 @@ func tickTimer() tea.Cmd {
 }
 
 // executeTargetStreaming starts streaming execution.
-// When dryRun is true, the executor invokes `make -n` to preview commands
-// without running them.
-func executeTargetStreaming(target, makefilePath string, dryRun bool) tea.Cmd {
+// Options control dry-run mode, additional env vars, and extra make
+// flags. See executor.ExecutionOptions for details.
+func executeTargetStreaming(target, makefilePath string, opts executor.ExecutionOptions) tea.Cmd {
 	return func() tea.Msg {
-		chunks, cancel := executor.ExecuteStreaming(target, makefilePath, dryRun)
+		chunks, cancel := executor.ExecuteStreaming(target, makefilePath, opts)
 		return streamStartedMsg{chunks: chunks, cancel: cancel}
 	}
 }

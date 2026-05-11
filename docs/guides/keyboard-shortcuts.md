@@ -9,6 +9,7 @@ Complete reference of all keyboard shortcuts in lazymake, organized by view.
 | `↑` / `↓` | Navigate up/down through targets |
 | `j` / `k` | Vim-style navigation (up/down) |
 | `Enter` | Execute the selected target |
+| `e` | Run the selected target with env vars and make flags (opens parameters form) |
 | `g` | View dependency graph for selected target |
 | `v` | Open variable inspector |
 | `w` | Open workspace picker to switch Makefiles |
@@ -72,6 +73,20 @@ Complete reference of all keyboard shortcuts in lazymake, organized by view.
 | `?` | Return to list view |
 | `Esc` | Return to list view |
 | `q` | Quit lazymake |
+| `Ctrl+C` | Quit lazymake |
+
+## Run Parameters Form
+
+Opened from the main list with `e` to set per-execution env vars and make flags
+(see [Interactive execution parameters](../features/execution-parameters.md)).
+
+| Key | Action |
+|-----|--------|
+| Type characters | Edit the focused field (env or flags) |
+| `Tab` | Switch focus between the env and flags fields |
+| `Shift+Tab` | Switch focus (reverse) |
+| `Enter` | Validate inputs and run the target |
+| `Esc` | Cancel and return to the list with no side effects |
 | `Ctrl+C` | Quit lazymake |
 
 ## Search/Filter Mode
