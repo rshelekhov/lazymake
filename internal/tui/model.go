@@ -21,6 +21,7 @@ import (
 	"github.com/rshelekhov/lazymake/internal/highlight"
 	"github.com/rshelekhov/lazymake/internal/history"
 	"github.com/rshelekhov/lazymake/internal/makefile"
+	"github.com/rshelekhov/lazymake/internal/presets"
 	"github.com/rshelekhov/lazymake/internal/safety"
 	"github.com/rshelekhov/lazymake/internal/shell"
 	"github.com/rshelekhov/lazymake/internal/variables"
@@ -38,13 +39,32 @@ const (
 	StateConfirmDangerous
 	StateVariables
 	StateWorkspace
-	StateRunParams // Interactive form for env vars and make flags (issue #37)
+	StateRunParams   // Interactive form for env vars and make flags (issue #37)
+	StateRunPresets  // Saved presets picker for a target (issue #35)
 )
 
 // Indices for the focused field in the run-params form.
 const (
 	paramsFieldEnv   = 0
 	paramsFieldFlags = 1
+)
+
+// Sub-modes inside StateRunParams. The form ↔ save-name prompt ↔
+// overwrite confirmation transitions stay inside StateRunParams so we
+// don't proliferate top-level AppState values for what is essentially
+// a wizard flow.
+const (
+	paramsSubModeForm              = 0
+	paramsSubModeSaveName          = 1
+	paramsSubModeOverwriteConfirm  = 2
+)
+
+// Sub-modes inside StateRunPresets. The picker pivots between the
+// main list and a delete confirmation overlay; both share the same
+// container so escape always returns to the list cleanly.
+const (
+	presetsSubModeList          = 0
+	presetsSubModeDeleteConfirm = 1
 )
 
 type Model struct {
@@ -112,6 +132,43 @@ type Model struct {
 	// so the output view can display the env/flags that were used even
 	// after CurrentRunOpts is cleared.
 	LastRunOpts executor.ExecutionOptions
+
+	// Saved run presets (issue #35). Presets is the on-disk store of
+	// named (env, flags) configurations; it may be nil if Load() failed
+	// at startup — every caller must nil-check before use to keep the
+	// app running gracefully without persistent presets.
+	//
+	// PresetsItems/PresetsCursor are the visible UI state for the
+	// picker; rebuilt every time the picker opens so additions or
+	// deletes don't strand a stale snapshot.
+	//
+	// PresetsTarget pins the target the picker was opened for so list
+	// navigation behind the picker doesn't change what gets executed.
+	//
+	// PresetsReturnTo decides where Enter/Esc lands: when opened from
+	// the list it's StateList (Enter starts execution); when opened
+	// from the params form via Ctrl+P it's StateRunParams (Enter
+	// populates the form inputs and returns there).
+	//
+	// PresetsSubMode toggles between the main list and a delete
+	// confirmation overlay; PresetsPendingDelete stores the name of
+	// the preset awaiting confirmation.
+	//
+	// ParamsSubMode + PresetNameInput drive the save-as-preset wizard
+	// that lives inside StateRunParams. PendingPresetName carries the
+	// typed name into the overwrite confirmation step.
+	Presets             *presets.Manager
+	PresetsItems        []presets.Preset
+	PresetsCursor       int
+	PresetsTarget       *Target
+	PresetsReturnTo     AppState
+	PresetsError        string
+	PresetsStatus       string // transient success message (e.g. after save)
+	PresetsSubMode      int
+	PresetsPendingDelete string
+	ParamsSubMode       int
+	PresetNameInput     textinput.Model
+	PendingPresetName   string
 
 	// Execution timing
 	ExecutionStartTime time.Time
@@ -289,6 +346,14 @@ func NewModel(cfg *config.Config) Model {
 		key.NewBinding(
 			key.WithKeys("e"),
 			key.WithHelp("e", "run with params"),
+		),
+		key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "presets"),
+		),
+		key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "rerun last preset"),
 		),
 		key.NewBinding(
 			key.WithKeys("/"),
@@ -479,6 +544,10 @@ func (m Model) SwitchWorkspace(newMakefilePath string, cfg *config.Config) Model
 	newModel.Width = m.Width
 	newModel.Height = m.Height
 	newModel.WorkspaceManager = m.WorkspaceManager
+	// Presets is a global store keyed by absolute Makefile path, so
+	// the same manager works for the new workspace — preserving it
+	// avoids re-reading presets.json on every workspace switch.
+	newModel.Presets = m.Presets
 
 	// Initialize recipe viewport if dimensions are available
 	if newModel.Width > 0 && newModel.Height > 0 {

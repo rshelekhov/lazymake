@@ -46,6 +46,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWorkspace(msg)
 	case StateRunParams:
 		return m.updateRunParams(msg)
+	case StateRunPresets:
+		return m.updateRunPresets(msg)
 	default:
 		return m, nil
 	}
@@ -109,6 +111,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleTargetSelection()
 	case "e":
 		return m.handleOpenParamsForm()
+	case "p":
+		return m.handleOpenPresetsPicker()
+	case "R":
+		return m.handleRerunLastUsed()
 	case "ctrl+d":
 		m.RecipeViewport.HalfPageDown()
 		return m, nil

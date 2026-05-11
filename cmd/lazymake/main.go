@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rshelekhov/lazymake/config"
+	"github.com/rshelekhov/lazymake/internal/presets"
 	"github.com/rshelekhov/lazymake/internal/tui"
 	"github.com/rshelekhov/lazymake/internal/workspace"
 	"github.com/spf13/cobra"
@@ -47,8 +48,17 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceMgr = workspace.NewEmpty()
 	}
 
+	// Initialize saved presets manager (issue #35). Failures here
+	// degrade gracefully: an empty manager means "no presets yet",
+	// the rest of the TUI works as before.
+	presetsMgr, err := presets.Load()
+	if err != nil {
+		presetsMgr = presets.NewEmpty()
+	}
+
 	m := tui.NewModel(cfg)
 	m.WorkspaceManager = workspaceMgr
+	m.Presets = presetsMgr
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
