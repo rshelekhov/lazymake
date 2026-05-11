@@ -115,12 +115,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOpenPresetsPicker()
 	case "R":
 		return m.handleRerunLastUsed()
-	case "ctrl+d":
-		m.RecipeViewport.HalfPageDown()
-		return m, nil
-	case "ctrl+u":
-		m.RecipeViewport.HalfPageUp()
-		return m, nil
+	case "ctrl+d", "ctrl+u":
+		return m.handleRecipeHalfPage(msg.String())
 	case "down", "j":
 		m = navigateToTarget(m, true)
 		m = updateRecipeViewportContent(m)
@@ -140,6 +136,19 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m = updateRecipeViewportContent(m)
 
 	return m, cmd
+}
+
+// handleRecipeHalfPage scrolls the recipe preview viewport by half a
+// page in the direction requested via the bound ctrl+d / ctrl+u keys.
+// Extracted from handleKeyPress so the dispatcher stays under the
+// gocyclo limit configured in .golangci.yml.
+func (m Model) handleRecipeHalfPage(key string) (tea.Model, tea.Cmd) {
+	if key == "ctrl+d" {
+		m.RecipeViewport.HalfPageDown()
+	} else {
+		m.RecipeViewport.HalfPageUp()
+	}
+	return m, nil
 }
 
 // navigateToTarget moves to next/previous Target, skipping headers and separators
