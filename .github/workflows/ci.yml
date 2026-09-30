@@ -68,3 +68,20 @@ jobs:
 
     - name: Build
       run: go build -v ./cmd/lazymake
+
+  nix:
+    name: Nix Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v31
+
+    - name: Build flake
+      run: nix build -L
+
+    - name: Check flake
+      run: nix flake check -L
