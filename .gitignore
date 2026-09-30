@@ -5,4 +5,4 @@
 # Build artifacts
 lazymake
 dist/
-result/
+result
