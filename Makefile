@@ -1,19 +1,19 @@
 .PHONY: build install test lint lint-fix clean run release snapshot
 
 BINARY_NAME := lazymake
-VERSION = 1.0.0
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GOFLAGS = -v -race
-LDFLAGS = -ldflags "-X main.version=$(VERSION)"
+LDFLAGS = -ldflags "-X github.com/rshelekhov/lazymake/version.Version=$(VERSION)"
 BUILD_DIR ?= ./bin
 
 build: ## Build the application
-	go build -o lazymake cmd/lazymake/main.go
+	go build $(LDFLAGS) -o lazymake ./cmd/lazymake
 
 install: ## Install to GOPATH/bin (requires GOPATH/bin in PATH)
-	go install ./cmd/lazymake
+	go install $(LDFLAGS) ./cmd/lazymake
 
 install-system: ## Install to /usr/local/bin (requires sudo)
-	go build -o lazymake cmd/lazymake/main.go
+	go build $(LDFLAGS) -o lazymake ./cmd/lazymake
 	sudo mv lazymake /usr/local/bin/
 
 run: ## Run the application without installing
