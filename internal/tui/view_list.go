@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/rshelekhov/lazymake/internal/safety"
@@ -427,15 +426,15 @@ func (m Model) renderStatusBar() string {
 	leftBar := m.buildLeftStatusBar(stats)
 	helpText := m.getHelpText()
 
-	return m.assembleStatusBar(leftBar, helpText)
+	return assembleStatusBar(m.Width, leftBar, helpText)
 }
 
 // targetStats holds counts of different target types
 type targetStats struct {
-	total      int
-	dangerous  int
-	critical   int
-	regressed  int
+	total     int
+	dangerous int
+	critical  int
+	regressed int
 }
 
 // countTargetStats counts unique targets by category
@@ -473,122 +472,87 @@ func (m Model) countTargetStats() targetStats {
 
 // buildLeftStatusBar creates the left side of the status bar with stats
 func (m Model) buildLeftStatusBar(stats targetStats) string {
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	plainNuggetStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Padding(0, 1)
-
-	yellowNuggetStyle := lipgloss.NewStyle().
-		Foreground(WarningColor).
-		Padding(0, 1)
-
 	var sections []string
 
 	// Dry-run badge (most prominent — always at the very left).
 	// Mirrors the workspace-path nugget styling (same foreground/padding,
 	// just a different background) so weight and tone are consistent.
 	if m.DryRun {
-		dryRunNuggetStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-			Background(WarningColor).
-			Padding(0, 1).
-			MarginRight(1)
-		sections = append(sections, dryRunNuggetStyle.Render("DRY-RUN"))
+		sections = append(sections, dryRunNugget("DRY-RUN"))
 	}
 
 	// Workspace path (colored)
-	workspacePath := m.getWorkspaceDisplayPath()
-	sections = append(sections, coloredNuggetStyle.Render(workspacePath))
+	sections = append(sections, coloredNugget(m.getWorkspaceDisplayPath()))
 
 	// Target count
-	sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%d targets", stats.total)))
+	sections = append(sections, plainNugget(fmt.Sprintf("%d targets", stats.total)))
 
 	// Dangerous count
 	if stats.dangerous > 0 {
 		dangerIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
-		sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%s %d dangerous", dangerIcon, stats.dangerous)))
+		sections = append(sections, plainNugget(fmt.Sprintf("%s %d dangerous", dangerIcon, stats.dangerous)))
 	}
 
 	// Critical count
 	if stats.critical > 0 {
 		criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
-		sections = append(sections, plainNuggetStyle.Render(fmt.Sprintf("%s %d critical", criticalIcon, stats.critical)))
+		sections = append(sections, plainNugget(fmt.Sprintf("%s %d critical", criticalIcon, stats.critical)))
 	}
 
 	// Regressed count
 	if stats.regressed > 0 {
-		sections = append(sections, yellowNuggetStyle.Render(fmt.Sprintf("%d regressed", stats.regressed)))
+		sections = append(sections, warnNugget(fmt.Sprintf("%d regressed", stats.regressed)))
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, sections...)
 }
 
-// getHelpText returns appropriate help text based on selected item
+// getHelpText returns appropriate help text for the bottom bar.
+//
+// The bar intentionally shows a slim 3–4-key default — the full
+// keymap lives behind `?` (StateKeymap). Contextual overrides hide
+// keys that would not do anything in the current state, so the bar
+// never lies by omission and never advertises a no-op.
 func (m Model) getHelpText() string {
-	item := m.List.SelectedItem()
-	if item == nil {
-		return formatKeyBindings(m.KeyBindings)
+	// Filter mode intercepts every key except enter/esc, so advertise
+	// only what actually works.
+	if m.IsFiltering {
+		return "enter: apply • esc: cancel"
 	}
 
-	target, ok := item.(Target)
-	if !ok || !target.IsDangerous {
-		return formatKeyBindings(m.KeyBindings)
+	// Dangerous-target contextual hint — preserved from the previous
+	// behavior: when the cursor sits on a flagged target, the bar
+	// turns into a confirmation prompt.
+	if item := m.List.SelectedItem(); item != nil {
+		if target, ok := item.(Target); ok && target.IsDangerous {
+			switch target.DangerLevel {
+			case safety.SeverityCritical:
+				criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
+				return criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
+			case safety.SeverityWarning:
+				warningIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
+				return warningIcon + " Warning • enter: run • esc: cancel • q: quit"
+			case safety.SeverityInfo:
+				infoIcon := lipgloss.NewStyle().Foreground(SecondaryColor).Render("○")
+				return infoIcon + " Info • enter: run • esc: cancel • q: quit"
+			}
+		}
 	}
 
-	switch target.DangerLevel {
-	case safety.SeverityCritical:
-		criticalIcon := lipgloss.NewStyle().Foreground(ErrorColor).Render("○")
-		return criticalIcon + " Critical • enter: confirm • esc: cancel • q: quit"
-	case safety.SeverityWarning:
-		warningIcon := lipgloss.NewStyle().Foreground(WarningColor).Render("○")
-		return warningIcon + " Warning • enter: run • esc: cancel • q: quit"
-	case safety.SeverityInfo:
-		infoIcon := lipgloss.NewStyle().Foreground(SecondaryColor).Render("○")
-		return infoIcon + " Info • enter: run • esc: cancel • q: quit"
-	default:
-		return formatKeyBindings(m.KeyBindings)
+	// Empty list (no Makefile, or filter returned nothing) — there
+	// is no target to run, so `enter: run` would be misleading.
+	hasTargets := false
+	for _, item := range m.List.Items() {
+		if _, ok := item.(Target); ok {
+			hasTargets = true
+			break
+		}
 	}
-}
-
-// assembleStatusBar combines all status bar components
-func (m Model) assembleStatusBar(leftBar, helpText string) string {
-	leftWidth := lipgloss.Width(leftBar)
-
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
-
-	// Middle section fills remaining space
-	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-
-	return lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Width(m.Width).
-		Padding(1, 1).
-		Render(bar)
-}
-
-// formatKeyBindings formats key bindings as "key: description • key: description • ..."
-func formatKeyBindings(bindings []key.Binding) string {
-	var parts []string
-	for _, binding := range bindings {
-		help := binding.Help()
-		parts = append(parts, help.Key+": "+help.Desc)
+	if !hasTargets {
+		return "/: filter • ?: keys • q: quit"
 	}
-	return strings.Join(parts, " • ")
+
+	return "enter: run • /: filter • ?: keys • q: quit"
 }
 
 // renderPerformanceSection returns context-aware performance info

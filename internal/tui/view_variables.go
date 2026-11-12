@@ -119,70 +119,23 @@ func (m Model) renderVariablesStatusBar() string {
 	usedVars := countUsedVariables(m.Variables)
 	unusedVars := totalVars - usedVars
 
-	// Base status bar style
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary)
+	sections := []string{coloredNugget(fmt.Sprintf("%d variables", totalVars))}
 
-	// Colored nugget style (only for first item)
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	// Plain nugget style (inherits status bar background, just text)
-	plainNuggetStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Padding(0, 1)
-
-	// Total variables nugget (only colored one)
-	totalNugget := coloredNuggetStyle.Render(fmt.Sprintf("%d variables", totalVars))
-
-	var sections []string
-	sections = append(sections, totalNugget)
-
-	// Used variables (plain text on status bar background)
 	if usedVars > 0 {
-		usedInfo := plainNuggetStyle.Render(fmt.Sprintf("%d used", usedVars))
-		sections = append(sections, usedInfo)
+		sections = append(sections, plainNugget(fmt.Sprintf("%d used", usedVars)))
 	}
-
-	// Unused variables (plain text on status bar background)
 	if unusedVars > 0 {
-		unusedInfo := plainNuggetStyle.Render(fmt.Sprintf("%d unused", unusedVars))
-		sections = append(sections, unusedInfo)
+		sections = append(sections, plainNugget(fmt.Sprintf("%d unused", unusedVars)))
 	}
 
 	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
-	leftWidth := lipgloss.Width(leftBar)
 
-	// Help text on the right (add scroll hint if scrollable)
 	helpText := "v/esc: return • q: quit"
 	if m.VariablesViewport.TotalLineCount() > m.VariablesViewport.VisibleLineCount() {
 		helpText = "↑/↓: scroll • " + helpText
 	}
 
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
-
-	// Middle section fills remaining space
-	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
-	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	// Combine all sections
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-
-	return statusBarStyle.
-		Width(m.Width).
-		Padding(1, 1).
-		Render(bar)
+	return assembleStatusBar(m.Width, leftBar, helpText)
 }
 
 // renderVariableBlock renders a single variable's information

@@ -34,7 +34,7 @@ const (
 	StateList AppState = iota
 	StateExecuting
 	StateOutput
-	StateHelp
+	StateKeymap // Full keyboard cheat sheet (opened via `?`)
 	StateGraph
 	StateConfirmDangerous
 	StateVariables
@@ -369,8 +369,16 @@ func NewModel(cfg *config.Config) Model {
 			key.WithHelp("g", "dependency graph"),
 		),
 		key.NewBinding(
+			key.WithKeys("v"),
+			key.WithHelp("v", "variables"),
+		),
+		key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "workspaces"),
+		),
+		key.NewBinding(
 			key.WithKeys("?"),
-			key.WithHelp("?", "help"),
+			key.WithHelp("?", "keys"),
 		),
 		key.NewBinding(
 			key.WithKeys("q"),

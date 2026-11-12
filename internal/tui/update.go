@@ -32,8 +32,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateList(msg)
 	case StateOutput:
 		return m.updateOutput(msg)
-	case StateHelp:
-		return m.updateHelp(msg)
+	case StateKeymap:
+		return m.updateKeymap(msg)
 	case StateGraph:
 		return m.updateGraph(msg)
 	case StateConfirmDangerous:
@@ -97,7 +97,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.FilterInput = ""
 		return m, nil
 	case "?":
-		m.State = StateHelp
+		m.State = StateKeymap
 		return m, nil
 	case "v":
 		m.State = StateVariables
@@ -457,7 +457,7 @@ func (m Model) updateOutput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateKeymap(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {

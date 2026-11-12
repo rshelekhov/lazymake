@@ -70,7 +70,6 @@ func (m Model) renderWorkspaceListContainer(width, height int) string {
 
 // renderWorkspaceStatusBar renders the status bar for workspace view
 func (m Model) renderWorkspaceStatusBar() string {
-	// Count stats
 	items := m.WorkspaceList.Items()
 	favoriteCount := 0
 	workspaceCount := 0
@@ -83,35 +82,15 @@ func (m Model) renderWorkspaceStatusBar() string {
 		}
 	}
 
-	// Base status bar style
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary)
-
-	// Colored nugget style (only for first item)
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	// Plain nugget style (inherits status bar background, just text)
-	plainNuggetStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Padding(0, 1)
-
-	// Workspaces count nugget (only colored one)
 	var label string
 	if workspaceCount == 1 {
 		label = "1 workspace"
 	} else {
 		label = fmt.Sprintf("%d workspaces", workspaceCount)
 	}
-	workspacesNugget := coloredNuggetStyle.Render(label)
 
-	var sections []string
-	sections = append(sections, workspacesNugget)
+	sections := []string{coloredNugget(label)}
 
-	// Favorites count (plain text on status bar background)
 	if favoriteCount > 0 {
 		var favLabel string
 		if favoriteCount == 1 {
@@ -119,35 +98,11 @@ func (m Model) renderWorkspaceStatusBar() string {
 		} else {
 			favLabel = fmt.Sprintf("%d favorites", favoriteCount)
 		}
-		favoriteInfo := plainNuggetStyle.Render(favLabel)
-		sections = append(sections, favoriteInfo)
+		sections = append(sections, plainNugget(favLabel))
 	}
 
-	// Calculate width used by nuggets
 	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
-	leftWidth := lipgloss.Width(leftBar)
-
-	// Right side: help text
 	helpText := "enter: switch • f: favorite • esc/w: cancel • q: quit"
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
 
-	// Middle section fills remaining space
-	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
-	middleWidth := max(m.Width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	// Combine all sections
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-
-	return statusBarStyle.
-		Width(m.Width).
-		Padding(1, 1).
-		Render(bar)
+	return assembleStatusBar(m.Width, leftBar, helpText)
 }

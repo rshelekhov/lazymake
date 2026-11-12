@@ -179,39 +179,12 @@ func humanizeTime(t time.Time) string {
 // renderPresetsStatusBar mirrors the params/graph views: workspace
 // nugget on the left, contextual help on the right.
 func (m Model) renderPresetsStatusBar(width int) string {
-	statusBarStyle := lipgloss.NewStyle().Foreground(TextPrimary)
-
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	workspacePath := m.getWorkspaceDisplayPath()
-	pathNugget := coloredNuggetStyle.Render(workspacePath)
-
-	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, pathNugget)
-	leftWidth := lipgloss.Width(leftBar)
+	leftBar := coloredNugget(m.getWorkspaceDisplayPath())
 
 	helpText := "enter: run • e: edit • d: delete • esc: cancel • q: quit"
 	if m.PresetsSubMode == presetsSubModeDeleteConfirm {
 		helpText = "y: confirm • n/esc: cancel • q: quit"
 	}
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
 
-	middleWidth := max(width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-	return statusBarStyle.
-		Width(width).
-		Padding(1, 1).
-		Render(bar)
+	return assembleStatusBar(width, leftBar, helpText)
 }

@@ -6,3 +6,5 @@
 lazymake
 dist/
 result
+
+.mnemex/

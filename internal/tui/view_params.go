@@ -121,19 +121,7 @@ func (m Model) renderRunParamsContent(width int) string {
 // renderRunParamsStatusBar mirrors the dependency-graph status bar:
 // workspace path nugget on the left, shortcuts on the right.
 func (m Model) renderRunParamsStatusBar(width int) string {
-	statusBarStyle := lipgloss.NewStyle().Foreground(TextPrimary)
-
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	workspacePath := m.getWorkspaceDisplayPath()
-	pathNugget := coloredNuggetStyle.Render(workspacePath)
-
-	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, pathNugget)
-	leftWidth := lipgloss.Width(leftBar)
+	leftBar := coloredNugget(m.getWorkspaceDisplayPath())
 
 	helpText := "enter: run • tab: switch field • ctrl+s: save preset • ctrl+p: load preset • esc: cancel"
 	switch m.ParamsSubMode {
@@ -142,25 +130,8 @@ func (m Model) renderRunParamsStatusBar(width int) string {
 	case paramsSubModeOverwriteConfirm:
 		helpText = "y: overwrite • n/esc: back"
 	}
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
 
-	// Account for status bar horizontal padding (1 left + 1 right = 2).
-	middleWidth := max(width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-
-	return statusBarStyle.
-		Width(width).
-		Padding(1, 1).
-		Render(bar)
+	return assembleStatusBar(width, leftBar, helpText)
 }
 
 // renderParamsLine formats env+flags as a single-line header for the
