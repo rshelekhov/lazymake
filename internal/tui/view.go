@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rshelekhov/lazymake/internal/graph"
 	"github.com/rshelekhov/lazymake/internal/history"
-	"github.com/rshelekhov/lazymake/internal/makefile"
 	"github.com/rshelekhov/lazymake/internal/util"
 )
 
@@ -19,8 +18,8 @@ func (m Model) View() string {
 	switch m.State {
 	case StateExecuting:
 		return m.renderExecutingView()
-	case StateHelp:
-		return m.renderHelpView()
+	case StateKeymap:
+		return m.renderKeymapView()
 	case StateGraph:
 		return m.renderGraphView()
 	case StateOutput:
@@ -69,95 +68,89 @@ func (m Model) renderErrorView() string {
 	return containerStyle.Render(content)
 }
 
-// renderHelpView displays all targets with their descriptions
-func (m Model) renderHelpView() string {
-	// Build the help content
-	var helpContent string
+// renderKeymapView displays the full keyboard cheat sheet.
+//
+// The bar in StateList intentionally shows only a handful of keys;
+// every action exposed by lazymake is enumerated here, grouped by
+// purpose. Triggered by `?` from the main list.
+func (m Model) renderKeymapView() string {
+	if m.Width == 0 || m.Height == 0 {
+		return "Loading keyboard shortcuts..."
+	}
 
-	// Title
-	title := TitleStyle.Render("Makefile Targets - Help")
-	helpContent += title + "\n\n"
+	title := TitleStyle.Render("Keyboard Shortcuts")
 
-	// Description
-	desc := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Render("Available targets:\n")
-	helpContent += desc + "\n"
+	keyStyle := lipgloss.NewStyle().Foreground(PrimaryColor).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(TextSecondary)
+	sectionStyle := lipgloss.NewStyle().Foreground(TextMuted).Bold(true).PaddingTop(1)
 
-	// List all targets with descriptions
-	if len(m.Targets) == 0 {
-		helpContent += lipgloss.NewStyle().
-			Foreground(TextMuted).
-			Render("  No targets found\n")
-	} else {
-		// Find the longest target name for alignment
-		maxNameLen := 0
-		for _, target := range m.Targets {
-			if len(target.Name) > maxNameLen {
-				maxNameLen = len(target.Name)
-			}
+	// keymapEntry renders one "key  description" line, with the key
+	// right-padded so descriptions line up across an entire section.
+	// Width 8 = "ctrl+r" (6 chars, the longest key) + 2-space gap.
+	const keyColWidth = 8
+	keymapEntry := func(k, desc string) string {
+		padded := k
+		for len(padded) < keyColWidth {
+			padded += " "
 		}
+		return "  " + keyStyle.Render(padded) + descStyle.Render(desc)
+	}
 
-		// Render each target with aligned descriptions
-		for _, target := range m.Targets {
-			// Target name with color
-			targetName := lipgloss.NewStyle().
-				Foreground(PrimaryColor).
-				Bold(true).
-				Render(target.Name)
+	type section struct {
+		title   string
+		entries [][2]string
+	}
 
-			// Calculate padding to align descriptions
-			padding := maxNameLen - len(target.Name) + 2 // +2 for spacing
+	sections := []section{
+		{
+			title: "Run",
+			entries: [][2]string{
+				{"enter", "run selected target"},
+				{"e", "run with params (env / make flags)"},
+				{"p", "open saved presets for target"},
+				{"R", "rerun last preset"},
+				{"ctrl+r", "rerun last execution"},
+			},
+		},
+		{
+			title: "Navigation",
+			entries: [][2]string{
+				{"/", "filter targets"},
+				{"g", "dependency graph"},
+				{"v", "variable inspector"},
+				{"w", "workspace picker"},
+			},
+		},
+		{
+			title: "Other",
+			entries: [][2]string{
+				{"?", "this cheat sheet"},
+				{"esc", "back / cancel"},
+				{"q", "quit"},
+			},
+		},
+	}
 
-			targetLine := "  " + targetName
-
-			// Add description with appropriate style and alignment
-			if target.Description != "" {
-				var descStyle lipgloss.Style
-				if target.CommentType == makefile.CommentDouble {
-					descStyle = DocDescriptionStyle
-				} else {
-					descStyle = DescriptionStyle
-				}
-				// Add padding spaces before description
-				for range padding {
-					targetLine += " "
-				}
-				targetLine += descStyle.Render(target.Description)
-			}
-
-			helpContent += targetLine + "\n"
+	var builder strings.Builder
+	util.WriteString(&builder, title+"\n")
+	for _, s := range sections {
+		util.WriteString(&builder, sectionStyle.Render(s.title)+"\n")
+		for _, e := range s.entries {
+			util.WriteString(&builder, keymapEntry(e[0], e[1])+"\n")
 		}
 	}
 
-	// Legend - use plain formatting to avoid lipgloss layout issues
-	helpContent += "\n"
-	helpContent += "Legend:\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(TextSecondary).Render("Gray") + " = ## documented target (recommended)\n"
-	helpContent += "  " + lipgloss.NewStyle().Foreground(TextMuted).Render("Gray Dark") + " = # regular comment\n"
-
-	// Wrap in a container with padding (no width constraint to avoid layout issues)
+	// Match the bordered container used by graph / params / presets /
+	// variables / workspace so all secondary views share a visual frame.
 	containerStyle := lipgloss.NewStyle().
-		Padding(1, 2)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(BorderColor).
+		Padding(1, 2).
+		Width(m.Width - 2)
+	content := containerStyle.Render(builder.String())
 
-	content := containerStyle.Render(helpContent)
-
-	// Status bar with lipgloss-style nuggets
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextSecondary).
-		Background(BackgroundSubtle)
-
-	helpText := "?: toggle help • g: graph • esc: return • q: quit"
-	rightStyle := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Align(lipgloss.Right)
-
-	bar := statusBarStyle.
-		Width(m.Width).
-		Render(rightStyle.Render(helpText))
-
-	return content + "\n" + bar
+	statusBar := assembleStatusBar(m.Width, "", "esc: return • q: quit")
+	return content + "\n" + statusBar
 }
 
 // renderGraphView displays the dependency graph for the selected target
@@ -287,53 +280,9 @@ func (m Model) renderGraphContent(width int) string {
 
 // renderGraphStatusBar renders the keyboard controls in status bar format
 func (m Model) renderGraphStatusBar(width int) string {
-	// Base status bar style - with background for entire bar
-	statusBarStyle := lipgloss.NewStyle().
-		Foreground(TextPrimary)
-
-	// Colored nugget style (only for first item)
-	coloredNuggetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(PrimaryColor).
-		Padding(0, 1).
-		MarginRight(1)
-
-	// Workspace path nugget (only colored one)
-	workspacePath := m.getWorkspaceDisplayPath()
-	pathNugget := coloredNuggetStyle.Render(workspacePath)
-
-	var sections []string
-	sections = append(sections, pathNugget)
-
-	// Calculate width used by nuggets
-	leftBar := lipgloss.JoinHorizontal(lipgloss.Top, sections...)
-	leftWidth := lipgloss.Width(leftBar)
-
-	// Right side: shortcuts
+	leftBar := coloredNugget(m.getWorkspaceDisplayPath())
 	helpText := "g/esc: return • +/-: depth • o: order • c: critical • p: parallel • q: quit"
-
-	// Right section with help text
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-	rightWidth := lipgloss.Width(right)
-
-	// Middle section fills remaining space
-	// Account for status bar horizontal padding (2 chars: 1 left + 1 right)
-	middleWidth := max(width-2-leftWidth-rightWidth, 1)
-	middle := lipgloss.NewStyle().
-		Width(middleWidth).
-		Align(lipgloss.Left).
-		Render("")
-
-	// Combine all sections
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, leftBar, middle, right)
-
-	return statusBarStyle.
-		Width(width).
-		Padding(1, 1).
-		Render(bar)
+	return assembleStatusBar(width, leftBar, helpText)
 }
 
 // renderOutputView displays output of the executed target
@@ -401,18 +350,9 @@ func (m Model) renderOutputView() string {
 		// Width(innerWidth)
 		Width(contentWidth)
 
-	// Status bar matching main view style
-	helpText := "esc: return • q: quit"
-	right := lipgloss.NewStyle().
-		Foreground(TextMuted).
-		Padding(0, 1).
-		Render(helpText)
-
-	statusBar := lipgloss.NewStyle().
-		Foreground(TextPrimary).
-		Width(m.Width).
-		Padding(1, 1).
-		Render(right)
+	// Status bar matching main view style (empty left side — this view
+	// only needs the help hint).
+	statusBar := assembleStatusBar(m.Width, "", "esc: return • q: quit")
 
 	return "\n" + viewportStyle.Render(builder.String()) + "\n" + statusBar
 }
