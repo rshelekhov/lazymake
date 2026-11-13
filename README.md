@@ -10,6 +10,9 @@
 
 A terminal UI for browsing and running Makefile targets.
 
+> [!NOTE]
+> **lazymake is feature-frozen.** It works and existing releases remain available, but no new features are planned. Issues and pull requests may go unanswered. If you need something it doesn't do, feel free to fork it — it's MIT-licensed.
+
 <img src="docs/assets/demo.gif" alt="Demo" width="100%" style="max-width: 909px;">
 
 ## Quick Start
@@ -165,7 +168,7 @@ Yes. Add target names to `exclude_targets` in `.lazymake.yaml`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+The project is feature-frozen, so new feature PRs are unlikely to be merged. For anything bigger than a small fix, consider forking. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup.
 
 ## License
 
