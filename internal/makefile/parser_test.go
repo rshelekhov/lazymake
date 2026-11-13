@@ -1144,3 +1144,49 @@ another-real: ## Another real target
 		}
 	}
 }
+
+func TestParsePatternRules(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "Makefile")
+
+	content := `.PHONY: build
+
+build: ## Build everything
+	go build ./...
+
+build-%: ## Build one module
+	go build ./cmd/$*
+
+%.o: %.c
+	cc -c $< -o $@
+`
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	targets, err := Parse(testFile)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	want := map[string]bool{"build": false, "build-%": true, "%.o": true}
+	if len(targets) != len(want) {
+		t.Fatalf("expected %d targets, got %v", len(want), getTargetNames(targets))
+	}
+	for _, target := range targets {
+		isPattern, ok := want[target.Name]
+		if !ok {
+			t.Errorf("unexpected target %q", target.Name)
+			continue
+		}
+		if target.IsPatternRule != isPattern {
+			t.Errorf("%s: IsPatternRule = %v, want %v", target.Name, target.IsPatternRule, isPattern)
+		}
+		if target.Name == "%.o" && len(target.Dependencies) != 0 {
+			t.Errorf("%%.o: pattern prerequisites should not become graph dependencies, got %v", target.Dependencies)
+		}
+		if target.Name == "build-%" && len(target.Recipe) != 1 {
+			t.Errorf("build-%%: expected 1 recipe line, got %v", target.Recipe)
+		}
+	}
+}

@@ -42,6 +42,7 @@ const (
 	StateRunParams   // Interactive form for env vars and make flags (issue #37)
 	StateRunPresets  // Saved presets picker for a target (issue #35)
 	StateConfirmRerun // Full-screen confirm for rerun-last (issue #36)
+	StatePatternStem  // Stem prompt before running a pattern rule like build-%
 )
 
 // Indices for the focused field in the run-params form.
@@ -171,6 +172,16 @@ type Model struct {
 	PresetNameInput     textinput.Model
 	PendingPresetName   string
 
+	// Stem prompt for pattern rules (see pattern.go). StemTarget is the
+	// pattern target being resolved, StemNext says where to go once the
+	// stem is entered, and LastStems remembers the last stem per pattern
+	// for this session so repeated runs are one keystroke.
+	StemInput  textinput.Model
+	StemTarget *Target
+	StemNext   stemAction
+	StemError  string
+	LastStems  map[string]string
+
 	// Execution timing
 	ExecutionStartTime time.Time
 	ExecutionElapsed   time.Duration
@@ -249,10 +260,11 @@ func convertAndEnrichWithSafety(targets []makefile.Target, safetyCfg *safety.Con
 	tuiTargets := make([]Target, len(targets))
 	for i, t := range targets {
 		tuiTargets[i] = Target{
-			Name:        t.Name,
-			Description: t.Description,
-			CommentType: t.CommentType,
-			Recipe:      t.Recipe,
+			Name:          t.Name,
+			Description:   t.Description,
+			CommentType:   t.CommentType,
+			Recipe:        t.Recipe,
+			IsPatternRule: t.IsPatternRule,
 		}
 
 		// Populate safety fields if target was flagged

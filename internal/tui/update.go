@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -50,6 +51,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateRunPresets(msg)
 	case StateConfirmRerun:
 		return m.updateConfirmRerun(msg)
+	case StatePatternStem:
+		return m.updatePatternStem(msg)
 	default:
 		return m, nil
 	}
@@ -260,7 +263,17 @@ func (m Model) handleTargetSelection() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if target.IsPatternRule {
+		return m.openStemPrompt(target, stemActionRun), textinput.Blink
+	}
+	return m.runTarget(target)
+}
 
+// runTarget is the plain-Enter run path for a concrete target: it
+// routes critical targets through the dangerous confirmation and
+// starts execution for everything else. Shared by list selection and
+// the pattern-rule stem prompt.
+func (m Model) runTarget(target Target) (tea.Model, tea.Cmd) {
 	// Plain Enter must never inherit params from a previous form
 	// submission. Reset CurrentRunOpts so dangerous-confirm and
 	// startExecution see a clean slate.

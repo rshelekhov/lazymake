@@ -29,6 +29,9 @@ func (m Model) handleOpenPresetsPicker() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if target.IsPatternRule {
+		return m.openStemPrompt(target, stemActionPresets), textinput.Blink
+	}
 	return m.openPresetsPicker(&target, StateList), nil
 }
 
