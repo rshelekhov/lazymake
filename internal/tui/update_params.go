@@ -21,6 +21,9 @@ func (m Model) handleOpenParamsForm() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if target.IsPatternRule {
+		return m.openStemPrompt(target, stemActionParams), textinput.Blink
+	}
 
 	m.initParamsForm(&target)
 	m.State = StateRunParams

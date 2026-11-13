@@ -32,6 +32,8 @@ func (m Model) View() string {
 		return m.renderRunParamsView()
 	case StateRunPresets:
 		return m.renderRunPresetsView()
+	case StatePatternStem:
+		return m.renderPatternStemView()
 	case StateVariables:
 		return m.renderVariablesView()
 	case StateWorkspace:

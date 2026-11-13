@@ -23,6 +23,11 @@ type Target struct {
 	CommentType  CommentType
 	Dependencies []string // List of target names this target depends on
 	Recipe       []string // Recipe lines (commands to execute)
+
+	// IsPatternRule is true for pattern rules such as `build-%` or `%.o`.
+	// Make expands the `%` at invocation time, so these cannot be run
+	// as-is: the caller has to substitute a concrete stem first.
+	IsPatternRule bool
 }
 
 // commentInfo holds information about a comment
@@ -192,11 +197,12 @@ func processTargetLine(line string, targets *[]Target, currentTargets []*Target,
 	names := strings.FieldsSeq(targetName)
 	for name := range names {
 		*targets = append(*targets, Target{
-			Name:         name,
-			Description:  finalDesc,
-			CommentType:  finalType,
-			Dependencies: depList,
-			Recipe:       nil,
+			Name:          name,
+			Description:   finalDesc,
+			CommentType:   finalType,
+			Dependencies:  depList,
+			Recipe:        nil,
+			IsPatternRule: strings.Contains(name, "%"),
 		})
 	}
 

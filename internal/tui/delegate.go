@@ -22,6 +22,10 @@ type Target struct {
 	CommentType makefile.CommentType
 	IsRecent    bool // Marks targets that appear in recent history
 
+	// IsPatternRule marks pattern rules like `build-%`. Running one
+	// first asks for the stem that replaces `%`.
+	IsPatternRule bool
+
 	// Recipe and safety fields
 	Recipe           []string             // Command lines to execute
 	LanguageOverride string               // Manual language override for syntax highlighting
@@ -192,6 +196,11 @@ func (d ItemDelegate) buildTitle(target Target, icon string, iconColor, titleCol
 	}
 	nameStyled := lipgloss.NewStyle().Foreground(titleColor).Render(target.Name)
 	titleParts = append(titleParts, nameStyled)
+	// The marker lives here rather than in FilterValue so it doesn't
+	// leak into fuzzy search matches.
+	if target.IsPatternRule {
+		titleParts = append(titleParts, lipgloss.NewStyle().Foreground(TextMuted).Render(PatternMarker))
+	}
 	return strings.Join(titleParts, " ")
 }
 
@@ -229,6 +238,9 @@ const (
 	IconInfo           = "ℹ" // Info
 	IconArrowRight     = "▸" // Right arrow (selected)
 )
+
+// PatternMarker is appended to the title of pattern-rule targets.
+const PatternMarker = "[pattern]"
 
 // shouldShowDurationBadge returns true if we should show duration badge for this target
 func shouldShowDurationBadge(target Target) bool {
