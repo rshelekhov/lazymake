@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-13
+
+This is the last planned feature release: lazymake is now feature-frozen. It keeps working and existing releases stay available, but no new features are planned.
+
 ### Added
 
 - Dry-run mode (#38): preview target execution via `make -n` without running the recipe. Activate session-wide via the `--dry-run` CLI flag or `dry_run: true` in `.lazymake.yaml`. CLI flag overrides the config. Dangerous-target confirmation still fires; history, exports, and shell integration entries are skipped. A `DRY-RUN` badge in the status bar and `make -n` in the executing/output headers indicate the active mode.
 - Interactive execution parameters (#37): press `e` on a target in the list to open a pre-run form for setting per-execution environment variables (`KEY=value` pairs, quoted values supported) and make flags (e.g. `-j4 -k --always-make`). Tab toggles focus between the two fields, Enter runs, Esc cancels without side effects. Parameters are echoed in the executing/output header and recorded in history and export entries. Dangerous targets still go through confirmation after the form. The last-used parameters per target are remembered for the current session.
 - Rerun last execution (#36): press `ctrl+r` on a target in the list to repeat its most recent run with the same environment variables and make flags. A full-screen confirmation shows the equivalent `make` command before execution starts. Survives restarts because the previous parameters are read from `history.json` (not in-memory session state). If the target is critical-dangerous, the safety details are embedded into the rerun confirmation so the user only confirms once. Independent of `R` (rerun last preset, #35): `R` runs the last-used named preset, `ctrl+r` repeats the actual last execution regardless of whether it used a preset.
+- Saved run presets (#35): save the env vars and make flags from the params form as a named preset with `ctrl+s`, and load one back with `ctrl+p`. Press `p` on a target to open the presets picker (Enter runs, `e` edits, `d` deletes) and `R` to rerun the last-used preset. Presets are stored per Makefile in `presets.json` in the user cache directory.
+- Pattern rule targets (#49): targets like `build-%` or `%.o` are marked with `[pattern]` in the list. Enter, `e` or `p` on one first asks for the stem, with a live `make build-foo` preview, then continues through the usual flow (safety confirmation, params, presets, history). The last stem per pattern is remembered for the session.
+- Nix flake (#45): `nix run github:rshelekhov/lazymake` and `nix profile install github:rshelekhov/lazymake`.
 
 ### Changed
 
+- Unified status bar across all views (#48): the list view shows a short hint (`enter: run • /: filter • ?: keys • q: quit`), and the full shortcut reference moved to a keymap view opened with `?`.
 - `executor.ExecuteStreaming` now takes an `ExecutionOptions` struct instead of a `dryRun bool`. Callers outside the TUI must migrate to the new signature.
+
+### Fixed
+
+- Release and `make build` binaries recorded `lazymake_version: dev` in export records; the version is now injected into `version.Version` at build time (#47)
 
 ## [0.4.1] - 2026-03-27
 
